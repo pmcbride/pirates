@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(open http://localhost:4173/)",
+      "Bash(git add *)",
+      "Bash(git commit -m 'Initial commit: Phaser game setup *)"
+    ]
+  }
+}

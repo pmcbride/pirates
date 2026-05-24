@@ -252,6 +252,14 @@ const drawerContent = (state: AppState): string => {
             Sound: ${state.profile.settings.muted ? "Muted" : "On"}
           </button>
           <p class="drawer-copy">Silences whooshes, pops, and victory horns. Haptic taps stay on.</p>
+          <button data-action="toggle-skip-prediction" class="drawer-toggle">
+            Skip Prediction: ${state.profile.settings.skipPrediction ? "On" : "Off"}
+          </button>
+          <p class="drawer-copy">Predict-then-run asks you to guess where the ship will land before each voyage. Turn this on to hop straight into playback.</p>
+          <button data-action="toggle-always-suggested" class="drawer-toggle">
+            Always Pre-load Full Plan: ${state.profile.settings.alwaysShowSuggested ? "On" : "Off"}
+          </button>
+          <p class="drawer-copy">After the first try at a voyage the dock only shows the first stamp. Turn this on to always start from the full suggested plan.</p>
         </section>
       `;
     case "map": {
@@ -366,6 +374,7 @@ interface MissionScaffold {
   palette: HTMLElement;
   drawerHost: HTMLElement;
   pickerHost: HTMLElement;
+  predictHost: HTMLElement;
   // Fingerprints of last-rendered inputs per region.
   fingerprints: {
     objective: string;
@@ -376,6 +385,7 @@ interface MissionScaffold {
     palette: string;
     drawer: string;
     picker: string;
+    predict: string;
     isRunning: boolean;
   };
   // Map of queued-command instanceId → rendered <article> + last fingerprint.
@@ -460,6 +470,19 @@ export class Hud {
         break;
       case "toggle-muted":
         gameStore.toggleMuted();
+        break;
+      case "toggle-skip-prediction":
+        gameStore.toggleSkipPrediction();
+        break;
+      case "toggle-always-suggested":
+        gameStore.toggleAlwaysShowSuggested();
+        break;
+      case "confirm-prediction":
+        gameStore.confirmPrediction();
+        break;
+      case "skip-prediction":
+        gameStore.toggleSkipPrediction();
+        gameStore.runActiveMission();
         break;
       case "add-command":
         if (templateId) {
@@ -734,12 +757,22 @@ export class Hud {
     const mission = state.rewardMissionId ? missions[state.rewardMissionId] : null;
     const reward = state.lastRun?.reward;
     const lastLog = state.profile.captainLog.at(-1);
+    const prediction = state.lastPredictionCorrect;
 
     return `
       <section class="reward-overlay">
         <div class="reward-copy">
           <p class="eyebrow">Treasure Recovered</p>
           <h2>${escapeHtml(mission?.label ?? "Voyage Clear")}</h2>
+          ${
+            prediction !== null
+              ? `<p class="prediction-feedback">${
+                  prediction
+                    ? "⭐ You guessed it! The ship landed right where you predicted."
+                    : "Close — try the next one!"
+                }</p>`
+              : ""
+          }
           <div class="reward-row">
             <span class="stat-pill">💰 ${escapeHtml(formatBerries(reward?.berries ?? 0))}</span>
             <span class="stat-pill bounty" aria-label="Bounty">🏴‍☠️ +${escapeHtml(formatBounty(reward?.bounty ?? 0))}</span>
@@ -797,6 +830,9 @@ export class Hud {
     // Picker host stays in the DOM but only has content while a picker is open;
     // empty innerHTML when closed.
     const pickerHost = Hud.makeElement(`<div class="picker-host"></div>`);
+    // Predict host shows the speech-bubble banner only while mission is in
+    // the "predicting" phase.
+    const predictHost = Hud.makeElement(`<div class="predict-host"></div>`);
 
     dock.appendChild(dockHead);
     dock.appendChild(queueList);
@@ -806,6 +842,7 @@ export class Hud {
     layer.appendChild(status);
     layer.appendChild(rail);
     layer.appendChild(hintHost);
+    layer.appendChild(predictHost);
     layer.appendChild(dock);
     layer.appendChild(drawerHost);
     layer.appendChild(pickerHost);
@@ -822,6 +859,7 @@ export class Hud {
       palette,
       drawerHost,
       pickerHost,
+      predictHost,
       fingerprints: {
         objective: "",
         status: "",
@@ -831,6 +869,7 @@ export class Hud {
         palette: "",
         drawer: "",
         picker: "",
+        predict: "",
         isRunning: false,
       },
       queueNodes: new Map(),
@@ -846,6 +885,8 @@ export class Hud {
 
     const m = this.mission;
     const isRunning = state.missionPhase === "running";
+    const isPredicting = state.missionPhase === "predicting";
+    const locked = isRunning || isPredicting;
 
     // — Objective chip
     const objFp = `${mission.id}|${mission.label}|${mission.sea}|${mission.objective.primary}`;
@@ -880,40 +921,82 @@ export class Hud {
     }
 
     // — Hint banner (toggle existence / refresh content only when hint changes)
-    const hintFp = hintFingerprint(state.activeHint);
+    const hintFp = `${hintFingerprint(state.activeHint)}|${state.lastPredictionCorrect ?? "n"}`;
     if (hintFp !== m.fingerprints.hint) {
+      const feedback =
+        state.lastPredictionCorrect !== null
+          ? `<p class="prediction-feedback">${
+              state.lastPredictionCorrect
+                ? "⭐ You guessed where the ship would land!"
+                : "Close — try the next one!"
+            }</p>`
+          : "";
       m.hintHost.innerHTML = state.activeHint
         ? `
           <section class="hint-banner surface-card">
             <p class="eyebrow">💬 Gentle Rewind</p>
             <strong>${escapeHtml(state.activeHint.reason)}</strong>
             <p>${escapeHtml(state.activeHint.suggestion)}</p>
+            ${feedback}
           </section>
         `
         : "";
       m.fingerprints.hint = hintFp;
     }
 
-    // — Dock head (depends on isRunning + mission tutorial only)
-    const dockHeadFp = `${isRunning ? "r" : "p"}|${mission.tutorial}`;
+    // — Predict banner (mounted only while predicting)
+    const predictFp = isPredicting
+      ? `predict|${state.predictedEndPosition ? `${state.predictedEndPosition.x},${state.predictedEndPosition.y}` : "none"}`
+      : "";
+    if (predictFp !== m.fingerprints.predict) {
+      m.predictHost.innerHTML = isPredicting
+        ? `
+          <section class="predict-banner surface-card">
+            <p class="eyebrow">🔮 Predict First</p>
+            <strong>Where will the ship end up?</strong>
+            <p>Tap a tile on the map to drop your guess, then run the plan.</p>
+            <div class="predict-actions">
+              <button
+                data-action="confirm-prediction"
+                class="primary-cta"
+                ${state.predictedEndPosition ? "" : "disabled"}
+              >▶ Run plan!</button>
+              <button data-action="skip-prediction" class="ghost-link">
+                Skip prediction
+              </button>
+            </div>
+          </section>
+        `
+        : "";
+      m.fingerprints.predict = predictFp;
+    }
+
+    // — Dock head (depends on phase + mission tutorial only)
+    const phaseChar = isRunning ? "r" : isPredicting ? "x" : "p";
+    const dockHeadFp = `${phaseChar}|${mission.tutorial}`;
     if (dockHeadFp !== m.fingerprints.dockHead) {
+      const h3Text = isRunning
+        ? "Captain's plan is sailing"
+        : isPredicting
+          ? "Predict before you sail"
+          : "Build the route";
       m.dockHead.innerHTML = `
         <div>
           <p class="eyebrow">Command Queue</p>
-          <h3>${isRunning ? "Captain's plan is sailing" : "Build the route"}</h3>
+          <h3>${h3Text}</h3>
           <p>${escapeHtml(mission.tutorial)}</p>
         </div>
         <div class="dock-actions">
-          <button ${isRunning ? "disabled" : ""} data-action="clear-queue">Clear</button>
-          <button ${isRunning ? "disabled" : ""} data-action="reset-queue">Reset</button>
-          <button ${isRunning ? "disabled" : ""} data-action="run-mission" class="primary-cta">▶ Run Plan</button>
+          <button ${locked ? "disabled" : ""} data-action="clear-queue">Clear</button>
+          <button ${locked ? "disabled" : ""} data-action="reset-queue">Reset</button>
+          <button ${locked ? "disabled" : ""} data-action="run-mission" class="primary-cta">▶ Run Plan</button>
         </div>
       `;
       m.fingerprints.dockHead = dockHeadFp;
     }
 
-    // — Palette grid (depends on mission palette + isRunning)
-    const paletteFp = `${mission.id}|${isRunning ? "r" : "p"}`;
+    // — Palette grid (depends on mission palette + locked)
+    const paletteFp = `${mission.id}|${locked ? "l" : "u"}`;
     if (paletteFp !== m.fingerprints.palette) {
       m.palette.innerHTML = mission.palette
         .map((templateId) => {
@@ -921,7 +1004,7 @@ export class Hud {
           const icon = iconFor(templateId as keyof typeof iconMap);
           return `
             <button
-              ${isRunning ? "disabled" : ""}
+              ${locked ? "disabled" : ""}
               class="palette-card ${accentMap[template.accent as keyof typeof accentMap] ?? "accent-blue"}"
               data-action="add-command"
               data-template-id="${templateId}"
@@ -938,7 +1021,7 @@ export class Hud {
     }
 
     // — Queue list (keyed reconcile + active class) — the whole point of this PR.
-    this.reconcileQueueList(state, isRunning);
+    this.reconcileQueueList(state, locked);
 
     // — Drawer host
     const drawerFp = drawerFingerprint(state);

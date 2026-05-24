@@ -890,3 +890,53 @@ canvas {
     scroll-behavior: auto !important;
   }
 }
+
+/* Predict-then-run beat */
+.predict-banner {
+  position: absolute;
+  left: 1rem;
+  top: 13rem;
+  width: min(82vw, 460px);
+  padding: 1.1rem 1.2rem 1.2rem;
+  z-index: 6;
+}
+
+.predict-banner strong {
+  font-family: var(--display-font);
+  font-size: 1.3rem;
+  color: var(--ink);
+  display: block;
+  margin: 0.2rem 0;
+}
+
+.predict-banner p {
+  margin: 0.3rem 0 0.7rem;
+  color: var(--ink-soft);
+}
+
+.predict-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.ghost-link {
+  background: transparent;
+  border: none;
+  color: var(--ink-soft);
+  text-decoration: underline;
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 0.4rem 0.6rem;
+}
+
+.ghost-link:hover {
+  color: var(--ink);
+}
+
+.prediction-feedback {
+  margin: 0.4rem 0 0;
+  font-weight: 600;
+  color: var(--ink);
+}

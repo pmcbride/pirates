@@ -32,15 +32,25 @@ World map ─► Mission planning ─► Plan execution ─► Resolution
    Starter Cove → Raftel. The player taps the next unlocked island. The map
    docket previews the reward and the one new concept the mission will teach.
 2. **Mission planning.** Bottom dock holds the **command queue** (drag/tap stamps
-   in) and the **block palette** (only the blocks this lesson cares about). A
-   suggested queue is pre-loaded the first time so the child never faces an empty
-   canvas. They tweak, reorder, or rebuild it.
-3. **Plan execution.** The Going Merry runs the queue beat-by-beat. Each block
+   in) and the **block palette** (only the blocks this lesson cares about). On a
+   mission's first attempt, the suggested queue is pre-loaded so the child never
+   faces an empty canvas. On subsequent attempts, only the first stamp is
+   pre-loaded — the kid has to think the rest through (a "Reset to Suggested"
+   button is always available as a safety net, and parents can enable a settings
+   toggle to always pre-load the full plan).
+3. **Predict-then-run.** Before playback starts (every mission except the
+   tutorial), the playfield enters a tap-to-predict overlay: "Where will the
+   ship end up?" The player drops a marker on a tile and confirms with "Run
+   plan!". After playback the reward (or hint) screen reports whether the
+   prediction was right — converting passive watching into active reasoning per
+   Wing/Bers/Resnick research on early CT. A "Skip prediction" link on the
+   predict screen persists in the profile for parents who want to opt out.
+4. **Plan execution.** The Going Merry runs the queue beat-by-beat. Each block
    highlights as it executes. On a hit (treasure, enemy, recruit) the affected
    tile pops and a 1-word callout fires. On a failure the ship freezes mid-beat,
    the offending block pulses, and a **speech bubble** from a relevant Straw Hat
    says what went wrong and what to add.
-4. **Resolution.** Success ⇒ Reward screen (berries + stars + new toy) and a
+5. **Resolution.** Success ⇒ Reward screen (berries + stars + new toy) and a
    single line of **Captain's Log** ("Day 14 — Cleared Spark Shoals, took the
    Marine skiff with one shot."). Failure ⇒ player drops back into planning with
    the queue intact and the hint pinned.
@@ -253,8 +263,10 @@ only. If publication is ever considered, all of the following must be renamed
   Need to test whether 5-year-olds reliably drag stamps from palette to queue,
   or whether tap-to-append is the only used path. Possibly remove HTML5 drag in
   v1.1 if telemetry confirms.
-- **Reading load:** the suggested-queue safety net might let kids beat missions
-  without engaging the lesson. Mitigation: after a successful run with the
-  unedited suggested queue, the next mission's suggested queue is *empty*.
+- **Reading load:** the suggested-queue safety net let kids beat missions
+  without engaging the lesson. Implemented mitigation: only the *first* attempt
+  pre-loads the full suggested queue; subsequent attempts start with a single
+  stamp (a "Reset to Suggested" button is always available, and parents can
+  re-enable the legacy behavior via Settings → "Always pre-load full plan").
 - **Save scope:** profile is single-slot per browser. Multi-kid households will
   collide. Consider a name-picker on first launch in v1.1.

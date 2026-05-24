@@ -6,11 +6,99 @@ import type {
   AppState,
   CommandBlock,
   ConditionKind,
+  MissionDefinition,
+  MissionRunResult,
   PickerAnchor,
   PickerType,
   PlannedCommand,
   PlayerProfile,
+  Position,
 } from "./types";
+
+/**
+ * Missions where prediction is required. Tutorial is exempt so the very first
+ * experience stays friction-free.
+ */
+const PREDICTION_EXEMPT_MISSION_IDS = new Set<string>(["tutorial-cove"]);
+
+/**
+ * Pure helper: does the player need to predict before running this mission?
+ * - Tutorial is exempt.
+ * - Player can opt out via settings (skipPrediction).
+ */
+export const shouldPredictForMission = (
+  missionId: string,
+  profile: PlayerProfile,
+): boolean => {
+  if (profile.settings.skipPrediction) {
+    return false;
+  }
+  return !PREDICTION_EXEMPT_MISSION_IDS.has(missionId);
+};
+
+/**
+ * Pure helper: pick the queue to pre-load when opening a mission, based on
+ * how many times the player has attempted it and their settings.
+ *
+ * - First attempt (or alwaysShowSuggested true): full suggested queue.
+ * - Subsequent attempts: stub queue with only the first command (so the
+ *   canvas isn't empty for a pre-reader). Empty suggested queue → empty stub.
+ */
+export const pickInitialQueue = (
+  mission: MissionDefinition,
+  profile: PlayerProfile,
+): PlannedCommand[] => {
+  const attempts = profile.attemptCounts[mission.id] ?? 0;
+  if (attempts === 0 || profile.settings.alwaysShowSuggested) {
+    return cloneQueuedCommands(mission.suggestedQueue);
+  }
+  if (mission.suggestedQueue.length === 0) {
+    return [];
+  }
+  return cloneQueuedCommands([mission.suggestedQueue[0]]);
+};
+
+/**
+ * Pure helper: where did the ship actually end up?
+ *
+ * - On success: finalState.ship.position.
+ * - On failure: the position right *before* the failing step — that's where
+ *   the kid's plan effectively ran out, which is the fairest comparison for
+ *   their prediction.
+ */
+export const shipEndPositionForPrediction = (
+  result: MissionRunResult,
+): Position => {
+  if (result.success) {
+    return result.finalState.ship.position;
+  }
+
+  // Walk back from the end to find the last non-failed step's ship position.
+  const lastNonFailed = [...result.steps]
+    .reverse()
+    .find((step) => step.status !== "failed");
+  if (lastNonFailed) {
+    return lastNonFailed.ship.position;
+  }
+
+  // No successful steps at all → fall back to final state.
+  return result.finalState.ship.position;
+};
+
+/**
+ * Pure helper: compare a predicted position to the actual ship end position.
+ * Returns null when there is no prediction to score.
+ */
+export const computePredictionCorrect = (
+  predicted: Position | null,
+  result: MissionRunResult,
+): boolean | null => {
+  if (!predicted) {
+    return null;
+  }
+  const actual = shipEndPositionForPrediction(result);
+  return predicted.x === actual.x && predicted.y === actual.y;
+};
 
 type Listener = (state: AppState) => void;
 
@@ -61,6 +149,8 @@ const initialState = (): AppState => {
     playbackIndex: 0,
     rewardMissionId: null,
     openPicker: null,
+    predictedEndPosition: null,
+    lastPredictionCorrect: null,
   };
 };
 
@@ -126,13 +216,15 @@ export class GameStore {
       ...state,
       screen: "mission",
       activeMissionId: missionId,
-      queuedCommands: cloneQueuedCommands(mission.suggestedQueue),
+      queuedCommands: pickInitialQueue(mission, state.profile),
       missionPhase: "planning",
       lastRun: null,
       activeHint: null,
       selectedDrawer: null,
       playbackIndex: 0,
       openPicker: null,
+      predictedEndPosition: null,
+      lastPredictionCorrect: null,
     }));
   }
 
@@ -147,7 +239,23 @@ export class GameStore {
       selectedDrawer: null,
       playbackIndex: 0,
       openPicker: null,
+      predictedEndPosition: null,
+      lastPredictionCorrect: null,
     }));
+  }
+
+  /**
+   * Wherever the queue gets mutated, we kick back to planning and forget any
+   * pending prediction — the plan changed, so a previous mark or run is stale.
+   */
+  private resetPlanningAfterEdit(state: AppState): Partial<AppState> {
+    return {
+      activeHint: null,
+      lastRun: null,
+      missionPhase: state.missionPhase === "running" ? state.missionPhase : "planning",
+      predictedEndPosition: null,
+      lastPredictionCorrect: null,
+    };
   }
 
   addCommand(templateId: string): void {
@@ -169,8 +277,7 @@ export class GameStore {
     this.update((state) => ({
       ...state,
       queuedCommands: [...state.queuedCommands, createCommandFromTemplate(template)],
-      activeHint: null,
-      lastRun: null,
+      ...this.resetPlanningAfterEdit(state),
     }));
   }
 
@@ -178,8 +285,7 @@ export class GameStore {
     this.update((state) => ({
       ...state,
       queuedCommands: [],
-      activeHint: null,
-      lastRun: null,
+      ...this.resetPlanningAfterEdit(state),
     }));
   }
 
@@ -192,8 +298,7 @@ export class GameStore {
     this.update((state) => ({
       ...state,
       queuedCommands: cloneQueuedCommands(missions[missionId].suggestedQueue),
-      activeHint: null,
-      lastRun: null,
+      ...this.resetPlanningAfterEdit(state),
     }));
   }
 
@@ -203,8 +308,7 @@ export class GameStore {
       queuedCommands: state.queuedCommands.filter(
         (command) => command.instanceId !== instanceId,
       ),
-      activeHint: null,
-      lastRun: null,
+      ...this.resetPlanningAfterEdit(state),
     }));
   }
 
@@ -225,8 +329,7 @@ export class GameStore {
       return {
         ...state,
         queuedCommands,
-        activeHint: null,
-        lastRun: null,
+        ...this.resetPlanningAfterEdit(state),
       };
     });
   }
@@ -465,7 +568,62 @@ export class GameStore {
     }));
   }
 
+  /**
+   * Press Run. Either transitions into the predict beat (most missions) or
+   * straight into playback (tutorial, or when the player has opted out).
+   */
   runActiveMission(): void {
+    const missionId = this.state.activeMissionId;
+    if (!missionId || this.state.queuedCommands.length === 0) {
+      return;
+    }
+
+    if (shouldPredictForMission(missionId, this.state.profile)) {
+      this.update((state) => ({
+        ...state,
+        missionPhase: "predicting",
+        activeHint: null,
+        lastRun: null,
+        predictedEndPosition: null,
+        lastPredictionCorrect: null,
+      }));
+      return;
+    }
+
+    this.executeRun();
+  }
+
+  /**
+   * Predict-mode action: drop a marker on a tile. Replaces any existing mark.
+   */
+  setPrediction(position: Position): void {
+    if (this.state.missionPhase !== "predicting") {
+      return;
+    }
+    this.update((state) => ({
+      ...state,
+      predictedEndPosition: { x: position.x, y: position.y },
+    }));
+  }
+
+  /**
+   * Commit the prediction and kick off playback. No-op if there's no marker.
+   */
+  confirmPrediction(): void {
+    if (this.state.missionPhase !== "predicting") {
+      return;
+    }
+    if (!this.state.predictedEndPosition) {
+      return;
+    }
+    this.executeRun();
+  }
+
+  /**
+   * Internal: actually call the engine, bump attempt counts, and score any
+   * prediction. Used by both the predict-flow and the skip-prediction path.
+   */
+  private executeRun(): void {
     const missionId = this.state.activeMissionId;
     if (!missionId || this.state.queuedCommands.length === 0) {
       return;
@@ -477,13 +635,27 @@ export class GameStore {
       this.state.profile,
     );
 
+    const predicted = this.state.predictedEndPosition;
+    const lastPredictionCorrect = computePredictionCorrect(predicted, result);
+
+    const profile: PlayerProfile = {
+      ...this.state.profile,
+      attemptCounts: {
+        ...this.state.profile.attemptCounts,
+        [missionId]: (this.state.profile.attemptCounts[missionId] ?? 0) + 1,
+      },
+    };
+    this.persistProfile(profile);
+
     this.update((state) => ({
       ...state,
+      profile,
       missionPhase: "running",
       lastRun: result,
       activeHint: null,
       playbackIndex: 0,
       openPicker: null,
+      lastPredictionCorrect,
     }));
   }
 
@@ -571,6 +743,38 @@ export class GameStore {
       settings: {
         ...this.state.profile.settings,
         muted: !this.state.profile.settings.muted,
+      },
+    };
+    this.persistProfile(profile);
+
+    this.update((state) => ({
+      ...state,
+      profile,
+    }));
+  }
+
+  toggleSkipPrediction(): void {
+    const profile: PlayerProfile = {
+      ...this.state.profile,
+      settings: {
+        ...this.state.profile.settings,
+        skipPrediction: !this.state.profile.settings.skipPrediction,
+      },
+    };
+    this.persistProfile(profile);
+
+    this.update((state) => ({
+      ...state,
+      profile,
+    }));
+  }
+
+  toggleAlwaysShowSuggested(): void {
+    const profile: PlayerProfile = {
+      ...this.state.profile,
+      settings: {
+        ...this.state.profile.settings,
+        alwaysShowSuggested: !this.state.profile.settings.alwaysShowSuggested,
       },
     };
     this.persistProfile(profile);

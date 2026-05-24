@@ -93,10 +93,11 @@ export const commandLibrary: Record<string, CommandBlock> = {
     label: "Repeat",
     shortLabel: "Repeat",
     accent: "sunset",
-    description: "Repeat one move two or three times.",
+    description: "Repeat one or two moves two or three times.",
     defaultCount: 2,
     defaultAction: "sail",
     actionOptions: ["sail", "fire", "collect", "talk"],
+    bodyMaxLength: 2,
   },
   if: {
     id: "if",
@@ -444,17 +445,14 @@ export const missions: Record<string, MissionDefinition> = {
         condition: "enemyAhead",
         thenAction: "fire",
       }),
-      makeCommand("coral-2", "repeat", {
-        count: 3,
-        action: "sail",
-      }),
+      makeCommand("coral-2", "sail", { action: "sail" }),
       makeCommand("coral-3", "sail", { action: "sail" }),
       makeCommand("coral-4", "sail", { action: "sail" }),
-      makeCommand("coral-5", "collect", { action: "collect" }),
-      makeCommand("coral-6", "repeat", {
-        count: 2,
-        action: "sail",
-      }),
+      makeCommand("coral-5", "sail", { action: "sail" }),
+      makeCommand("coral-6", "sail", { action: "sail" }),
+      makeCommand("coral-7", "collect", { action: "collect" }),
+      makeCommand("coral-8", "sail", { action: "sail" }),
+      makeCommand("coral-9", "sail", { action: "sail" }),
     ],
   },
   "treasure-isle": {
@@ -514,8 +512,12 @@ export const missions: Record<string, MissionDefinition> = {
         thenAction: "dodge",
       }),
       makeCommand("isle-3", "repeat", {
-        count: 3,
+        count: 2,
         action: "sail",
+        body: [
+          makeCommand("isle-3a", "sail", { action: "sail" }),
+          makeCommand("isle-3b", "sail", { action: "sail" }),
+        ],
       }),
       makeCommand("isle-4", "sail", { action: "sail" }),
       makeCommand("isle-5", "if", {

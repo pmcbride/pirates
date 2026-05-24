@@ -635,6 +635,7 @@ export class Hud {
         this.renderMapInPlace(state);
         break;
       case "mission":
+      case "sandbox":
         this.renderMissionInPlace(state);
         break;
       case "reward":
@@ -661,6 +662,7 @@ export class Hud {
         layer.innerHTML = this.renderMapMarkup(state);
         break;
       case "mission":
+      case "sandbox":
         this.mountMissionScaffold(layer, state);
         break;
       case "reward":
@@ -735,7 +737,9 @@ export class Hud {
             })
             .join("")}
         </div>
-        <button data-action="open-selected-mission" class="primary-cta">⛵ Set Sail</button>
+        <button data-action="open-selected-mission" class="primary-cta">${
+          missionId === "sandbox-isle" ? "🏝️ Free Play" : "⛵ Set Sail"
+        }</button>
       </section>
       ${drawerMarkup}
     `;
@@ -883,12 +887,16 @@ export class Hud {
     const isRunning = state.missionPhase === "running";
     const isPredicting = state.missionPhase === "predicting";
     const locked = isRunning || isPredicting;
+    const isSandbox = Boolean(mission.sandbox);
 
     // — Objective chip
-    const objFp = `${mission.id}|${mission.label}|${mission.sea}|${mission.objective.primary}`;
+    const objFp = `${mission.id}|${mission.label}|${mission.sea}|${mission.objective.primary}|${isSandbox ? "s" : "m"}`;
     if (objFp !== m.fingerprints.objective) {
+      const eyebrowText = isSandbox
+        ? `${escapeHtml(mission.sea)} — Sandbox — play money`
+        : escapeHtml(mission.sea);
       m.objective.innerHTML = `
-        <p class="eyebrow">${escapeHtml(mission.sea)}</p>
+        <p class="eyebrow">${eyebrowText}</p>
         <h2>${escapeHtml(mission.label)}</h2>
         <p>${escapeHtml(mission.objective.primary)}</p>
       `;
@@ -917,7 +925,7 @@ export class Hud {
     }
 
     // — Hint banner (toggle existence / refresh content only when hint changes)
-    const hintFp = `${hintFingerprint(state.activeHint)}|${state.lastPredictionCorrect ?? "n"}`;
+    const hintFp = `${hintFingerprint(state.activeHint)}|${state.lastPredictionCorrect ?? "n"}|${isSandbox ? "s" : "m"}`;
     if (hintFp !== m.fingerprints.hint) {
       const feedback =
         state.lastPredictionCorrect !== null
@@ -927,7 +935,7 @@ export class Hud {
                 : "Close — try the next one!"
             }</p>`
           : "";
-      m.hintHost.innerHTML = state.activeHint
+      m.hintHost.innerHTML = state.activeHint && !isSandbox
         ? `
           <section class="hint-banner surface-card">
             <p class="eyebrow">💬 Gentle Rewind</p>

@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { missionNodes } from "../../sim/content";
+import { missionNodes, sandboxMissionId } from "../../sim/content";
 import { gameStore } from "../../sim/store";
 import { uiColors } from "../assets/manifest";
 
@@ -69,10 +69,14 @@ export class WorldMapScene extends Phaser.Scene {
 
     const state = gameStore.getState();
 
-    // Dotted route lines between successive islands.
-    for (let index = 0; index < missionNodes.length - 1; index += 1) {
-      const current = missionNodes[index];
-      const next = missionNodes[index + 1];
+    // Dotted route lines between successive islands. Sandbox sits off the
+    // main route — skip it so the dashed line follows the curriculum.
+    const routeNodes = missionNodes.filter(
+      (node) => node.missionId !== sandboxMissionId,
+    );
+    for (let index = 0; index < routeNodes.length - 1; index += 1) {
+      const current = routeNodes[index];
+      const next = routeNodes[index + 1];
       const x1 = (current.x / 100) * width;
       const y1 = (current.y / 100) * height;
       const x2 = (next.x / 100) * width;
@@ -90,6 +94,7 @@ export class WorldMapScene extends Phaser.Scene {
     missionNodes.forEach((node) => {
       const x = (node.x / 100) * width;
       const y = (node.y / 100) * height;
+      const isSandbox = node.missionId === sandboxMissionId;
       const unlocked = state.profile.unlockedMissionIds.includes(node.missionId);
       const complete = state.profile.completedMissionIds.includes(node.missionId);
       const selected = state.selectedMissionId === node.missionId;
@@ -104,7 +109,13 @@ export class WorldMapScene extends Phaser.Scene {
         x,
         y,
         selected ? 44 : 36,
-        complete ? uiColors.mint : unlocked ? uiColors.sun : uiColors.parchmentDeep,
+        isSandbox
+          ? uiColors.mint
+          : complete
+            ? uiColors.mint
+            : unlocked
+              ? uiColors.sun
+              : uiColors.parchmentDeep,
       );
       nodeGraphics.setStrokeStyle(6, uiColors.ink, 1);
       nodeGraphics.setInteractive({ useHandCursor: unlocked });
@@ -114,9 +125,11 @@ export class WorldMapScene extends Phaser.Scene {
         }
       });
 
-      // X-marks-the-spot for the final island, lock for the rest.
-      const marker =
-        node.missionId === "treasure-isle"
+      // X-marks-the-spot for the final island, palm tree for sandbox,
+      // lock for the rest.
+      const marker = isSandbox
+        ? "🌴"
+        : node.missionId === "treasure-isle"
           ? "✕"
           : complete
             ? "✓"

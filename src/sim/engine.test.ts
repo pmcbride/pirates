@@ -248,6 +248,78 @@ describe("mission runner", () => {
     expect(result.reward?.logLine).toContain("hauled 1 chest");
     expect(result.reward?.logLine).not.toContain("Marine");
   });
+
+  it("clears the windrise-cove East Blue practice with its sample queue", () => {
+    const profile = {
+      ...defaultProfile(),
+      commandUnlocks: ["sail", "collect", "fire", "dodge"],
+    };
+    const mission = missions["windrise-cove"];
+
+    const result = runMission(
+      mission,
+      cloneQueuedCommands(mission.suggestedQueue),
+      profile,
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.reward?.berries).toBe(110);
+    // 1M base + 2M for two Marines defeated.
+    expect(result.reward?.bounty).toBe(3_000_000);
+  });
+
+  it("clears the barrel-bay East Blue practice with its sample queue", () => {
+    const profile = {
+      ...defaultProfile(),
+      commandUnlocks: ["sail", "collect", "fire", "dodge"],
+    };
+    const mission = missions["barrel-bay"];
+
+    const result = runMission(
+      mission,
+      cloneQueuedCommands(mission.suggestedQueue),
+      profile,
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.reward?.berries).toBe(130);
+    // 2M base + 1M for the Marine defeated.
+    expect(result.reward?.bounty).toBe(3_000_000);
+  });
+
+  it("treats sandbox runs as success even when the queue does nothing useful", () => {
+    const profile = defaultProfile();
+    const mission = missions["sandbox-isle"];
+
+    const result = runMission(
+      mission,
+      cloneQueuedCommands(mission.suggestedQueue),
+      profile,
+    );
+
+    // Sandbox should always return success and never produce a reward bundle.
+    expect(result.success).toBe(true);
+    expect(result.reward).toBeUndefined();
+    expect(result.hint).toBeUndefined();
+  });
+
+  it("bounces the ship instead of failing when a sandbox queue hits an obstacle", () => {
+    const profile = defaultProfile();
+    const mission = missions["sandbox-isle"];
+
+    // Sail east 5 times: ship goes 0→1→2→3→ would hit obstacle at (4,3).
+    // Engine should bounce back to start, mark success, return no hint.
+    const queue = cloneQueuedCommands([
+      ...mission.suggestedQueue,
+      ...mission.suggestedQueue,
+    ]);
+    const result = runMission(mission, queue, profile);
+
+    expect(result.success).toBe(true);
+    expect(result.hint).toBeUndefined();
+    // After bounce, the ship should be back at the start position.
+    expect(result.finalState.ship.position).toEqual(mission.start.position);
+  });
 });
 
 describe("profile persistence", () => {

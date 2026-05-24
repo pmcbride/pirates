@@ -172,6 +172,8 @@ describe("profile migration for attemptCounts and new settings", () => {
   it("does not crash on a totally empty profile", () => {
     const profile = deserializeProfile("{}");
     expect(profile.attemptCounts).toEqual({});
-    expect(profile.unlockedMissionIds).toEqual(["tutorial-cove"]);
+    // sandbox-isle is force-merged into unlockedMissionIds by the PR-5 migration.
+    expect(profile.unlockedMissionIds).toContain("tutorial-cove");
+    expect(profile.unlockedMissionIds).toContain("sandbox-isle");
   });
 });

@@ -119,6 +119,7 @@ export interface CommandBlock {
   defaultCondition?: ConditionKind;
   actionOptions?: ActionCommandId[];
   conditionOptions?: ConditionKind[];
+  bodyMaxLength?: number;
 }
 
 export interface PlannedCommand {
@@ -129,6 +130,28 @@ export interface PlannedCommand {
   count?: number;
   condition?: ConditionKind;
   thenAction?: ActionCommandId;
+  /**
+   * Optional inner sequence for loop commands. When present and non-empty,
+   * the engine runs each body action per iteration; the legacy `action`
+   * field is ignored. Cap is enforced by the picker / store helpers
+   * (see `CommandBlock.bodyMaxLength`).
+   */
+  body?: PlannedCommand[];
+}
+
+export type PickerType = "ifCondition" | "ifAction";
+
+export interface PickerAnchor {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export interface OpenPicker {
+  type: PickerType;
+  instanceId: string;
+  anchor: PickerAnchor;
 }
 
 export interface MissionDefinition {
@@ -228,4 +251,5 @@ export interface AppState {
   selectedDrawer: "crew" | "settings" | "map" | "log" | null;
   playbackIndex: number;
   rewardMissionId: string | null;
+  openPicker: OpenPicker | null;
 }

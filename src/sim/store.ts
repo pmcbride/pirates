@@ -1,7 +1,16 @@
 import { commandLibrary, missionNodes, missions, orderedMissionIds } from "./content";
 import { cloneQueuedCommands, getMission, runMission } from "./engine";
 import { applyReward, defaultProfile, loadProfile, saveProfile } from "./profile";
-import type { AppState, CommandBlock, PlannedCommand, PlayerProfile } from "./types";
+import type {
+  ActionCommandId,
+  AppState,
+  CommandBlock,
+  ConditionKind,
+  PickerAnchor,
+  PickerType,
+  PlannedCommand,
+  PlayerProfile,
+} from "./types";
 
 type Listener = (state: AppState) => void;
 
@@ -51,6 +60,7 @@ const initialState = (): AppState => {
     selectedDrawer: null,
     playbackIndex: 0,
     rewardMissionId: null,
+    openPicker: null,
   };
 };
 
@@ -122,6 +132,7 @@ export class GameStore {
       activeHint: null,
       selectedDrawer: null,
       playbackIndex: 0,
+      openPicker: null,
     }));
   }
 
@@ -135,6 +146,7 @@ export class GameStore {
       activeHint: null,
       selectedDrawer: null,
       playbackIndex: 0,
+      openPicker: null,
     }));
   }
 
@@ -311,6 +323,148 @@ export class GameStore {
     }));
   }
 
+  addLoopBodyAction(instanceId: string, templateId: string): void {
+    const missionId = this.state.activeMissionId;
+    if (!missionId) {
+      return;
+    }
+
+    const template = commandLibrary[templateId];
+    if (!template || template.type !== "action") {
+      return;
+    }
+
+    const loopTemplate = commandLibrary.repeat;
+    const maxLength = loopTemplate?.bodyMaxLength ?? 2;
+
+    this.update((state) => ({
+      ...state,
+      queuedCommands: state.queuedCommands.map((command) => {
+        if (command.instanceId !== instanceId || command.type !== "loop") {
+          return command;
+        }
+        const body = command.body ?? [];
+        if (body.length >= maxLength) {
+          return command;
+        }
+        const inner: PlannedCommand = {
+          instanceId: commandCounter(),
+          templateId: template.id,
+          type: "action",
+          action: template.defaultAction ?? "sail",
+        };
+        return {
+          ...command,
+          body: [...body, inner],
+        };
+      }),
+      activeHint: null,
+      lastRun: null,
+    }));
+  }
+
+  removeLoopBodyAction(instanceId: string, innerInstanceId: string): void {
+    this.update((state) => ({
+      ...state,
+      queuedCommands: state.queuedCommands.map((command) => {
+        if (command.instanceId !== instanceId || command.type !== "loop") {
+          return command;
+        }
+        const body = (command.body ?? []).filter(
+          (inner) => inner.instanceId !== innerInstanceId,
+        );
+        return {
+          ...command,
+          body,
+        };
+      }),
+      activeHint: null,
+      lastRun: null,
+    }));
+  }
+
+  cycleLoopBodyAction(instanceId: string, innerInstanceId: string): void {
+    const missionId = this.state.activeMissionId;
+    if (!missionId) {
+      return;
+    }
+
+    const allowedActions = missions[missionId].palette.filter(
+      (commandId) => commandLibrary[commandId]?.type === "action",
+    );
+    if (allowedActions.length === 0) {
+      return;
+    }
+
+    this.update((state) => ({
+      ...state,
+      queuedCommands: state.queuedCommands.map((command) => {
+        if (command.instanceId !== instanceId || command.type !== "loop") {
+          return command;
+        }
+        const body = command.body ?? [];
+        return {
+          ...command,
+          body: body.map((inner) => {
+            if (inner.instanceId !== innerInstanceId) {
+              return inner;
+            }
+            const currentIndex = allowedActions.indexOf(inner.action ?? "sail");
+            const nextAction =
+              allowedActions[(currentIndex + 1) % allowedActions.length] ?? "sail";
+            return {
+              ...inner,
+              templateId: nextAction,
+              action: nextAction as ActionCommandId,
+            };
+          }),
+        };
+      }),
+      activeHint: null,
+      lastRun: null,
+    }));
+  }
+
+  openPicker(type: PickerType, instanceId: string, anchor: PickerAnchor): void {
+    this.update((state) => ({
+      ...state,
+      openPicker: { type, instanceId, anchor },
+    }));
+  }
+
+  closePicker(): void {
+    if (!this.state.openPicker) {
+      return;
+    }
+    this.update((state) => ({
+      ...state,
+      openPicker: null,
+    }));
+  }
+
+  selectPickerOption(value: string): void {
+    const picker = this.state.openPicker;
+    if (!picker) {
+      return;
+    }
+
+    this.update((state) => ({
+      ...state,
+      queuedCommands: state.queuedCommands.map((command) => {
+        if (command.instanceId !== picker.instanceId || command.type !== "condition") {
+          return command;
+        }
+        if (picker.type === "ifCondition") {
+          return { ...command, condition: value as ConditionKind };
+        }
+        return { ...command, thenAction: value as ActionCommandId };
+      }),
+      openPicker: null,
+      activeHint: null,
+      lastRun: null,
+    }));
+  }
+
   runActiveMission(): void {
     const missionId = this.state.activeMissionId;
     if (!missionId || this.state.queuedCommands.length === 0) {
@@ -329,6 +483,7 @@ export class GameStore {
       lastRun: result,
       activeHint: null,
       playbackIndex: 0,
+      openPicker: null,
     }));
   }
 

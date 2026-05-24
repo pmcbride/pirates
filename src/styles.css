@@ -521,6 +521,102 @@ canvas {
 .accent-sunset { background: #ffd1a8; }
 .accent-storm { background: #cfddf0; }
 
+/* ── Loop body row (Repeat block inner sequence) ───────────── */
+
+.loop-body-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.loop-body-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.chip-mini {
+  min-height: 36px;
+  min-width: 36px;
+  padding: 0 0.45rem;
+  background: var(--parchment);
+  color: var(--ink);
+  border: var(--border-ink);
+  border-radius: 999px;
+  box-shadow: 0 2px 0 rgba(43, 29, 14, 0.25);
+  font-weight: 800;
+}
+
+.chip-add {
+  min-width: 56px;
+}
+
+/* ── Condition picker popover (2x2) ────────────────────────── */
+
+.picker-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(43, 29, 14, 0.25);
+  pointer-events: auto;
+  z-index: 50;
+}
+
+.picker-popover {
+  position: absolute;
+  padding: 0.9rem;
+  width: min(220px, 80vw);
+  background:
+    repeating-linear-gradient(
+      45deg,
+      rgba(241, 217, 154, 0.12) 0 6px,
+      transparent 6px 12px
+    ),
+    linear-gradient(180deg, var(--parchment) 0%, var(--parchment-deep) 100%);
+  border: var(--border-ink);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+.picker-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.6rem;
+}
+
+.picker-tile {
+  min-height: 80px;
+  min-width: 80px;
+  padding: 0.5rem 0.4rem;
+  display: grid;
+  gap: 0.2rem;
+  justify-items: center;
+  align-content: center;
+  background: var(--parchment);
+  color: var(--ink);
+  border: var(--border-ink);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sticker);
+  font-weight: 800;
+}
+
+.picker-tile:hover:not(:disabled) {
+  background: var(--sky);
+  transform: translateY(-2px);
+  transition: transform 0.08s ease;
+}
+
+.picker-icon {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.picker-label {
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+
 /* ── Drawers ───────────────────────────────────────────────── */
 
 .drawer-host {

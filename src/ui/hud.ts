@@ -67,14 +67,37 @@ const queueCard = (command: PlannedCommand, isRunning: boolean): string => {
   const disabled = isRunning ? "disabled" : "";
 
   if (command.type === "loop") {
-    const action = (command.action ?? "sail") as keyof typeof iconMap;
+    const body = command.body ?? [];
+    const repeatTemplate = commandLibrary.repeat;
+    const maxBody = repeatTemplate?.bodyMaxLength ?? 2;
+    const canAddBody = !isRunning && body.length < maxBody;
+
+    const bodyChips = body.length
+      ? body
+          .map((inner) => {
+            const innerAction = (inner.action ?? "sail") as keyof typeof iconMap;
+            return `
+              <span class="loop-body-chip">
+                <button ${disabled} data-action="cycle-loop-body" data-instance-id="${command.instanceId}" data-inner-id="${inner.instanceId}" class="chip-button">${iconFor(innerAction)} ${labelMap[innerAction as keyof typeof labelMap]}</button>
+                <button ${disabled} aria-label="Remove inner action" data-action="remove-loop-body" data-instance-id="${command.instanceId}" data-inner-id="${inner.instanceId}" class="chip-mini">✕</button>
+              </span>
+            `;
+          })
+          .join("")
+      : `
+        <button ${disabled} data-action="loop-action" data-instance-id="${command.instanceId}" class="chip-button">${iconFor((command.action ?? "sail") as keyof typeof iconMap)} ${labelMap[(command.action ?? "sail") as keyof typeof labelMap]}</button>
+      `;
+
     return `
       <article class="queue-card ${accent}">
         <div class="queue-main">
           <span class="stamp-icon">${iconFor("repeat")}</span>
           <div class="queue-kicker">Repeat</div>
           <button ${disabled} data-action="loop-count" data-instance-id="${command.instanceId}" class="chip-button">×${command.count ?? 2}</button>
-          <button ${disabled} data-action="loop-action" data-instance-id="${command.instanceId}" class="chip-button">${iconFor(action)} ${labelMap[action as keyof typeof labelMap]}</button>
+        </div>
+        <div class="loop-body-row">
+          ${bodyChips}
+          <button ${canAddBody ? "" : "disabled"} data-action="add-loop-body" data-instance-id="${command.instanceId}" class="chip-button chip-add" aria-label="Add inner action">+</button>
         </div>
         <div class="queue-tools">
           <button ${disabled} aria-label="Move left" data-action="move-left" data-instance-id="${command.instanceId}">◀</button>
@@ -93,9 +116,9 @@ const queueCard = (command: PlannedCommand, isRunning: boolean): string => {
         <div class="queue-main">
           <span class="stamp-icon">${iconFor("if")}</span>
           <div class="queue-kicker">If</div>
-          <button ${disabled} data-action="if-condition" data-instance-id="${command.instanceId}" class="chip-button">${iconFor(condition)} ${labelMap[condition as keyof typeof labelMap]}</button>
+          <button ${disabled} data-action="open-if-condition-picker" data-instance-id="${command.instanceId}" class="chip-button">${iconFor(condition)} ${labelMap[condition as keyof typeof labelMap]}</button>
           <span class="queue-word">then</span>
-          <button ${disabled} data-action="if-action" data-instance-id="${command.instanceId}" class="chip-button">${iconFor(thenAction)} ${labelMap[thenAction as keyof typeof labelMap]}</button>
+          <button ${disabled} data-action="open-if-action-picker" data-instance-id="${command.instanceId}" class="chip-button">${iconFor(thenAction)} ${labelMap[thenAction as keyof typeof labelMap]}</button>
         </div>
         <div class="queue-tools">
           <button ${disabled} aria-label="Move left" data-action="move-left" data-instance-id="${command.instanceId}">◀</button>
@@ -246,6 +269,63 @@ const statsInline = (state: AppState): string => `
   </div>
 `;
 
+const conditionOptions = [
+  "enemyAhead",
+  "obstacleAhead",
+  "treasureHere",
+  "crewHere",
+] as const;
+const conditionActionOptions = ["fire", "dodge", "collect", "talk"] as const;
+
+const renderConditionPicker = (state: AppState): string => {
+  const picker = state.openPicker;
+  if (!picker) {
+    return "";
+  }
+
+  const options: readonly string[] =
+    picker.type === "ifCondition" ? conditionOptions : conditionActionOptions;
+
+  const tiles = options
+    .map((value) => {
+      const label = labelMap[value as keyof typeof labelMap] ?? value;
+      const icon = iconFor(value as keyof typeof iconMap);
+      return `
+        <button
+          class="picker-tile"
+          data-action="select-picker-option"
+          data-value="${escapeHtml(value)}"
+        >
+          <span class="picker-icon">${icon}</span>
+          <span class="picker-label">${escapeHtml(label)}</span>
+        </button>
+      `;
+    })
+    .join("");
+
+  const anchor = picker.anchor;
+  // Anchor the popover near the tapped chip; clamp to a small inset so it
+  // does not overflow the viewport. The backdrop swallows the outside taps.
+  const top = Math.max(16, anchor.y + anchor.h + 8);
+  const left = Math.max(16, anchor.x);
+
+  return `
+    <div class="picker-backdrop" data-action="close-picker">
+      <div
+        class="picker-popover surface-card"
+        role="dialog"
+        aria-label="${picker.type === "ifCondition" ? "Choose condition" : "Choose action"}"
+        style="top:${top}px; left:${left}px;"
+        data-action="picker-noop"
+      >
+        <div class="picker-grid">
+          ${tiles}
+        </div>
+      </div>
+    </div>
+  `;
+};
+
 const statusStrip = (state: AppState): string => `
   <div class="status-strip">
     <span class="stat-pill"><span class="stat-icon">💰</span>${escapeHtml(formatBerries(state.profile.berries))}</span>
@@ -343,16 +423,57 @@ export class Hud {
           gameStore.cycleLoopAction(instanceId);
         }
         break;
-      case "if-condition":
+      case "open-if-condition-picker":
         if (instanceId) {
-          gameStore.cycleCondition(instanceId);
+          const rect = button.getBoundingClientRect();
+          gameStore.openPicker("ifCondition", instanceId, {
+            x: rect.left,
+            y: rect.top,
+            w: rect.width,
+            h: rect.height,
+          });
         }
         break;
-      case "if-action":
+      case "open-if-action-picker":
         if (instanceId) {
-          gameStore.cycleConditionAction(instanceId);
+          const rect = button.getBoundingClientRect();
+          gameStore.openPicker("ifAction", instanceId, {
+            x: rect.left,
+            y: rect.top,
+            w: rect.width,
+            h: rect.height,
+          });
         }
         break;
+      case "select-picker-option": {
+        const value = button.dataset.value;
+        if (value) {
+          gameStore.selectPickerOption(value);
+        }
+        break;
+      }
+      case "close-picker":
+        gameStore.closePicker();
+        break;
+      case "add-loop-body":
+        if (instanceId) {
+          gameStore.addLoopBodyAction(instanceId, "sail");
+        }
+        break;
+      case "remove-loop-body": {
+        const innerId = button.dataset.innerId;
+        if (instanceId && innerId) {
+          gameStore.removeLoopBodyAction(instanceId, innerId);
+        }
+        break;
+      }
+      case "cycle-loop-body": {
+        const innerId = button.dataset.innerId;
+        if (instanceId && innerId) {
+          gameStore.cycleLoopBodyAction(instanceId, innerId);
+        }
+        break;
+      }
     }
   };
 
@@ -391,6 +512,7 @@ export class Hud {
       <div class="hud-layer screen-${state.screen}">
         ${this.renderScreen(state)}
         ${state.selectedDrawer ? `<aside class="drawer-host">${drawerContent(state)}</aside>` : ""}
+        ${state.openPicker ? renderConditionPicker(state) : ""}
       </div>
     `;
   }

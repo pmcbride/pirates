@@ -13,10 +13,13 @@ export const defaultProfile = (): PlayerProfile => ({
   commandUnlocks: ["sail", "collect"],
   bestStars: {},
   captainLog: [],
+  attemptCounts: {},
   settings: {
     reducedMotion: false,
     soundOn: true,
     muted: false,
+    skipPrediction: false,
+    alwaysShowSuggested: false,
   },
 });
 
@@ -51,6 +54,7 @@ export const deserializeProfile = (raw: string | null): PlayerProfile => {
       commandUnlocks: parsed.commandUnlocks ?? merged.commandUnlocks,
       bestStars: parsed.bestStars ?? merged.bestStars,
       captainLog: parsed.captainLog ?? merged.captainLog,
+      attemptCounts: parsed.attemptCounts ?? merged.attemptCounts,
       settings: {
         ...merged.settings,
         ...(parsed.settings ?? {}),

@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { gameStore } from "../../sim/store";
+import { getActiveTheme } from "../../themes";
 import { uiColors } from "../assets/manifest";
 
 export class TitleScene extends Phaser.Scene {
@@ -12,6 +13,7 @@ export class TitleScene extends Phaser.Scene {
   create(): void {
     const width = this.scale.width;
     const height = this.scale.height;
+    const theme = getActiveTheme(gameStore.getState().profile);
 
     const sky = this.add.graphics();
     sky.fillGradientStyle(uiColors.sky, uiColors.sun, uiColors.sea, uiColors.seaDeep, 1);
@@ -46,7 +48,7 @@ export class TitleScene extends Phaser.Scene {
       .text(
         width / 2,
         600,
-        "Queue bold moves.\nWatch the Going Merry sail.\nChase the One Piece.",
+        theme.taglines.titlePoster,
         {
           align: "center",
           lineSpacing: 14,

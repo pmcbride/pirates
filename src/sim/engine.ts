@@ -1,3 +1,4 @@
+import type { Theme } from "../themes/types";
 import { missions } from "./content";
 import type {
   ActionCommandId,
@@ -52,6 +53,7 @@ const cloneReward = (reward: RewardBundle): RewardBundle => ({
 const composeLogLine = (
   mission: MissionDefinition,
   state: MissionState,
+  theme: Theme,
 ): string => {
   const enemyCount = state.defeatedEnemyIds.length;
   const treasureCount = mission.tiles.filter(
@@ -65,15 +67,18 @@ const composeLogLine = (
       !state.tiles.find((current) => current.id === tile.id && current.active),
   );
 
-  const parts: string[] = [`Cleared ${mission.label}`];
+  const missionLabel = theme.missions[mission.id]?.label ?? mission.id;
+  const parts: string[] = [`Cleared ${missionLabel}`];
   if (enemyCount > 0) {
-    parts.push(`splashed ${enemyCount} Marine${enemyCount === 1 ? "" : "s"}`);
+    const enemyNoun =
+      enemyCount === 1 ? theme.enemyKind.singular : theme.enemyKind.plural;
+    parts.push(`splashed ${enemyCount} ${enemyNoun}`);
   }
   if (treasureCount > 0) {
     parts.push(`hauled ${treasureCount} chest${treasureCount === 1 ? "" : "s"}`);
   }
   if (recruited) {
-    parts.push("a new Straw Hat joined the crew");
+    parts.push("a new shipmate joined the crew");
   }
   return `${parts.join(", ")}.`;
 };
@@ -104,7 +109,6 @@ export const createMissionState = (
   queuedCommands: cloneQueuedCommands(queuedCommands),
   currentBeat: 0,
   status: "planning",
-  objective: mission.objective,
   collectedBerries: 0,
   defeatedEnemyIds: [],
 });
@@ -208,11 +212,16 @@ const remainingRequiredTiles = (
     .map((tileId) => activeTileById(state.tiles, tileId))
     .filter((tile): tile is MissionTile => Boolean(tile));
 
-const hintPrefix = (profile: PlayerProfile): string =>
-  profile.crewRoster.includes("zoro") ? "Zoro points with a sparkle. " : "";
+const hintPrefix = (profile: PlayerProfile, theme: Theme): string => {
+  if (!profile.crewRoster.includes("zoro")) {
+    return "";
+  }
+  return theme.hintPrefixes.withSparkleCrew ?? "";
+};
 
 const makeHint = (
   profile: PlayerProfile,
+  theme: Theme,
   reason: string,
   suggestion: string,
   retryFromStep: number,
@@ -220,7 +229,7 @@ const makeHint = (
   highlightPositions: Position[],
 ): HintResult => ({
   reason,
-  suggestion: `${hintPrefix(profile)}${suggestion}`,
+  suggestion: `${hintPrefix(profile, theme)}${suggestion}`,
   focusTemplateId,
   highlightPositions,
   retryFromStep,
@@ -282,6 +291,7 @@ const rewardForMission = (
   mission: MissionDefinition,
   state: MissionState,
   profile: PlayerProfile,
+  theme: Theme,
 ): RewardBundle => {
   const reward = cloneReward(mission.reward);
 
@@ -290,7 +300,7 @@ const rewardForMission = (
   }
 
   reward.bounty += state.defeatedEnemyIds.length * 1_000_000;
-  reward.logLine = composeLogLine(mission, state);
+  reward.logLine = composeLogLine(mission, state, theme);
 
   return reward;
 };
@@ -299,6 +309,7 @@ export const runMission = (
   mission: MissionDefinition,
   queuedCommands: PlannedCommand[],
   profile: PlayerProfile,
+  theme: Theme,
 ): MissionRunResult => {
   const state = createMissionState(mission, queuedCommands);
   state.status = "running";
@@ -351,6 +362,7 @@ export const runMission = (
     state.status = "failed";
     failedHint = makeHint(
       profile,
+      theme,
       title,
       message,
       Math.max(stepIndex - 1, 0),
@@ -399,13 +411,13 @@ export const runMission = (
     }
 
     state.status = "success";
-    const reward = rewardForMission(mission, state, profile);
+    const reward = rewardForMission(mission, state, profile, theme);
 
     pushStep(commandId, title, "The crew reaches the treasure marker.", "success", [
       { kind: "goal", text: "Goal reached.", positions: [clonePosition(mission.goal)] },
       {
         kind: "reward",
-        text: `Earn ${reward.berries} berries and ${reward.stars} star${reward.stars === 1 ? "" : "s"}.`,
+        text: `Earn ${reward.berries} ${reward.berries === 1 ? theme.currency.nameSingular : theme.currency.namePlural} and ${reward.stars} star${reward.stars === 1 ? "" : "s"}.`,
       },
     ]);
 
@@ -445,8 +457,8 @@ export const runMission = (
         if (collision?.kind === "enemy") {
           return failRun(
             commandId,
-            "An enemy was still in the lane",
-            "Splash the skiff with Fire before sailing into it.",
+            `A ${theme.enemyKind.singular} was still in the lane`,
+            `Splash the ${theme.enemyKind.singular} with Fire before sailing into it.`,
             "fire",
             [collision.position],
           );
@@ -503,7 +515,11 @@ export const runMission = (
           deactivateTile(state.tiles, enemy.id);
           state.defeatedEnemyIds.push(enemy.id);
           pushStep(commandId, title, "A splash cannon clears the lane.", "running", [
-            { kind: "fire", text: "Marine splashed away.", positions: [enemy.position] },
+            {
+              kind: "fire",
+              text: `${theme.enemyKind.singular[0].toUpperCase()}${theme.enemyKind.singular.slice(1)} splashed away.`,
+              positions: [enemy.position],
+            },
           ]);
         } else {
           pushStep(commandId, title, "The cannon splashes water, but no foe was there.", "running", [
@@ -685,12 +701,12 @@ export const runMission = (
   }
 
   state.status = "success";
-  const reward = rewardForMission(mission, state, profile);
+  const reward = rewardForMission(mission, state, profile, theme);
   pushStep("finish", "Mission clear", "The whole route is complete.", "success", [
     { kind: "goal", text: "Route complete." },
     {
       kind: "reward",
-      text: `Earn ${reward.berries} berries and ${reward.stars} stars.`,
+      text: `Earn ${reward.berries} ${reward.berries === 1 ? theme.currency.nameSingular : theme.currency.namePlural} and ${reward.stars} stars.`,
     },
   ]);
 

@@ -7,6 +7,7 @@ import {
   deserializeProfile,
   serializeProfile,
 } from "./profile";
+import type { PlannedCommand } from "./types";
 
 describe("mission runner", () => {
   it("clears the tutorial mission with its sample queue", () => {
@@ -98,6 +99,138 @@ describe("mission runner", () => {
     expect(result.reward?.bounty).toBe(2_000_000);
     expect(result.reward?.logLine).toContain("Shells Town");
     expect(result.reward?.logLine).toContain("splashed 1 Marine");
+  });
+
+  it("runs each action in a loop body per iteration", () => {
+    const profile = defaultProfile();
+    const mission = missions["current-crescent"];
+
+    // Replace the first Repeat x3 Sail + Sail with Repeat x2 [Sail, Sail] —
+    // same 4 forward moves to reach the chest at (4,2), but exercises the
+    // new body path instead of the legacy single-action loop.
+    const customQueue: PlannedCommand[] = [
+      {
+        instanceId: "loop-1",
+        templateId: "repeat",
+        type: "loop",
+        count: 2,
+        body: [
+          {
+            instanceId: "loop-1a",
+            templateId: "sail",
+            type: "action",
+            action: "sail",
+          },
+          {
+            instanceId: "loop-1b",
+            templateId: "sail",
+            type: "action",
+            action: "sail",
+          },
+        ],
+      },
+      {
+        instanceId: "after-loop",
+        templateId: "collect",
+        type: "action",
+        action: "collect",
+      },
+      {
+        instanceId: "loop-2",
+        templateId: "repeat",
+        type: "loop",
+        count: 3,
+        action: "sail",
+      },
+    ];
+
+    const result = runMission(mission, customQueue, profile);
+
+    expect(result.success).toBe(true);
+    expect(result.finalState.ship.position).toEqual({ x: 7, y: 2 });
+  });
+
+  it("falls back to the legacy `action` when loop body is empty", () => {
+    const profile = defaultProfile();
+    const mission = missions["current-crescent"];
+
+    // Body is explicitly empty; the legacy action `sail` must drive each iteration.
+    const customQueue = cloneQueuedCommands(mission.suggestedQueue).map((command) => {
+      if (command.instanceId !== "current-1") return command;
+      return { ...command, body: [] };
+    });
+
+    const result = runMission(mission, customQueue, profile);
+
+    expect(result.success).toBe(true);
+    expect(result.finalState.ship.position).toEqual({ x: 7, y: 2 });
+  });
+
+  it("fails the whole run when an action inside a loop body fails", () => {
+    const profile = defaultProfile();
+    const mission = missions["spark-shoals"];
+
+    // First action is Sail directly into the Marine at (1,1) — should fail
+    // on the first inner action with the "fire" hint.
+    const queue: PlannedCommand[] = [
+      {
+        instanceId: "loop-x",
+        templateId: "repeat",
+        type: "loop",
+        count: 2,
+        body: [
+          {
+            instanceId: "loop-x-a",
+            templateId: "sail",
+            type: "action",
+            action: "sail",
+          },
+        ],
+      },
+    ];
+
+    const result = runMission(mission, queue, profile);
+
+    expect(result.success).toBe(false);
+    expect(result.hint?.focusTemplateId).toBe("fire");
+  });
+
+  it("treasure-isle suggested queue uses a loop body and completes", () => {
+    const profile = {
+      ...defaultProfile(),
+      commandUnlocks: ["sail", "fire", "dodge", "talk", "repeat", "if"],
+    };
+    const mission = missions["treasure-isle"];
+
+    const result = runMission(
+      mission,
+      cloneQueuedCommands(mission.suggestedQueue),
+      profile,
+    );
+
+    expect(result.success).toBe(true);
+    const isle3 = mission.suggestedQueue.find((c) => c.instanceId === "isle-3");
+    expect(isle3?.body?.length).toBe(2);
+  });
+
+  it("coral-lookout suggested queue completes for a default profile (no fruits, no crew)", () => {
+    const profile = defaultProfile();
+    const mission = missions["coral-lookout"];
+
+    // No repeat allowed in this mission's palette anymore — the lesson is
+    // purely about the If conditional.
+    expect(mission.palette).not.toContain("repeat");
+    expect(
+      mission.suggestedQueue.every((command) => command.templateId !== "repeat"),
+    ).toBe(true);
+
+    const result = runMission(
+      mission,
+      cloneQueuedCommands(mission.suggestedQueue),
+      profile,
+    );
+
+    expect(result.success).toBe(true);
   });
 
   it("composes a captain's log line when no enemies are defeated", () => {

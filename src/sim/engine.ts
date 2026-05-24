@@ -326,6 +326,28 @@ export const runMission = (
     focusTemplateId: string | undefined,
     highlightPositions: Position[],
   ): MissionRunResult => {
+    // Sandbox missions never truly fail. Bounce the ship back to start with a
+    // soft "splash" beat, mark the run successful (so no hint banner), and let
+    // the player keep playing. No reward is awarded — store.finishPlayback gates
+    // on mission.sandbox to skip persistence.
+    if (mission.sandbox) {
+      state.ship.position = clonePosition(mission.start.position);
+      state.ship.facing = mission.start.facing;
+      pushStep(commandId, "Splash!", "Splash! The ship bounces back to the dock.", "running", [
+        { kind: "move", text: "Splash! Try a different plan.", positions: highlightPositions },
+      ]);
+      state.status = "success";
+      return {
+        success: true,
+        steps,
+        finalState: {
+          ...state,
+          tiles: cloneTiles(state.tiles),
+          ship: cloneShip(state.ship),
+        },
+      };
+    }
+
     state.status = "failed";
     failedHint = makeHint(
       profile,
@@ -618,6 +640,24 @@ export const runMission = (
     if (result) {
       return result;
     }
+  }
+
+  if (mission.sandbox) {
+    // Sandbox: queue ran out, no failure. Mark success without a reward so the
+    // store can finish playback and return to free-play planning.
+    state.status = "success";
+    pushStep("finish", "Free play", "End of plan. Try another route!", "success", [
+      { kind: "goal", text: "Free play complete." },
+    ]);
+    return {
+      success: true,
+      steps,
+      finalState: {
+        ...state,
+        tiles: cloneTiles(state.tiles),
+        ship: cloneShip(state.ship),
+      },
+    };
   }
 
   if (!goalReached(mission, state)) {

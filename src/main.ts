@@ -31,6 +31,7 @@ const screenSceneMap: Record<string, string> = {
   title: "title",
   map: "world-map",
   mission: "mission",
+  sandbox: "mission",
   reward: "reward",
 };
 

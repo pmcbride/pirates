@@ -182,6 +182,40 @@ export const missionNodes: MissionNode[] = [
     unlockMissionIds: ["tutorial-cove"],
   },
   {
+    id: "windrise-cove",
+    missionId: "windrise-cove",
+    label: "Windrise Cove",
+    sea: "East Blue",
+    x: 37,
+    y: 58,
+    difficulty: "breeze",
+    preview: "Two Marine skiffs guard the lane. Fire, sail, fire, sail.",
+    rewards: {
+      berries: 110,
+      bounty: 1_000_000,
+      stars: 2,
+      unlockCommandIds: [],
+    },
+    unlockMissionIds: ["spark-shoals"],
+  },
+  {
+    id: "barrel-bay",
+    missionId: "barrel-bay",
+    label: "Barrel Bay",
+    sea: "East Blue",
+    x: 44,
+    y: 52,
+    difficulty: "breeze",
+    preview: "Dodge a reef, splash a Marine, scoop the chest.",
+    rewards: {
+      berries: 130,
+      bounty: 2_000_000,
+      stars: 2,
+      unlockCommandIds: [],
+    },
+    unlockMissionIds: ["windrise-cove"],
+  },
+  {
     id: "current-crescent",
     missionId: "current-crescent",
     label: "Reverse Mountain",
@@ -196,7 +230,7 @@ export const missionNodes: MissionNode[] = [
       stars: 2,
       unlockCommandIds: ["repeat"],
     },
-    unlockMissionIds: ["spark-shoals"],
+    unlockMissionIds: ["barrel-bay"],
   },
   {
     id: "coral-lookout",
@@ -234,6 +268,32 @@ export const missionNodes: MissionNode[] = [
     },
     unlockMissionIds: ["coral-lookout"],
   },
+  {
+    id: "sandbox-isle",
+    missionId: "sandbox-isle",
+    label: "Free Play Isle",
+    sea: "Open Ocean",
+    x: 15,
+    y: 30,
+    difficulty: "cove",
+    preview: "An open lagoon. No goal, no marines, no failure — just sail.",
+    rewards: {
+      berries: 0,
+      bounty: 0,
+      stars: 0,
+      unlockCommandIds: [],
+    },
+    unlockMissionIds: [],
+  },
+];
+
+export const sandboxNodeId = "sandbox-isle";
+export const sandboxMissionId = "sandbox-isle";
+export const defaultSandboxPalette: string[] = [
+  "sail",
+  "turn-left",
+  "turn-right",
+  "collect",
 ];
 
 export const missions: Record<string, MissionDefinition> = {
@@ -333,6 +393,119 @@ export const missions: Record<string, MissionDefinition> = {
       makeCommand("spark-6", "collect", { action: "collect" }),
       makeCommand("spark-7", "sail", { action: "sail" }),
       makeCommand("spark-8", "sail", { action: "sail" }),
+    ],
+  },
+  "windrise-cove": {
+    id: "windrise-cove",
+    nodeId: "windrise-cove",
+    label: "Windrise Cove",
+    sea: "East Blue",
+    briefing: "Two Marine skiffs guard the cove. Splash one, sail through, splash the next.",
+    tutorial: "Fire when a Marine is ahead, then Sail through the gap.",
+    width: 7,
+    height: 3,
+    start: {
+      position: { x: 0, y: 1 },
+      facing: "east",
+    },
+    goal: { x: 6, y: 1 },
+    objective: {
+      primary: "Splash both Marines, then dock at the cove.",
+      short: "Fire, Sail, Fire, Sail to the dock.",
+    },
+    palette: ["fire", "sail"],
+    requiredTileIds: [],
+    reward: {
+      berries: 110,
+      bounty: 1_000_000,
+      stars: 2,
+      unlockCommandIds: [],
+    },
+    tiles: [
+      {
+        id: "windrise-enemy-1",
+        kind: "enemy",
+        position: { x: 2, y: 1 },
+        label: "Marine",
+        active: true,
+      },
+      {
+        id: "windrise-enemy-2",
+        kind: "enemy",
+        position: { x: 4, y: 1 },
+        label: "Marine",
+        active: true,
+      },
+    ],
+    suggestedQueue: [
+      makeCommand("windrise-1", "sail", { action: "sail" }),
+      makeCommand("windrise-2", "fire", { action: "fire" }),
+      makeCommand("windrise-3", "sail", { action: "sail" }),
+      makeCommand("windrise-4", "sail", { action: "sail" }),
+      makeCommand("windrise-5", "fire", { action: "fire" }),
+      makeCommand("windrise-6", "sail", { action: "sail" }),
+      makeCommand("windrise-7", "sail", { action: "sail" }),
+      makeCommand("windrise-8", "sail", { action: "sail" }),
+    ],
+  },
+  "barrel-bay": {
+    id: "barrel-bay",
+    nodeId: "barrel-bay",
+    label: "Barrel Bay",
+    sea: "East Blue",
+    briefing: "A chest, a Marine, and a reef line the bay. Use every move you know.",
+    tutorial: "Collect the chest, Fire the Marine, Dodge the reef, then dock.",
+    width: 6,
+    height: 3,
+    start: {
+      position: { x: 0, y: 1 },
+      facing: "east",
+    },
+    goal: { x: 5, y: 0 },
+    objective: {
+      primary: "Grab the chest, splash the Marine, dodge the reef, and reach the bay.",
+      short: "Collect, Fire, Dodge, then dock.",
+    },
+    palette: ["sail", "collect", "fire", "dodge"],
+    requiredTileIds: ["barrel-chest"],
+    reward: {
+      berries: 130,
+      bounty: 2_000_000,
+      stars: 2,
+      unlockCommandIds: [],
+    },
+    tiles: [
+      {
+        id: "barrel-chest",
+        kind: "treasure",
+        position: { x: 1, y: 1 },
+        label: "Bay Chest",
+        active: true,
+      },
+      {
+        id: "barrel-enemy",
+        kind: "enemy",
+        position: { x: 3, y: 1 },
+        label: "Marine",
+        active: true,
+      },
+      {
+        id: "barrel-reef",
+        kind: "obstacle",
+        position: { x: 4, y: 1 },
+        label: "Reef",
+        active: true,
+      },
+    ],
+    suggestedQueue: [
+      makeCommand("barrel-1", "sail", { action: "sail" }),
+      makeCommand("barrel-2", "collect", { action: "collect" }),
+      makeCommand("barrel-3", "sail", { action: "sail" }),
+      makeCommand("barrel-4", "fire", { action: "fire" }),
+      makeCommand("barrel-5", "sail", { action: "sail" }),
+      makeCommand("barrel-6", "dodge", { action: "dodge" }),
+      makeCommand("barrel-7", "sail", { action: "sail" }),
+      makeCommand("barrel-8", "sail", { action: "sail" }),
     ],
   },
   "current-crescent": {
@@ -530,9 +703,82 @@ export const missions: Record<string, MissionDefinition> = {
       makeCommand("isle-9", "sail", { action: "sail" }),
     ],
   },
+  "sandbox-isle": {
+    id: "sandbox-isle",
+    nodeId: "sandbox-isle",
+    label: "Free Play Isle",
+    sea: "Open Ocean",
+    briefing: "An open lagoon. Sail anywhere — no goal, no marines, no losing.",
+    tutorial: "Sandbox — play money. Try any blocks you've unlocked.",
+    width: 10,
+    height: 6,
+    start: {
+      position: { x: 0, y: 3 },
+      facing: "east",
+    },
+    // Off-board goal — sandbox missions never finish at a goal tile.
+    goal: { x: -1, y: -1 },
+    objective: {
+      primary: "Free play — sail, scoop play-treasure, try out your moves.",
+      short: "Free play. Nothing breaks here.",
+    },
+    palette: [...defaultSandboxPalette],
+    requiredTileIds: [],
+    sandbox: true,
+    reward: {
+      berries: 0,
+      bounty: 0,
+      stars: 0,
+      unlockCommandIds: [],
+    },
+    tiles: [
+      {
+        id: "sandbox-chest-1",
+        kind: "treasure",
+        position: { x: 3, y: 1 },
+        label: "Play Chest",
+        active: true,
+      },
+      {
+        id: "sandbox-chest-2",
+        kind: "treasure",
+        position: { x: 6, y: 4 },
+        label: "Play Chest",
+        active: true,
+      },
+      {
+        id: "sandbox-chest-3",
+        kind: "treasure",
+        position: { x: 8, y: 2 },
+        label: "Play Chest",
+        active: true,
+      },
+      {
+        id: "sandbox-island-1",
+        kind: "obstacle",
+        position: { x: 4, y: 3 },
+        label: "Palm Isle",
+        active: true,
+      },
+      {
+        id: "sandbox-island-2",
+        kind: "obstacle",
+        position: { x: 7, y: 0 },
+        label: "Palm Isle",
+        active: true,
+      },
+    ],
+    suggestedQueue: [
+      makeCommand("sandbox-1", "sail", { action: "sail" }),
+      makeCommand("sandbox-2", "sail", { action: "sail" }),
+      makeCommand("sandbox-3", "sail", { action: "sail" }),
+    ],
+  },
 };
 
-export const orderedMissionIds = missionNodes.map((node) => node.missionId);
+export const orderedMissionIds = missionNodes
+  .filter((node) => node.missionId !== sandboxMissionId)
+  .map((node) => node.missionId);
 
 export const bountyRank = (bounty: number): string => {
   if (bounty >= 100_000_000) return "Yonko-class";

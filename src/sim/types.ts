@@ -178,6 +178,12 @@ export interface MissionDefinition {
   reward: RewardBundle;
   tiles: MissionTile[];
   suggestedQueue: PlannedCommand[];
+  /**
+   * Marks a free-play sandbox mission: no rewards persist, failures bounce
+   * the ship instead of showing the hint banner, and attemptCounts/captain's
+   * log are not advanced. Sandbox missions are always-unlocked play-money zones.
+   */
+  sandbox?: boolean;
 }
 
 export interface MissionState {
@@ -244,7 +250,7 @@ export interface MissionRunResult {
 }
 
 export interface AppState {
-  screen: "title" | "map" | "mission" | "reward";
+  screen: "title" | "map" | "mission" | "reward" | "sandbox";
   profile: PlayerProfile;
   selectedMissionId: string | null;
   activeMissionId: string | null;

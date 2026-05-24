@@ -1,4 +1,11 @@
-import { commandLibrary, missionNodes, missions, orderedMissionIds } from "./content";
+import {
+  commandLibrary,
+  defaultSandboxPalette,
+  missionNodes,
+  missions,
+  orderedMissionIds,
+  sandboxMissionId,
+} from "./content";
 import { cloneQueuedCommands, getMission, runMission } from "./engine";
 import { applyReward, defaultProfile, loadProfile, saveProfile } from "./profile";
 import type {
@@ -211,6 +218,11 @@ export class GameStore {
       return;
     }
 
+    if (missionId === sandboxMissionId) {
+      this.openSandbox();
+      return;
+    }
+
     const mission = getMission(missionId);
     this.update((state) => ({
       ...state,
@@ -225,6 +237,32 @@ export class GameStore {
       openPicker: null,
       predictedEndPosition: null,
       lastPredictionCorrect: null,
+    }));
+  }
+
+  openSandbox(): void {
+    const mission = getMission(sandboxMissionId);
+    if (!mission) {
+      return;
+    }
+
+    // Build the sandbox palette from what the player has unlocked. Brand-new
+    // players (no unlocks beyond defaults) still get sail/turn/collect.
+    const unlockSet = new Set<string>(this.state.profile.commandUnlocks);
+    defaultSandboxPalette.forEach((id) => unlockSet.add(id));
+    const palette = Object.keys(commandLibrary).filter((id) => unlockSet.has(id));
+    mission.palette = palette.length > 0 ? palette : [...defaultSandboxPalette];
+
+    this.update((state) => ({
+      ...state,
+      screen: "sandbox",
+      activeMissionId: sandboxMissionId,
+      queuedCommands: cloneQueuedCommands(mission.suggestedQueue),
+      missionPhase: "planning",
+      lastRun: null,
+      activeHint: null,
+      selectedDrawer: null,
+      playbackIndex: 0,
     }));
   }
 
@@ -670,6 +708,20 @@ export class GameStore {
     const missionId = this.state.activeMissionId;
     const result = this.state.lastRun;
     if (!missionId || !result) {
+      return;
+    }
+
+    // Sandbox runs never persist rewards, never bump captain's log, never
+    // unlock new missions, and never switch to the reward screen. They just
+    // reset the queue/phase back to planning so the player can keep playing.
+    const mission = missions[missionId];
+    if (mission?.sandbox) {
+      this.update((state) => ({
+        ...state,
+        missionPhase: "planning",
+        activeHint: null,
+        playbackIndex: 0,
+      }));
       return;
     }
 

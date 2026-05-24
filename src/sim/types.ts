@@ -33,6 +33,7 @@ export interface Position {
 export interface PlayerSettings {
   reducedMotion: boolean;
   soundOn: boolean;
+  muted: boolean;
 }
 
 export interface CaptainLogEntry {

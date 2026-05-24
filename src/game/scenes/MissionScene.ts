@@ -2,7 +2,13 @@ import Phaser from "phaser";
 import { missions } from "../../sim/content";
 import { createMissionState } from "../../sim/engine";
 import { gameStore } from "../../sim/store";
-import type { MissionDefinition, MissionTile, RunStep } from "../../sim/types";
+import type {
+  AppState,
+  MissionDefinition,
+  MissionTile,
+  Position,
+  RunStep,
+} from "../../sim/types";
 import { kindTextureMap, textureKeys, uiColors } from "../assets/manifest";
 
 export class MissionScene extends Phaser.Scene {
@@ -10,11 +16,15 @@ export class MissionScene extends Phaser.Scene {
 
   private boardLayer?: Phaser.GameObjects.Container;
 
+  private predictLayer?: Phaser.GameObjects.Container;
+
   private statusText?: Phaser.GameObjects.Text;
 
   private activePlaybackToken = 0;
 
   private renderedMissionId: string | null = null;
+
+  private renderedPhase: AppState["missionPhase"] | null = null;
 
   constructor() {
     super("mission");
@@ -22,6 +32,7 @@ export class MissionScene extends Phaser.Scene {
 
   create(): void {
     this.boardLayer = this.add.container(0, 0);
+    this.predictLayer = this.add.container(0, 0).setVisible(false);
     this.statusText = this.add
       .text(this.scale.width / 2, 220, "", {
         fontFamily: "Nunito, Trebuchet MS, sans-serif",
@@ -34,6 +45,7 @@ export class MissionScene extends Phaser.Scene {
 
     this.unsubscribe = gameStore.subscribe((state) => {
       if (state.screen !== "mission") {
+        this.predictLayer?.setVisible(false);
         return;
       }
 
@@ -43,7 +55,12 @@ export class MissionScene extends Phaser.Scene {
       }
 
       const mission = missions[missionId];
-      if (this.renderedMissionId !== missionId || state.missionPhase === "planning") {
+      const phaseChanged = this.renderedPhase !== state.missionPhase;
+      if (
+        this.renderedMissionId !== missionId ||
+        state.missionPhase === "planning" ||
+        (phaseChanged && state.missionPhase === "predicting")
+      ) {
         this.activePlaybackToken += 1;
         this.renderedMissionId = missionId;
         this.renderBoard(
@@ -51,7 +68,20 @@ export class MissionScene extends Phaser.Scene {
           createMissionState(mission, state.queuedCommands).ship,
           createMissionState(mission, state.queuedCommands).tiles,
         );
-        this.statusText?.setText(mission.briefing);
+        this.statusText?.setText(
+          state.missionPhase === "predicting"
+            ? "Where will the ship end up? Tap a tile."
+            : mission.briefing,
+        );
+      }
+
+      this.renderedPhase = state.missionPhase;
+
+      if (state.missionPhase === "predicting") {
+        this.renderPredictLayer(mission, state.predictedEndPosition);
+      } else {
+        this.predictLayer?.setVisible(false);
+        this.predictLayer?.removeAll(true);
       }
 
       if (state.missionPhase === "running" && state.lastRun) {
@@ -59,6 +89,65 @@ export class MissionScene extends Phaser.Scene {
         this.playRun(mission, state.lastRun.steps, playbackToken);
       }
     });
+  }
+
+  private renderPredictLayer(
+    mission: MissionDefinition,
+    predicted: Position | null,
+  ): void {
+    if (!this.predictLayer) {
+      return;
+    }
+    this.predictLayer.setVisible(true);
+    this.predictLayer.removeAll(true);
+
+    const { tileSize, offsetX, offsetY } = this.boardMetrics(mission);
+    const overlay = this.add.graphics();
+    overlay.fillStyle(0x000000, 0.18);
+    overlay.fillRect(
+      offsetX,
+      offsetY,
+      mission.width * tileSize,
+      mission.height * tileSize,
+    );
+    this.predictLayer.add(overlay);
+
+    for (let y = 0; y < mission.height; y += 1) {
+      for (let x = 0; x < mission.width; x += 1) {
+        const cellX = offsetX + x * tileSize;
+        const cellY = offsetY + y * tileSize;
+        const cellSize = tileSize - 8;
+        const hit = this.add.zone(
+          cellX + cellSize / 2,
+          cellY + cellSize / 2,
+          cellSize,
+          cellSize,
+        );
+        hit.setInteractive({ useHandCursor: true });
+        hit.on("pointerdown", () => {
+          gameStore.setPrediction({ x, y });
+        });
+        this.predictLayer.add(hit);
+      }
+    }
+
+    if (predicted) {
+      const markX = offsetX + predicted.x * tileSize + tileSize / 2;
+      const markY = offsetY + predicted.y * tileSize + tileSize / 2;
+      const ring = this.add.graphics();
+      ring.lineStyle(6, 0xffd166, 1);
+      ring.strokeCircle(markX, markY, tileSize * 0.36);
+      ring.fillStyle(0xffd166, 0.35);
+      ring.fillCircle(markX, markY, tileSize * 0.36);
+      this.predictLayer.add(ring);
+      const star = this.add
+        .text(markX, markY, "⭐", {
+          fontFamily: "Nunito, sans-serif",
+          fontSize: `${Math.max(tileSize * 0.4, 24)}px`,
+        })
+        .setOrigin(0.5);
+      this.predictLayer.add(star);
+    }
   }
 
   private boardMetrics(mission: MissionDefinition) {
@@ -208,5 +297,7 @@ export class MissionScene extends Phaser.Scene {
   shutdown(): void {
     this.unsubscribe?.();
     this.unsubscribe = undefined;
+    this.predictLayer?.removeAll(true);
+    this.renderedPhase = null;
   }
 }

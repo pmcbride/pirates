@@ -33,6 +33,8 @@ export interface Position {
 export interface PlayerSettings {
   reducedMotion: boolean;
   soundOn: boolean;
+  skipPrediction: boolean;
+  alwaysShowSuggested: boolean;
 }
 
 export interface CaptainLogEntry {
@@ -52,6 +54,7 @@ export interface PlayerProfile {
   commandUnlocks: string[];
   bestStars: Record<string, number>;
   captainLog: CaptainLogEntry[];
+  attemptCounts: Record<string, number>;
   settings: PlayerSettings;
 }
 
@@ -222,10 +225,12 @@ export interface AppState {
   selectedMissionId: string | null;
   activeMissionId: string | null;
   queuedCommands: PlannedCommand[];
-  missionPhase: "planning" | "running";
+  missionPhase: "planning" | "predicting" | "running";
   lastRun: MissionRunResult | null;
   activeHint: HintResult | null;
   selectedDrawer: "crew" | "settings" | "map" | "log" | null;
   playbackIndex: number;
   rewardMissionId: string | null;
+  predictedEndPosition: Position | null;
+  lastPredictionCorrect: boolean | null;
 }

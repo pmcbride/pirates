@@ -208,6 +208,14 @@ const drawerContent = (state: AppState): string => {
             Reduced Motion: ${state.profile.settings.reducedMotion ? "On" : "Off"}
           </button>
           <p class="drawer-copy">Cuts cosmetic motion and speeds up the plan playback while keeping every gameplay beat readable.</p>
+          <button data-action="toggle-skip-prediction" class="drawer-toggle">
+            Skip Prediction: ${state.profile.settings.skipPrediction ? "On" : "Off"}
+          </button>
+          <p class="drawer-copy">Predict-then-run asks you to guess where the ship will land before each voyage. Turn this on to hop straight into playback.</p>
+          <button data-action="toggle-always-suggested" class="drawer-toggle">
+            Always Pre-load Full Plan: ${state.profile.settings.alwaysShowSuggested ? "On" : "Off"}
+          </button>
+          <p class="drawer-copy">After the first try at a voyage the dock only shows the first stamp. Turn this on to always start from the full suggested plan.</p>
         </section>
       `;
     case "map": {
@@ -303,6 +311,19 @@ export class Hud {
         break;
       case "toggle-reduced-motion":
         gameStore.toggleReducedMotion();
+        break;
+      case "toggle-skip-prediction":
+        gameStore.toggleSkipPrediction();
+        break;
+      case "toggle-always-suggested":
+        gameStore.toggleAlwaysShowSuggested();
+        break;
+      case "confirm-prediction":
+        gameStore.confirmPrediction();
+        break;
+      case "skip-prediction":
+        gameStore.toggleSkipPrediction();
+        gameStore.runActiveMission();
         break;
       case "add-command":
         if (templateId) {
@@ -476,8 +497,10 @@ export class Hud {
     }
 
     const isRunning = state.missionPhase === "running";
+    const isPredicting = state.missionPhase === "predicting";
+    const locked = isRunning || isPredicting;
     const queueMarkup = state.queuedCommands.length
-      ? state.queuedCommands.map((command) => queueCard(command, isRunning)).join("")
+      ? state.queuedCommands.map((command) => queueCard(command, locked)).join("")
       : '<div class="empty-queue">Tap stamps below to build a sailing plan.</div>';
 
     const palette = mission.palette
@@ -486,7 +509,7 @@ export class Hud {
         const icon = iconFor(templateId as keyof typeof iconMap);
         return `
           <button
-            ${isRunning ? "disabled" : ""}
+            ${locked ? "disabled" : ""}
             class="palette-card ${accentMap[template.accent as keyof typeof accentMap] ?? "accent-blue"}"
             data-action="add-command"
             data-template-id="${templateId}"
@@ -499,6 +522,26 @@ export class Hud {
         `;
       })
       .join("");
+
+    const predictBubble = isPredicting
+      ? `
+        <section class="predict-banner surface-card">
+          <p class="eyebrow">🔮 Predict First</p>
+          <strong>Where will the ship end up?</strong>
+          <p>Tap a tile on the map to drop your guess, then run the plan.</p>
+          <div class="predict-actions">
+            <button
+              data-action="confirm-prediction"
+              class="primary-cta"
+              ${state.predictedEndPosition ? "" : "disabled"}
+            >▶ Run plan!</button>
+            <button data-action="skip-prediction" class="ghost-link">
+              Skip prediction
+            </button>
+          </div>
+        </section>
+      `
+      : "";
 
     return `
       <header class="objective-chip surface-card">
@@ -523,22 +566,39 @@ export class Hud {
               <p class="eyebrow">💬 Gentle Rewind</p>
               <strong>${escapeHtml(state.activeHint.reason)}</strong>
               <p>${escapeHtml(state.activeHint.suggestion)}</p>
+              ${
+                state.lastPredictionCorrect !== null
+                  ? `<p class="prediction-feedback">${
+                      state.lastPredictionCorrect
+                        ? "⭐ You guessed where the ship would land!"
+                        : "Close — try the next one!"
+                    }</p>`
+                  : ""
+              }
             </section>
           `
           : ""
       }
 
+      ${predictBubble}
+
       <section class="command-dock surface-card">
         <div class="dock-head">
           <div>
             <p class="eyebrow">Command Queue</p>
-            <h3>${isRunning ? "Captain's plan is sailing" : "Build the route"}</h3>
+            <h3>${
+              isRunning
+                ? "Captain's plan is sailing"
+                : isPredicting
+                  ? "Predict before you sail"
+                  : "Build the route"
+            }</h3>
             <p>${escapeHtml(mission.tutorial)}</p>
           </div>
           <div class="dock-actions">
-            <button ${isRunning ? "disabled" : ""} data-action="clear-queue">Clear</button>
-            <button ${isRunning ? "disabled" : ""} data-action="reset-queue">Reset</button>
-            <button ${isRunning ? "disabled" : ""} data-action="run-mission" class="primary-cta">▶ Run Plan</button>
+            <button ${locked ? "disabled" : ""} data-action="clear-queue">Clear</button>
+            <button ${locked ? "disabled" : ""} data-action="reset-queue">Reset</button>
+            <button ${locked ? "disabled" : ""} data-action="run-mission" class="primary-cta">▶ Run Plan</button>
           </div>
         </div>
         <div class="queue-list" data-dropzone="queue">
@@ -555,12 +615,22 @@ export class Hud {
     const mission = state.rewardMissionId ? missions[state.rewardMissionId] : null;
     const reward = state.lastRun?.reward;
     const lastLog = state.profile.captainLog.at(-1);
+    const prediction = state.lastPredictionCorrect;
 
     return `
       <section class="reward-overlay">
         <div class="reward-copy">
           <p class="eyebrow">Treasure Recovered</p>
           <h2>${escapeHtml(mission?.label ?? "Voyage Clear")}</h2>
+          ${
+            prediction !== null
+              ? `<p class="prediction-feedback">${
+                  prediction
+                    ? "⭐ You guessed it! The ship landed right where you predicted."
+                    : "Close — try the next one!"
+                }</p>`
+              : ""
+          }
           <div class="reward-row">
             <span class="stat-pill">💰 ${escapeHtml(formatBerries(reward?.berries ?? 0))}</span>
             <span class="stat-pill bounty" aria-label="Bounty">🏴‍☠️ +${escapeHtml(formatBounty(reward?.bounty ?? 0))}</span>

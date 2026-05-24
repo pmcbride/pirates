@@ -10,6 +10,8 @@ import {
 } from "../sim/content";
 import { gameStore } from "../sim/store";
 import type { AppState, PlannedCommand } from "../sim/types";
+import { playSfx, setMuted } from "./audio";
+import { haptic } from "./haptic";
 
 const labelMap = {
   sail: "Sail",
@@ -208,6 +210,10 @@ const drawerContent = (state: AppState): string => {
             Reduced Motion: ${state.profile.settings.reducedMotion ? "On" : "Off"}
           </button>
           <p class="drawer-copy">Cuts cosmetic motion and speeds up the plan playback while keeping every gameplay beat readable.</p>
+          <button data-action="toggle-muted" class="drawer-toggle">
+            Sound: ${state.profile.settings.muted ? "Muted" : "On"}
+          </button>
+          <p class="drawer-copy">Silences whooshes, pops, and victory horns. Haptic taps stay on.</p>
         </section>
       `;
     case "map": {
@@ -262,6 +268,7 @@ export class Hud {
     this.root.addEventListener("dragover", this.handleDragOver);
     this.root.addEventListener("drop", this.handleDrop);
     gameStore.subscribe((state) => {
+      setMuted(state.profile.settings.muted);
       this.root.innerHTML = this.render(state);
     });
   }
@@ -296,6 +303,8 @@ export class Hud {
         gameStore.leaveMission();
         break;
       case "claim-reward":
+        playSfx("reward-claim");
+        haptic("success");
         gameStore.claimReward();
         break;
       case "toggle-drawer":
@@ -304,8 +313,13 @@ export class Hud {
       case "toggle-reduced-motion":
         gameStore.toggleReducedMotion();
         break;
+      case "toggle-muted":
+        gameStore.toggleMuted();
+        break;
       case "add-command":
         if (templateId) {
+          playSfx("stamp-drop");
+          haptic("tap");
           gameStore.addCommand(templateId);
         }
         break;
@@ -316,40 +330,49 @@ export class Hud {
         gameStore.resetQueue();
         break;
       case "run-mission":
+        playSfx("stamp-drop");
+        haptic("confirm");
         gameStore.runActiveMission();
         break;
       case "remove-command":
         if (instanceId) {
+          haptic("tap");
           gameStore.removeCommand(instanceId);
         }
         break;
       case "move-left":
         if (instanceId) {
+          haptic("tap");
           gameStore.moveCommand(instanceId, -1);
         }
         break;
       case "move-right":
         if (instanceId) {
+          haptic("tap");
           gameStore.moveCommand(instanceId, 1);
         }
         break;
       case "loop-count":
         if (instanceId) {
+          haptic("tap");
           gameStore.cycleLoopCount(instanceId);
         }
         break;
       case "loop-action":
         if (instanceId) {
+          haptic("tap");
           gameStore.cycleLoopAction(instanceId);
         }
         break;
       case "if-condition":
         if (instanceId) {
+          haptic("tap");
           gameStore.cycleCondition(instanceId);
         }
         break;
       case "if-action":
         if (instanceId) {
+          haptic("tap");
           gameStore.cycleConditionAction(instanceId);
         }
         break;
@@ -382,6 +405,8 @@ export class Hud {
     event.preventDefault();
     const templateId = event.dataTransfer.getData("text/plain");
     if (templateId) {
+      playSfx("stamp-drop");
+      haptic("tap");
       gameStore.addCommand(templateId);
     }
   };

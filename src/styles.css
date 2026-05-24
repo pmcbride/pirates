@@ -448,6 +448,15 @@ canvas {
   background: var(--parchment);
   display: grid;
   gap: 0.7rem;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.queue-card.is-active {
+  transform: translateY(-3px);
+  box-shadow:
+    var(--shadow-sticker),
+    0 0 0 4px var(--sun),
+    0 0 24px 6px rgba(255, 178, 74, 0.75);
 }
 
 .queue-main {

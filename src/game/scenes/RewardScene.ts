@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { formatBerries, formatBounty, missions } from "../../sim/content";
+import { formatBountyFor, formatCurrency, getActiveTheme } from "../../themes";
 import { gameStore } from "../../sim/store";
 import { uiColors } from "../assets/manifest";
 
@@ -43,7 +43,10 @@ export class RewardScene extends Phaser.Scene {
         });
       }
 
-      const mission = state.rewardMissionId ? missions[state.rewardMissionId] : null;
+      const theme = getActiveTheme(state.profile);
+      const missionLabel = state.rewardMissionId
+        ? (theme.missions[state.rewardMissionId]?.label ?? "Treasure Found")
+        : "Treasure Found";
       const reward = state.lastRun?.reward;
 
       this.add
@@ -58,7 +61,7 @@ export class RewardScene extends Phaser.Scene {
         .setOrigin(0.5);
 
       this.add
-        .text(width / 2, 370, mission?.label ?? "Treasure Found", {
+        .text(width / 2, 370, missionLabel, {
           fontFamily: "Nunito, Trebuchet MS, sans-serif",
           fontSize: "34px",
           color: "#2b1d0e",
@@ -69,7 +72,7 @@ export class RewardScene extends Phaser.Scene {
         .text(
           width / 2,
           560,
-          `💰 +${formatBerries(reward?.berries ?? 0)}\n🏴‍☠️ +${formatBounty(reward?.bounty ?? 0)}\n⭐ +${reward?.stars ?? 0}`,
+          `💰 +${formatCurrency(theme, reward?.berries ?? 0)}\n🏴‍☠️ +${formatBountyFor(theme, reward?.bounty ?? 0)}\n⭐ +${reward?.stars ?? 0}`,
           {
             align: "center",
             lineSpacing: 16,

@@ -1,10 +1,14 @@
 import {
-  bountyRank,
+  bountyRankFor,
+  formatBountyFor,
+  formatCurrency,
+  getActiveTheme,
+  orderedThemeIds,
+  themes,
+} from "../themes";
+import type { Theme, ThemeId } from "../themes/types";
+import {
   commandLibrary,
-  crewMates,
-  formatBerries,
-  formatBounty,
-  fruitPowers,
   missionNodes,
   missions,
 } from "../sim/content";
@@ -22,7 +26,7 @@ const labelMap = {
   fire: "Fire",
   collect: "Collect",
   talk: "Talk",
-  enemyAhead: "Marine Ahead",
+  enemyAhead: "Foe Ahead",
   obstacleAhead: "Reef Ahead",
   treasureHere: "Treasure Here",
   crewHere: "Crew Here",
@@ -63,6 +67,25 @@ const escapeHtml = (value: string): string =>
     .replaceAll('"', "&quot;");
 
 const iconFor = (key: keyof typeof iconMap): string => iconMap[key] ?? "•";
+
+// Helpers — resolve mission/sea/crew/fruit display strings against a theme.
+const missionLabel = (theme: Theme, missionId: string): string =>
+  theme.missions[missionId]?.label ?? missionId;
+
+const missionSea = (theme: Theme, missionId: string): string =>
+  theme.missions[missionId]?.sea ?? "";
+
+const missionPreview = (theme: Theme, missionId: string): string =>
+  theme.missions[missionId]?.preview ?? "";
+
+const missionBriefing = (theme: Theme, missionId: string): string =>
+  theme.missions[missionId]?.briefing ?? "";
+
+const missionTutorial = (theme: Theme, missionId: string): string =>
+  theme.missions[missionId]?.tutorial ?? "";
+
+const missionObjective = (theme: Theme, missionId: string): string =>
+  theme.missions[missionId]?.objective.primary ?? "";
 
 /**
  * Render the *inner* markup of a queue card (the contents of the <article>
@@ -165,8 +188,8 @@ const commandFingerprint = (command: PlannedCommand, isRunning: boolean): string
     isRunning ? "r" : "p",
   ].join("|");
 
-const wantedCrewCard = (crewId: string): string => {
-  const crew = crewMates[crewId];
+const wantedCrewCard = (theme: Theme, crewId: string): string => {
+  const crew = theme.crew[crewId];
   if (!crew) return "";
   return `
     <li>
@@ -180,8 +203,8 @@ const wantedCrewCard = (crewId: string): string => {
   `;
 };
 
-const wantedFruitCard = (fruitId: string): string => {
-  const fruit = fruitPowers[fruitId];
+const wantedFruitCard = (theme: Theme, fruitId: string): string => {
+  const fruit = theme.fruits[fruitId];
   if (!fruit) return "";
   return `
     <li>
@@ -195,16 +218,41 @@ const wantedFruitCard = (fruitId: string): string => {
   `;
 };
 
-const drawerContent = (state: AppState): string => {
+const themePickerMarkup = (currentThemeId: ThemeId): string => {
+  const options = orderedThemeIds
+    .map((id) => {
+      const theme = themes[id];
+      const active = id === currentThemeId;
+      return `
+        <button
+          data-action="set-theme"
+          data-theme-id="${id}"
+          class="drawer-toggle${active ? " is-active" : ""}"
+          aria-pressed="${active}"
+        >
+          ${escapeHtml(theme.meta.label)}${active ? " ✓" : ""}
+        </button>
+        <p class="drawer-copy">${escapeHtml(theme.meta.description)}</p>
+      `;
+    })
+    .join("");
+
+  return `
+    <h4 class="drawer-subhead">Theme</h4>
+    ${options}
+  `;
+};
+
+const drawerContent = (state: AppState, theme: Theme): string => {
   switch (state.selectedDrawer) {
     case "crew": {
       const crewList = state.profile.crewRoster.length
-        ? state.profile.crewRoster.map(wantedCrewCard).join("")
-        : `<li><div class="wanted-card"><p class="wanted-name">No crew yet</p><p class="wanted-line">Win voyages to invite Straw Hats aboard.</p></div></li>`;
+        ? state.profile.crewRoster.map((id) => wantedCrewCard(theme, id)).join("")
+        : `<li><div class="wanted-card"><p class="wanted-name">No crew yet</p><p class="wanted-line">Win voyages to invite shipmates aboard.</p></div></li>`;
 
       const fruitList = state.profile.fruitPowers.length
-        ? state.profile.fruitPowers.map(wantedFruitCard).join("")
-        : `<li><div class="wanted-card"><p class="wanted-name">No Devil Fruits yet</p><p class="wanted-line">Skypiea Lookout hides the first glowing fruit.</p></div></li>`;
+        ? state.profile.fruitPowers.map((id) => wantedFruitCard(theme, id)).join("")
+        : `<li><div class="wanted-card"><p class="wanted-name">No Devil Fruits yet</p><p class="wanted-line">A lookout in the sky hides the first glowing fruit.</p></div></li>`;
 
       return `
         <section class="drawer-panel">
@@ -260,6 +308,7 @@ const drawerContent = (state: AppState): string => {
             Always Pre-load Full Plan: ${state.profile.settings.alwaysShowSuggested ? "On" : "Off"}
           </button>
           <p class="drawer-copy">After the first try at a voyage the dock only shows the first stamp. Turn this on to always start from the full suggested plan.</p>
+          ${themePickerMarkup(state.profile.settings.themeId)}
         </section>
       `;
     case "map": {
@@ -271,7 +320,7 @@ const drawerContent = (state: AppState): string => {
           return `
             <li>
               <button ${unlocked ? "" : "disabled"} data-action="select-mission" data-mission-id="${node.missionId}">
-                ${escapeHtml(node.label)} — ${status}
+                ${escapeHtml(missionLabel(theme, node.missionId))} — ${status}
               </button>
             </li>
           `;
@@ -290,17 +339,17 @@ const drawerContent = (state: AppState): string => {
   }
 };
 
-const statsInlineMarkup = (profile: PlayerProfile): string => `
+const statsInlineMarkup = (profile: PlayerProfile, theme: Theme): string => `
   <div class="stats-inline">
-    <span class="stat-pill"><span class="stat-icon">💰</span>${escapeHtml(formatBerries(profile.berries))}</span>
-    <span class="stat-pill bounty" aria-label="Bounty"><span class="stat-icon" aria-hidden="true">🏴‍☠️</span>${escapeHtml(formatBounty(profile.bounty))}</span>
+    <span class="stat-pill"><span class="stat-icon">💰</span>${escapeHtml(formatCurrency(theme, profile.berries))}</span>
+    <span class="stat-pill bounty" aria-label="Bounty"><span class="stat-icon" aria-hidden="true">🏴‍☠️</span>${escapeHtml(formatBountyFor(theme, profile.bounty))}</span>
     <span class="stat-pill"><span class="stat-icon">⭐</span>${profile.stars}</span>
   </div>
 `;
 
-const statusStripInnerMarkup = (profile: PlayerProfile): string => `
-  <span class="stat-pill"><span class="stat-icon">💰</span>${escapeHtml(formatBerries(profile.berries))}</span>
-  <span class="stat-pill bounty" aria-label="Bounty"><span class="stat-icon" aria-hidden="true">🏴‍☠️</span>${escapeHtml(formatBounty(profile.bounty))}</span>
+const statusStripInnerMarkup = (profile: PlayerProfile, theme: Theme): string => `
+  <span class="stat-pill"><span class="stat-icon">💰</span>${escapeHtml(formatCurrency(theme, profile.berries))}</span>
+  <span class="stat-pill bounty" aria-label="Bounty"><span class="stat-icon" aria-hidden="true">🏴‍☠️</span>${escapeHtml(formatBountyFor(theme, profile.bounty))}</span>
   <span class="stat-pill"><span class="stat-icon">🧑‍🎤</span>${profile.crewRoster.length}</span>
   <span class="stat-pill"><span class="stat-icon">🍎</span>${profile.fruitPowers.length}</span>
 `;
@@ -440,6 +489,7 @@ export class Hud {
     const instanceId = button.dataset.instanceId;
     const templateId = button.dataset.templateId;
     const drawer = button.dataset.drawer as AppState["selectedDrawer"] | undefined;
+    const themeId = button.dataset.themeId as ThemeId | undefined;
 
     switch (action) {
       case "start-adventure":
@@ -483,6 +533,11 @@ export class Hud {
       case "skip-prediction":
         gameStore.toggleSkipPrediction();
         gameStore.runActiveMission();
+        break;
+      case "set-theme":
+        if (themeId) {
+          gameStore.setTheme(themeId);
+        }
         break;
       case "add-command":
         if (templateId) {
@@ -650,23 +705,24 @@ export class Hud {
     this.mission = null;
     this.root.innerHTML = "";
 
+    const theme = getActiveTheme(state.profile);
     const layer = document.createElement("div");
     layer.className = `hud-layer screen-${state.screen}`;
     this.currentLayer = layer;
 
     switch (state.screen) {
       case "title":
-        layer.innerHTML = this.renderTitleMarkup();
+        layer.innerHTML = this.renderTitleMarkup(theme);
         break;
       case "map":
-        layer.innerHTML = this.renderMapMarkup(state);
+        layer.innerHTML = this.renderMapMarkup(state, theme);
         break;
       case "mission":
       case "sandbox":
         this.mountMissionScaffold(layer, state);
         break;
       case "reward":
-        layer.innerHTML = this.renderRewardMarkup(state);
+        layer.innerHTML = this.renderRewardMarkup(state, theme);
         break;
     }
 
@@ -675,14 +731,14 @@ export class Hud {
 
   // ── Title ──────────────────────────────────────────────────
 
-  private renderTitleMarkup(): string {
+  private renderTitleMarkup(theme: Theme): string {
     return `
       <section class="title-overlay">
         <div class="poster-copy">
           <p class="eyebrow">An early-coding pirate voyage</p>
-          <h1>Set sail for the One Piece.</h1>
-          <p class="support-copy">Drag big command stamps to plan a route. Splash Marines, scoop berries, recruit Straw Hats, and chase Devil Fruits across the Grand Line.</p>
-          <button data-action="start-adventure" class="primary-cta">⛵ Set Sail</button>
+          <h1>${escapeHtml(theme.taglines.titleHeadline)}</h1>
+          <p class="support-copy">${escapeHtml(theme.taglines.titleSupport)}</p>
+          <button data-action="start-adventure" class="primary-cta">${escapeHtml(theme.taglines.setSailCta)}</button>
         </div>
       </section>
     `;
@@ -690,14 +746,13 @@ export class Hud {
 
   // ── Map ────────────────────────────────────────────────────
 
-  private renderMapMarkup(state: AppState): string {
+  private renderMapMarkup(state: AppState, theme: Theme): string {
     const missionId = state.selectedMissionId ?? state.profile.unlockedMissionIds[0];
     const node = missionNodes.find((entry) => entry.missionId === missionId);
-    const mission = missionId ? missions[missionId] : null;
-    const rank = bountyRank(state.profile.bounty);
+    const rank = bountyRankFor(theme, state.profile.bounty);
 
     const drawerMarkup = state.selectedDrawer
-      ? `<aside class="drawer-host">${drawerContent(state)}</aside>`
+      ? `<aside class="drawer-host">${drawerContent(state, theme)}</aside>`
       : "";
 
     return `
@@ -707,7 +762,7 @@ export class Hud {
           <h2 style="margin:0;font-family:var(--display-font);font-size:1.8rem;">Pick the next voyage</h2>
           <p style="margin:0.2rem 0 0;color:var(--ink-soft);font-size:0.9rem;">${escapeHtml(rank)}</p>
         </div>
-        ${statsInlineMarkup(state.profile)}
+        ${statsInlineMarkup(state.profile, theme)}
       </header>
 
       <nav class="rail-actions">
@@ -718,27 +773,29 @@ export class Hud {
       </nav>
 
       <section class="map-docket surface-card">
-        <p class="eyebrow">${escapeHtml(node?.sea ?? "Starter Cove")}</p>
-        <h3>${escapeHtml(node?.label ?? "Foosha Cove")}</h3>
-        <p>${escapeHtml(node?.preview ?? mission?.briefing ?? "")}</p>
+        <p class="eyebrow">${escapeHtml(node ? missionSea(theme, node.missionId) : "")}</p>
+        <h3>${escapeHtml(node ? missionLabel(theme, node.missionId) : "")}</h3>
+        <p>${escapeHtml(node ? missionPreview(theme, node.missionId) || missionBriefing(theme, node.missionId) : "")}</p>
         <div class="map-reward-row">
-          <span>💰 ${escapeHtml(formatBerries(node?.rewards.berries ?? 0))}</span>
-          <span>🏴‍☠️ ${escapeHtml(formatBounty(node?.rewards.bounty ?? 0))}</span>
+          <span>💰 ${escapeHtml(formatCurrency(theme, node?.rewards.berries ?? 0))}</span>
+          <span>🏴‍☠️ ${escapeHtml(formatBountyFor(theme, node?.rewards.bounty ?? 0))}</span>
           <span>⭐ ${node?.rewards.stars ?? 0}</span>
-          ${node?.rewards.crewId ? `<span>🧑‍🎤 ${escapeHtml(crewMates[node.rewards.crewId]?.name ?? "")}</span>` : ""}
-          ${node?.rewards.fruitPowerId ? `<span>🍎 ${escapeHtml(fruitPowers[node.rewards.fruitPowerId]?.name ?? "")}</span>` : ""}
+          ${node?.rewards.crewId ? `<span>🧑‍🎤 ${escapeHtml(theme.crew[node.rewards.crewId]?.name ?? "")}</span>` : ""}
+          ${node?.rewards.fruitPowerId ? `<span>🍎 ${escapeHtml(theme.fruits[node.rewards.fruitPowerId]?.name ?? "")}</span>` : ""}
         </div>
         <div class="mission-pill-row">
           ${missionNodes
             .map((entry) => {
               const unlocked = state.profile.unlockedMissionIds.includes(entry.missionId);
               const current = missionId === entry.missionId;
-              return `<button ${unlocked ? "" : "disabled"} data-action="select-mission" data-mission-id="${entry.missionId}" class="route-pill ${current ? "is-current" : ""}">${escapeHtml(entry.label)}</button>`;
+              return `<button ${unlocked ? "" : "disabled"} data-action="select-mission" data-mission-id="${entry.missionId}" class="route-pill ${current ? "is-current" : ""}">${escapeHtml(missionLabel(theme, entry.missionId))}</button>`;
             })
             .join("")}
         </div>
         <button data-action="open-selected-mission" class="primary-cta">${
-          missionId === "sandbox-isle" ? "🏝️ Free Play" : "⛵ Set Sail"
+          missionId === "sandbox-isle"
+            ? "🏝️ Free Play"
+            : escapeHtml(theme.taglines.setSailCta)
         }</button>
       </section>
       ${drawerMarkup}
@@ -752,22 +809,25 @@ export class Hud {
    */
   private renderMapInPlace(state: AppState): void {
     if (!this.currentLayer) return;
-    this.currentLayer.innerHTML = this.renderMapMarkup(state);
+    const theme = getActiveTheme(state.profile);
+    this.currentLayer.innerHTML = this.renderMapMarkup(state, theme);
   }
 
   // ── Reward ─────────────────────────────────────────────────
 
-  private renderRewardMarkup(state: AppState): string {
-    const mission = state.rewardMissionId ? missions[state.rewardMissionId] : null;
+  private renderRewardMarkup(state: AppState, theme: Theme): string {
     const reward = state.lastRun?.reward;
     const lastLog = state.profile.captainLog.at(-1);
     const prediction = state.lastPredictionCorrect;
+    const rewardLabel = state.rewardMissionId
+      ? missionLabel(theme, state.rewardMissionId)
+      : "Voyage Clear";
 
     return `
       <section class="reward-overlay">
         <div class="reward-copy">
           <p class="eyebrow">Treasure Recovered</p>
-          <h2>${escapeHtml(mission?.label ?? "Voyage Clear")}</h2>
+          <h2>${escapeHtml(rewardLabel)}</h2>
           ${
             prediction !== null
               ? `<p class="prediction-feedback">${
@@ -778,15 +838,15 @@ export class Hud {
               : ""
           }
           <div class="reward-row">
-            <span class="stat-pill">💰 ${escapeHtml(formatBerries(reward?.berries ?? 0))}</span>
-            <span class="stat-pill bounty" aria-label="Bounty">🏴‍☠️ +${escapeHtml(formatBounty(reward?.bounty ?? 0))}</span>
+            <span class="stat-pill">💰 ${escapeHtml(formatCurrency(theme, reward?.berries ?? 0))}</span>
+            <span class="stat-pill bounty" aria-label="Bounty">🏴‍☠️ +${escapeHtml(formatBountyFor(theme, reward?.bounty ?? 0))}</span>
             <span class="stat-pill">⭐ +${reward?.stars ?? 0}</span>
           </div>
           ${
             reward?.crewId
-              ? `<ul class="drawer-list" style="margin:0;">${wantedCrewCard(reward.crewId)}</ul>`
+              ? `<ul class="drawer-list" style="margin:0;">${wantedCrewCard(theme, reward.crewId)}</ul>`
               : reward?.fruitPowerId
-                ? `<ul class="drawer-list" style="margin:0;">${wantedFruitCard(reward.fruitPowerId)}</ul>`
+                ? `<ul class="drawer-list" style="margin:0;">${wantedFruitCard(theme, reward.fruitPowerId)}</ul>`
                 : ""
           }
           ${
@@ -807,7 +867,8 @@ export class Hud {
 
   private renderRewardInPlace(state: AppState): void {
     if (!this.currentLayer) return;
-    this.currentLayer.innerHTML = this.renderRewardMarkup(state);
+    const theme = getActiveTheme(state.profile);
+    this.currentLayer.innerHTML = this.renderRewardMarkup(state, theme);
   }
 
   // ── Mission scaffold ───────────────────────────────────────
@@ -884,31 +945,35 @@ export class Hud {
     }
 
     const m = this.mission;
+    const theme = getActiveTheme(state.profile);
     const isRunning = state.missionPhase === "running";
     const isPredicting = state.missionPhase === "predicting";
     const locked = isRunning || isPredicting;
     const isSandbox = Boolean(mission.sandbox);
 
     // — Objective chip
-    const objFp = `${mission.id}|${mission.label}|${mission.sea}|${mission.objective.primary}|${isSandbox ? "s" : "m"}`;
+    const themedLabel = missionLabel(theme, mission.id);
+    const themedSea = missionSea(theme, mission.id);
+    const themedObjective = missionObjective(theme, mission.id);
+    const objFp = `${mission.id}|${theme.meta.id}|${themedLabel}|${themedSea}|${themedObjective}|${isSandbox ? "s" : "m"}`;
     if (objFp !== m.fingerprints.objective) {
       const eyebrowText = isSandbox
-        ? `${escapeHtml(mission.sea)} — Sandbox — play money`
-        : escapeHtml(mission.sea);
+        ? `${escapeHtml(themedSea || "Open Ocean")} — Sandbox — play money`
+        : escapeHtml(themedSea);
       m.objective.innerHTML = `
         <p class="eyebrow">${eyebrowText}</p>
-        <h2>${escapeHtml(mission.label)}</h2>
-        <p>${escapeHtml(mission.objective.primary)}</p>
+        <h2>${escapeHtml(themedLabel)}</h2>
+        <p>${escapeHtml(themedObjective)}</p>
       `;
       m.fingerprints.objective = objFp;
     }
 
     // — Status strip
     const profile = state.profile;
-    const statusFp = `${profile.berries}|${profile.bounty}|${profile.crewRoster.length}|${profile.fruitPowers.length}`;
+    const statusFp = `${theme.meta.id}|${profile.berries}|${profile.bounty}|${profile.crewRoster.length}|${profile.fruitPowers.length}`;
     if (statusFp !== m.fingerprints.status) {
       // Render the .stat-pill children straight into the wrapper.
-      m.status.innerHTML = statusStripInnerMarkup(profile);
+      m.status.innerHTML = statusStripInnerMarkup(profile, theme);
       m.fingerprints.status = statusFp;
     }
 
@@ -976,8 +1041,9 @@ export class Hud {
     }
 
     // — Dock head (depends on phase + mission tutorial only)
+    const themedTutorial = missionTutorial(theme, mission.id);
     const phaseChar = isRunning ? "r" : isPredicting ? "x" : "p";
-    const dockHeadFp = `${phaseChar}|${mission.tutorial}`;
+    const dockHeadFp = `${theme.meta.id}|${phaseChar}|${themedTutorial}`;
     if (dockHeadFp !== m.fingerprints.dockHead) {
       const h3Text = isRunning
         ? "Captain's plan is sailing"
@@ -988,7 +1054,7 @@ export class Hud {
         <div>
           <p class="eyebrow">Command Queue</p>
           <h3>${h3Text}</h3>
-          <p>${escapeHtml(mission.tutorial)}</p>
+          <p>${escapeHtml(themedTutorial)}</p>
         </div>
         <div class="dock-actions">
           <button ${locked ? "disabled" : ""} data-action="clear-queue">Clear</button>
@@ -1028,11 +1094,11 @@ export class Hud {
     this.reconcileQueueList(state, locked);
 
     // — Drawer host
-    const drawerFp = drawerFingerprint(state);
+    const drawerFp = `${theme.meta.id}|${drawerFingerprint(state)}`;
     if (drawerFp !== m.fingerprints.drawer) {
       if (state.selectedDrawer) {
         m.drawerHost.hidden = false;
-        m.drawerHost.innerHTML = drawerContent(state);
+        m.drawerHost.innerHTML = drawerContent(state, theme);
       } else {
         m.drawerHost.hidden = true;
         m.drawerHost.innerHTML = "";

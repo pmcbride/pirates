@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { missionNodes, sandboxMissionId } from "../../sim/content";
 import { gameStore } from "../../sim/store";
+import { getActiveTheme } from "../../themes";
 import { uiColors } from "../assets/manifest";
 
 export class WorldMapScene extends Phaser.Scene {
@@ -47,7 +48,13 @@ export class WorldMapScene extends Phaser.Scene {
     }
     this.layer?.add(chart);
 
-    const title = this.add.text(120, 110, "Grand Line Chart", {
+    const state = gameStore.getState();
+    const theme = getActiveTheme(state.profile);
+    // Theme drives the chart's name — "Open Seas Chart" in the original
+    // theme, "Grand Line Chart" in the one-piece overlay.
+    const chartTitle = `${theme.meta.label} Chart`;
+
+    const title = this.add.text(120, 110, chartTitle, {
       fontFamily: "Fredoka, Georgia, serif",
       fontSize: "62px",
       color: "#2b1d0e",
@@ -66,8 +73,6 @@ export class WorldMapScene extends Phaser.Scene {
       },
     );
     this.layer?.add(subtitle);
-
-    const state = gameStore.getState();
 
     // Dotted route lines between successive islands. Sandbox sits off the
     // main route — skip it so the dashed line follows the curriculum.
@@ -146,7 +151,8 @@ export class WorldMapScene extends Phaser.Scene {
         .setOrigin(0.5);
       this.layer?.add([nodeGraphics, markerText]);
 
-      const label = this.add.text(x, y + 56, node.label, {
+      const nodeLabel = theme.missions[node.missionId]?.label ?? node.missionId;
+      const label = this.add.text(x, y + 56, nodeLabel, {
         fontFamily: "Nunito, Trebuchet MS, sans-serif",
         fontSize: "22px",
         color: unlocked ? "#2b1d0e" : "#4b3a23",

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { originalTheme } from "../themes";
 import { missions } from "./content";
 import { cloneQueuedCommands, runMission } from "./engine";
 import { defaultProfile, deserializeProfile } from "./profile";
@@ -76,6 +77,7 @@ describe("prediction correctness helpers", () => {
       mission,
       cloneQueuedCommands(mission.suggestedQueue),
       profile,
+      originalTheme,
     );
     expect(computePredictionCorrect(null, result)).toBeNull();
   });
@@ -87,6 +89,7 @@ describe("prediction correctness helpers", () => {
       mission,
       cloneQueuedCommands(mission.suggestedQueue),
       profile,
+      originalTheme,
     );
     const actual = shipEndPositionForPrediction(result);
     expect(computePredictionCorrect(actual, result)).toBe(true);
@@ -99,6 +102,7 @@ describe("prediction correctness helpers", () => {
       mission,
       cloneQueuedCommands(mission.suggestedQueue),
       profile,
+      originalTheme,
     );
     const actual = shipEndPositionForPrediction(result);
     expect(
@@ -112,7 +116,7 @@ describe("prediction correctness helpers", () => {
     // Keep fire + one sail, then drop the rest — ship will run out of moves
     // short of the goal, which fails at the end (after several successful steps).
     const queue = cloneQueuedCommands(mission.suggestedQueue.slice(0, 2));
-    const result = runMission(mission, queue, profile);
+    const result = runMission(mission, queue, profile, originalTheme);
     expect(result.success).toBe(false);
 
     const actual = shipEndPositionForPrediction(result);
@@ -133,7 +137,7 @@ describe("prediction correctness helpers", () => {
     const queue = cloneQueuedCommands(
       mission.suggestedQueue.filter((command) => command.templateId !== "fire"),
     );
-    const result = runMission(mission, queue, profile);
+    const result = runMission(mission, queue, profile, originalTheme);
     expect(result.success).toBe(false);
     const actual = shipEndPositionForPrediction(result);
     expect(actual).toEqual(result.finalState.ship.position);

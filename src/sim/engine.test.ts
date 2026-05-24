@@ -1,17 +1,26 @@
 import { describe, expect, it } from "vitest";
 import { missions } from "./content";
 import { cloneQueuedCommands, runMission } from "./engine";
-import { applyReward, defaultProfile, deserializeProfile, serializeProfile } from "./profile";
+import {
+  applyReward,
+  defaultProfile,
+  deserializeProfile,
+  serializeProfile,
+} from "./profile";
 
 describe("mission runner", () => {
   it("clears the tutorial mission with its sample queue", () => {
     const profile = defaultProfile();
     const mission = missions["tutorial-cove"];
 
-    const result = runMission(mission, cloneQueuedCommands(mission.suggestedQueue), profile);
+    const result = runMission(
+      mission,
+      cloneQueuedCommands(mission.suggestedQueue),
+      profile,
+    );
 
     expect(result.success).toBe(true);
-    expect(result.reward?.gold).toBe(6);
+    expect(result.reward?.berries).toBe(60);
     expect(result.finalState.status).toBe("success");
   });
 
@@ -19,8 +28,16 @@ describe("mission runner", () => {
     const profile = defaultProfile();
     const mission = missions["current-crescent"];
 
-    const first = runMission(mission, cloneQueuedCommands(mission.suggestedQueue), profile);
-    const second = runMission(mission, cloneQueuedCommands(mission.suggestedQueue), profile);
+    const first = runMission(
+      mission,
+      cloneQueuedCommands(mission.suggestedQueue),
+      profile,
+    );
+    const second = runMission(
+      mission,
+      cloneQueuedCommands(mission.suggestedQueue),
+      profile,
+    );
 
     expect(first.success).toBe(true);
     expect(second.success).toBe(true);
@@ -37,10 +54,14 @@ describe("mission runner", () => {
     };
     const mission = missions["coral-lookout"];
 
-    const result = runMission(mission, cloneQueuedCommands(mission.suggestedQueue), profile);
+    const result = runMission(
+      mission,
+      cloneQueuedCommands(mission.suggestedQueue),
+      profile,
+    );
 
     expect(result.success).toBe(true);
-    expect(result.reward?.fruitPowerId).toBe("emberfruit");
+    expect(result.reward?.fruitPowerId).toBe("gumgum");
   });
 
   it("returns a hint and preserves the draft queue on failure", () => {
@@ -55,20 +76,117 @@ describe("mission runner", () => {
 
     expect(result.success).toBe(false);
     expect(result.hint?.focusTemplateId).toBe("fire");
-    expect(result.hint?.reason).toContain("enemy");
+    expect(result.hint?.reason.toLowerCase()).toContain("enemy");
     expect(queue).toEqual(before);
+  });
+
+  it("awards bounty per defeated Marine on success", () => {
+    const profile = {
+      ...defaultProfile(),
+      commandUnlocks: ["sail", "collect", "fire", "dodge"],
+    };
+    const mission = missions["spark-shoals"];
+
+    const result = runMission(
+      mission,
+      cloneQueuedCommands(mission.suggestedQueue),
+      profile,
+    );
+
+    expect(result.success).toBe(true);
+    // 1M base bounty from mission + 1M for the defeated Marine
+    expect(result.reward?.bounty).toBe(2_000_000);
+    expect(result.reward?.logLine).toContain("Shells Town");
+    expect(result.reward?.logLine).toContain("splashed 1 Marine");
+  });
+
+  it("composes a captain's log line when no enemies are defeated", () => {
+    const profile = defaultProfile();
+    const mission = missions["tutorial-cove"];
+
+    const result = runMission(
+      mission,
+      cloneQueuedCommands(mission.suggestedQueue),
+      profile,
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.reward?.logLine).toContain("Foosha Cove");
+    expect(result.reward?.logLine).toContain("hauled 1 chest");
+    expect(result.reward?.logLine).not.toContain("Marine");
   });
 });
 
 describe("profile persistence", () => {
   it("serializes, reloads, and unlocks the next mission", () => {
     const profile = defaultProfile();
-    const rewarded = applyReward(profile, "tutorial-cove", { gold: 6, stars: 1, unlockCommandIds: ["fire"] }, "spark-shoals");
+    const rewarded = applyReward(
+      profile,
+      "tutorial-cove",
+      { berries: 60, bounty: 0, stars: 1, unlockCommandIds: ["fire"] },
+      "spark-shoals",
+    );
     const roundTrip = deserializeProfile(serializeProfile(rewarded));
 
-    expect(roundTrip.gold).toBe(6);
+    expect(roundTrip.berries).toBe(60);
     expect(roundTrip.commandUnlocks).toContain("fire");
     expect(roundTrip.unlockedMissionIds).toContain("spark-shoals");
     expect(roundTrip.completedMissionIds).toContain("tutorial-cove");
+  });
+
+  it("appends a captain's log entry when reward includes a logLine", () => {
+    const profile = defaultProfile();
+    const rewarded = applyReward(
+      profile,
+      "tutorial-cove",
+      {
+        berries: 60,
+        bounty: 0,
+        stars: 1,
+        unlockCommandIds: ["fire"],
+        logLine: "Cleared Foosha Cove, hauled 1 chest.",
+      },
+      "spark-shoals",
+    );
+
+    expect(rewarded.captainLog).toHaveLength(1);
+    expect(rewarded.captainLog[0]).toMatchObject({
+      day: 1,
+      missionId: "tutorial-cove",
+      oneLine: "Cleared Foosha Cove, hauled 1 chest.",
+    });
+  });
+
+  it("accumulates bounty across rewards", () => {
+    const profile = defaultProfile();
+    const first = applyReward(profile, "tutorial-cove", {
+      berries: 60,
+      bounty: 0,
+      stars: 1,
+      unlockCommandIds: [],
+    });
+    const second = applyReward(first, "spark-shoals", {
+      berries: 100,
+      bounty: 2_000_000,
+      stars: 2,
+      unlockCommandIds: [],
+    });
+
+    expect(second.bounty).toBe(2_000_000);
+    expect(second.berries).toBe(160);
+  });
+
+  it("migrates older saves where berries were called 'gold'", () => {
+    const legacy = JSON.stringify({
+      gold: 18,
+      stars: 2,
+      unlockedMissionIds: ["tutorial-cove", "spark-shoals"],
+      completedMissionIds: ["tutorial-cove"],
+    });
+    const profile = deserializeProfile(legacy);
+
+    expect(profile.berries).toBe(18);
+    expect(profile.bounty).toBe(0);
+    expect(profile.captainLog).toEqual([]);
   });
 });

@@ -1,7 +1,7 @@
 import Phaser from "phaser";
 import { textureKeys, uiColors } from "../assets/manifest";
 
-const drawRoundedRect = (
+const drawStamp = (
   scene: Phaser.Scene,
   key: string,
   fill: number,
@@ -13,8 +13,8 @@ const drawRoundedRect = (
   graphics.setVisible(false);
   graphics.fillStyle(fill, 1);
   graphics.fillRoundedRect(0, 0, width, height, radius);
-  graphics.lineStyle(6, uiColors.foam, 0.9);
-  graphics.strokeRoundedRect(0, 0, width, height, radius);
+  graphics.lineStyle(6, uiColors.ink, 1);
+  graphics.strokeRoundedRect(3, 3, width - 6, height - 6, radius);
   graphics.generateTexture(key, width, height);
   graphics.destroy();
 };
@@ -25,13 +25,20 @@ export class BootScene extends Phaser.Scene {
   }
 
   create(): void {
-    drawRoundedRect(this, textureKeys.ship, uiColors.gold, 108, 86, 28);
-    drawRoundedRect(this, textureKeys.enemy, uiColors.coral);
-    drawRoundedRect(this, textureKeys.obstacle, uiColors.reef);
-    drawRoundedRect(this, textureKeys.treasure, uiColors.sand);
-    drawRoundedRect(this, textureKeys.crew, uiColors.plum);
-    drawRoundedRect(this, textureKeys.goal, uiColors.mint, 110, 110, 40);
-    drawRoundedRect(this, textureKeys.current, uiColors.storm, 96, 96, 30);
+    // Going Merry — a sun-yellow rounded ship token with an ink outline.
+    drawStamp(this, textureKeys.ship, uiColors.sun, 108, 86, 28);
+    // Marine skiff — coral with ink outline.
+    drawStamp(this, textureKeys.enemy, uiColors.coral);
+    // Reef — muted green.
+    drawStamp(this, textureKeys.obstacle, uiColors.reef);
+    // Chest — parchment + gold.
+    drawStamp(this, textureKeys.treasure, uiColors.gold);
+    // Waiting Straw Hat — plum.
+    drawStamp(this, textureKeys.crew, uiColors.plum);
+    // Goal marker — bright sun.
+    drawStamp(this, textureKeys.goal, uiColors.sunset, 110, 110, 40);
+    // Current — sea blue.
+    drawStamp(this, textureKeys.current, uiColors.sea, 96, 96, 30);
 
     this.scene.start("title");
   }

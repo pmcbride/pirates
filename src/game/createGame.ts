@@ -11,7 +11,7 @@ export const createGame = (parent: HTMLElement): Phaser.Game =>
     parent,
     width: 900,
     height: 1500,
-    backgroundColor: "#08273a",
+    backgroundColor: "#4ec3df",
     scale: {
       mode: Phaser.Scale.FIT,
       autoCenter: Phaser.Scale.CENTER_BOTH,

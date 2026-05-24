@@ -9,16 +9,23 @@ export const textureKeys = {
 } as const;
 
 export const uiColors = {
-  sea: 0x0f3b57,
-  seaDeep: 0x08273a,
-  foam: 0xd7f6f7,
+  sea: 0x4ec3df,
+  seaDeep: 0x1d6f9f,
+  sky: 0xffe9b8,
+  sun: 0xffb24a,
+  sunset: 0xff7a4e,
+  parchment: 0xfff1cf,
+  parchmentDeep: 0xf1d99a,
+  ink: 0x2b1d0e,
+  foam: 0xd6f3f8,
   sand: 0xf7d78b,
-  coral: 0xf67c5c,
-  mint: 0x6fe4ba,
-  plum: 0x8f78c9,
-  gold: 0xf3b63c,
-  reef: 0x1c6a67,
-  storm: 0x264f73,
+  coral: 0xff6b5c,
+  mint: 0x7be0a3,
+  plum: 0x8e7ad8,
+  gold: 0xffc94a,
+  reef: 0x4f6a55,
+  storm: 0x3c6e91,
+  bounty: 0xc4391c,
   white: 0xffffff,
 } as const;
 

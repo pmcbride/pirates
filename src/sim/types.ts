@@ -35,24 +35,34 @@ export interface PlayerSettings {
   soundOn: boolean;
 }
 
+export interface CaptainLogEntry {
+  day: number;
+  missionId: string;
+  oneLine: string;
+}
+
 export interface PlayerProfile {
   unlockedMissionIds: string[];
   completedMissionIds: string[];
-  gold: number;
+  berries: number;
+  bounty: number;
   stars: number;
   crewRoster: string[];
   fruitPowers: string[];
   commandUnlocks: string[];
   bestStars: Record<string, number>;
+  captainLog: CaptainLogEntry[];
   settings: PlayerSettings;
 }
 
 export interface RewardBundle {
-  gold: number;
+  berries: number;
+  bounty: number;
   stars: number;
   crewId?: string;
   fruitPowerId?: string;
   unlockCommandIds: string[];
+  logLine?: string;
 }
 
 export interface CrewMate {
@@ -158,7 +168,8 @@ export interface MissionState {
   currentBeat: number;
   status: "planning" | "running" | "success" | "failed";
   objective: MissionObjective;
-  collectedGold: number;
+  collectedBerries: number;
+  defeatedEnemyIds: string[];
 }
 
 export interface RunEvent {
@@ -214,7 +225,7 @@ export interface AppState {
   missionPhase: "planning" | "running";
   lastRun: MissionRunResult | null;
   activeHint: HintResult | null;
-  selectedDrawer: "crew" | "settings" | "map" | null;
+  selectedDrawer: "crew" | "settings" | "map" | "log" | null;
   playbackIndex: number;
   rewardMissionId: string | null;
 }

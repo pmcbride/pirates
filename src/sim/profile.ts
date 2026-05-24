@@ -1,16 +1,18 @@
-import type { PlayerProfile, RewardBundle } from "./types";
+import type { CaptainLogEntry, PlayerProfile, RewardBundle } from "./types";
 
-const profileStorageKey = "sea-of-codes/profile";
+const profileStorageKey = "sea-of-codes/profile/v2";
 
 export const defaultProfile = (): PlayerProfile => ({
   unlockedMissionIds: ["tutorial-cove"],
   completedMissionIds: [],
-  gold: 0,
+  berries: 0,
+  bounty: 0,
   stars: 0,
   crewRoster: [],
   fruitPowers: [],
   commandUnlocks: ["sail", "collect"],
   bestStars: {},
+  captainLog: [],
   settings: {
     reducedMotion: false,
     soundOn: true,
@@ -29,12 +31,17 @@ export const deserializeProfile = (raw: string | null): PlayerProfile => {
   }
 
   try {
-    const parsed = JSON.parse(raw) as Partial<PlayerProfile>;
+    const parsed = JSON.parse(raw) as Partial<PlayerProfile> & {
+      gold?: number;
+    };
     const merged = defaultProfile();
 
     return {
       ...merged,
       ...parsed,
+      // Migration: older saves used `gold` instead of `berries`.
+      berries: parsed.berries ?? parsed.gold ?? merged.berries,
+      bounty: parsed.bounty ?? merged.bounty,
       unlockedMissionIds: parsed.unlockedMissionIds ?? merged.unlockedMissionIds,
       completedMissionIds:
         parsed.completedMissionIds ?? merged.completedMissionIds,
@@ -42,6 +49,7 @@ export const deserializeProfile = (raw: string | null): PlayerProfile => {
       fruitPowers: parsed.fruitPowers ?? merged.fruitPowers,
       commandUnlocks: parsed.commandUnlocks ?? merged.commandUnlocks,
       bestStars: parsed.bestStars ?? merged.bestStars,
+      captainLog: parsed.captainLog ?? merged.captainLog,
       settings: {
         ...merged.settings,
         ...(parsed.settings ?? {}),
@@ -67,7 +75,8 @@ export const applyReward = (
 ): PlayerProfile => {
   const updated = cloneProfile(profile);
 
-  if (!updated.completedMissionIds.includes(missionId)) {
+  const isFirstClear = !updated.completedMissionIds.includes(missionId);
+  if (isFirstClear) {
     updated.completedMissionIds.push(missionId);
   }
 
@@ -75,7 +84,8 @@ export const applyReward = (
     updated.unlockedMissionIds.push(nextMissionId);
   }
 
-  updated.gold += reward.gold;
+  updated.berries += reward.berries;
+  updated.bounty += reward.bounty;
   updated.stars += reward.stars;
   updated.bestStars[missionId] = Math.max(
     reward.stars,
@@ -98,6 +108,15 @@ export const applyReward = (
       updated.commandUnlocks.push(commandId);
     }
   });
+
+  if (reward.logLine) {
+    const entry: CaptainLogEntry = {
+      day: updated.captainLog.length + 1,
+      missionId,
+      oneLine: reward.logLine,
+    };
+    updated.captainLog.push(entry);
+  }
 
   return updated;
 };

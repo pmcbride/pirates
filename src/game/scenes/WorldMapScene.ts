@@ -27,55 +27,64 @@ export class WorldMapScene extends Phaser.Scene {
     const height = this.scale.height;
     this.layer?.removeAll(true);
 
-    const backdrop = this.add.graphics();
-    backdrop.fillGradientStyle(
-      uiColors.seaDeep,
-      uiColors.sea,
-      uiColors.seaDeep,
-      uiColors.storm,
-      1,
-    );
-    backdrop.fillRect(0, 0, width, height);
-    backdrop.fillStyle(uiColors.foam, 0.07);
-    for (let row = 0; row < 8; row += 1) {
-      backdrop.fillRoundedRect(70, 140 + row * 150, width - 140, 34, 16);
-    }
-    this.layer?.add(backdrop);
+    // Sea backdrop.
+    const sea = this.add.graphics();
+    sea.fillGradientStyle(uiColors.sky, uiColors.sun, uiColors.sea, uiColors.seaDeep, 1);
+    sea.fillRect(0, 0, width, height);
+    this.layer?.add(sea);
 
-    const title = this.add.text(64, 72, "Sea Chart", {
-      fontFamily: "Georgia, Times New Roman, serif",
+    // Parchment scroll for the chart, with torn-edge effect via two ellipses.
+    const padding = 80;
+    const chart = this.add.graphics();
+    chart.fillStyle(uiColors.parchment, 0.96);
+    chart.fillRoundedRect(padding, padding + 60, width - padding * 2, height - padding * 2 - 360, 40);
+    chart.lineStyle(6, uiColors.ink, 0.85);
+    chart.strokeRoundedRect(padding, padding + 60, width - padding * 2, height - padding * 2 - 360, 40);
+    // subtle parchment hatching
+    chart.lineStyle(2, uiColors.ink, 0.06);
+    for (let y = padding + 80; y < height - padding - 320; y += 36) {
+      chart.lineBetween(padding + 20, y, width - padding - 20, y);
+    }
+    this.layer?.add(chart);
+
+    const title = this.add.text(120, 110, "Grand Line Chart", {
+      fontFamily: "Fredoka, Georgia, serif",
       fontSize: "62px",
-      color: "#fff5cc",
+      color: "#2b1d0e",
       fontStyle: "bold",
     });
     this.layer?.add(title);
 
     const subtitle = this.add.text(
-      64,
-      140,
-      "Choose the next route and teach the crew a fresh trick.",
+      120,
+      180,
+      "Tap an island to plot the next voyage.",
       {
-        fontFamily: "Trebuchet MS, Avenir Next, Segoe UI, sans-serif",
+        fontFamily: "Nunito, Trebuchet MS, sans-serif",
         fontSize: "26px",
-        color: "#d7f6f7",
+        color: "#4b3a23",
       },
     );
     this.layer?.add(subtitle);
 
     const state = gameStore.getState();
 
+    // Dotted route lines between successive islands.
     for (let index = 0; index < missionNodes.length - 1; index += 1) {
       const current = missionNodes[index];
       const next = missionNodes[index + 1];
-      const line = this.add.graphics();
-      line.lineStyle(8, uiColors.foam, 0.28);
-      line.lineBetween(
-        (current.x / 100) * width,
-        (current.y / 100) * height,
-        (next.x / 100) * width,
-        (next.y / 100) * height,
-      );
-      this.layer?.add(line);
+      const x1 = (current.x / 100) * width;
+      const y1 = (current.y / 100) * height;
+      const x2 = (next.x / 100) * width;
+      const y2 = (next.y / 100) * height;
+      const dots = this.add.graphics();
+      dots.fillStyle(uiColors.ink, 0.55);
+      const steps = 18;
+      for (let step = 1; step < steps; step += 1) {
+        const t = step / steps;
+        dots.fillCircle(x1 + (x2 - x1) * t, y1 + (y2 - y1) * t, 4);
+      }
+      this.layer?.add(dots);
     }
 
     missionNodes.forEach((node) => {
@@ -84,13 +93,20 @@ export class WorldMapScene extends Phaser.Scene {
       const unlocked = state.profile.unlockedMissionIds.includes(node.missionId);
       const complete = state.profile.completedMissionIds.includes(node.missionId);
       const selected = state.selectedMissionId === node.missionId;
+
+      // Sea-foam halo around selected island.
+      if (selected) {
+        const halo = this.add.circle(x, y, 64, uiColors.foam, 0.55);
+        this.layer?.add(halo);
+      }
+
       const nodeGraphics = this.add.circle(
         x,
         y,
-        selected ? 46 : 38,
-        complete ? uiColors.mint : unlocked ? uiColors.gold : uiColors.storm,
+        selected ? 44 : 36,
+        complete ? uiColors.mint : unlocked ? uiColors.sun : uiColors.parchmentDeep,
       );
-      nodeGraphics.setStrokeStyle(8, uiColors.foam, unlocked ? 1 : 0.4);
+      nodeGraphics.setStrokeStyle(6, uiColors.ink, 1);
       nodeGraphics.setInteractive({ useHandCursor: unlocked });
       nodeGraphics.on("pointerdown", () => {
         if (unlocked) {
@@ -98,15 +114,36 @@ export class WorldMapScene extends Phaser.Scene {
         }
       });
 
-      const label = this.add.text(x, y + 66, node.label, {
-        fontFamily: "Trebuchet MS, Avenir Next, Segoe UI, sans-serif",
-        fontSize: "24px",
-        color: unlocked ? "#fff6d6" : "#9ab2c1",
-        align: "center",
+      // X-marks-the-spot for the final island, lock for the rest.
+      const marker =
+        node.missionId === "treasure-isle"
+          ? "✕"
+          : complete
+            ? "✓"
+            : unlocked
+              ? "★"
+              : "🔒";
+      const markerText = this.add
+        .text(x, y, marker, {
+          fontFamily: "Fredoka, Georgia, serif",
+          fontSize: "28px",
+          color: "#2b1d0e",
+          fontStyle: "bold",
+        })
+        .setOrigin(0.5);
+      this.layer?.add([nodeGraphics, markerText]);
+
+      const label = this.add.text(x, y + 56, node.label, {
+        fontFamily: "Nunito, Trebuchet MS, sans-serif",
+        fontSize: "22px",
+        color: unlocked ? "#2b1d0e" : "#4b3a23",
+        fontStyle: "bold",
+        backgroundColor: "#fff1cf",
+        padding: { x: 10, y: 4 },
       });
       label.setOrigin(0.5, 0);
 
-      this.layer?.add([nodeGraphics, label]);
+      this.layer?.add(label);
     });
   }
 

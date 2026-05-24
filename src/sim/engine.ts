@@ -49,6 +49,35 @@ const cloneReward = (reward: RewardBundle): RewardBundle => ({
   unlockCommandIds: [...reward.unlockCommandIds],
 });
 
+const composeLogLine = (
+  mission: MissionDefinition,
+  state: MissionState,
+): string => {
+  const enemyCount = state.defeatedEnemyIds.length;
+  const treasureCount = mission.tiles.filter(
+    (tile) =>
+      tile.kind === "treasure" &&
+      !state.tiles.find((current) => current.id === tile.id && current.active),
+  ).length;
+  const recruited = mission.tiles.some(
+    (tile) =>
+      tile.kind === "crew" &&
+      !state.tiles.find((current) => current.id === tile.id && current.active),
+  );
+
+  const parts: string[] = [`Cleared ${mission.label}`];
+  if (enemyCount > 0) {
+    parts.push(`splashed ${enemyCount} Marine${enemyCount === 1 ? "" : "s"}`);
+  }
+  if (treasureCount > 0) {
+    parts.push(`hauled ${treasureCount} chest${treasureCount === 1 ? "" : "s"}`);
+  }
+  if (recruited) {
+    parts.push("a new Straw Hat joined the crew");
+  }
+  return `${parts.join(", ")}.`;
+};
+
 const cloneShip = (ship: MissionState["ship"]): MissionState["ship"] => ({
   facing: ship.facing,
   position: clonePosition(ship.position),
@@ -76,7 +105,8 @@ export const createMissionState = (
   currentBeat: 0,
   status: "planning",
   objective: mission.objective,
-  collectedGold: 0,
+  collectedBerries: 0,
+  defeatedEnemyIds: [],
 });
 
 const positionsEqual = (left: Position, right: Position): boolean =>
@@ -163,7 +193,7 @@ const evaluateCondition = (
 };
 
 const fireRange = (profile: PlayerProfile): number =>
-  profile.fruitPowers.includes("emberfruit") ? 2 : 1;
+  profile.fruitPowers.includes("gumgum") ? 2 : 1;
 
 const goalReached = (
   mission: MissionDefinition,
@@ -179,7 +209,7 @@ const remainingRequiredTiles = (
     .filter((tile): tile is MissionTile => Boolean(tile));
 
 const hintPrefix = (profile: PlayerProfile): string =>
-  profile.crewRoster.includes("sunny") ? "Sunny points with a sparkle. " : "";
+  profile.crewRoster.includes("zoro") ? "Zoro points with a sparkle. " : "";
 
 const makeHint = (
   profile: PlayerProfile,
@@ -250,13 +280,17 @@ const snapshotStep = (
 
 const rewardForMission = (
   mission: MissionDefinition,
+  state: MissionState,
   profile: PlayerProfile,
 ): RewardBundle => {
   const reward = cloneReward(mission.reward);
 
-  if (profile.crewRoster.includes("pebble")) {
-    reward.gold += 1;
+  if (profile.crewRoster.includes("nami")) {
+    reward.berries += 1;
   }
+
+  reward.bounty += state.defeatedEnemyIds.length * 1_000_000;
+  reward.logLine = composeLogLine(mission, state);
 
   return reward;
 };
@@ -343,13 +377,13 @@ export const runMission = (
     }
 
     state.status = "success";
-    const reward = rewardForMission(mission, profile);
+    const reward = rewardForMission(mission, state, profile);
 
     pushStep(commandId, title, "The crew reaches the treasure marker.", "success", [
       { kind: "goal", text: "Goal reached.", positions: [clonePosition(mission.goal)] },
       {
         kind: "reward",
-        text: `Earn ${reward.gold} gold and ${reward.stars} star${reward.stars === 1 ? "" : "s"}.`,
+        text: `Earn ${reward.berries} berries and ${reward.stars} star${reward.stars === 1 ? "" : "s"}.`,
       },
     ]);
 
@@ -445,8 +479,9 @@ export const runMission = (
         const enemy = findEnemyAhead(state, fireRange(profile));
         if (enemy) {
           deactivateTile(state.tiles, enemy.id);
+          state.defeatedEnemyIds.push(enemy.id);
           pushStep(commandId, title, "A splash cannon clears the lane.", "running", [
-            { kind: "fire", text: "Enemy splashed away.", positions: [enemy.position] },
+            { kind: "fire", text: "Marine splashed away.", positions: [enemy.position] },
           ]);
         } else {
           pushStep(commandId, title, "The cannon splashes water, but no foe was there.", "running", [
@@ -459,7 +494,7 @@ export const runMission = (
         const treasure = activeTileAt(state.tiles, state.ship.position, ["treasure"]);
         if (treasure) {
           deactivateTile(state.tiles, treasure.id);
-          state.collectedGold += 3;
+          state.collectedBerries += 30;
           pushStep(commandId, title, "Treasure aboard. The crew cheers.", "running", [
             { kind: "collect", text: "Collected treasure.", positions: [treasure.position] },
           ]);
@@ -575,13 +610,13 @@ export const runMission = (
     );
   }
 
-  const reward = rewardForMission(mission, profile);
   state.status = "success";
+  const reward = rewardForMission(mission, state, profile);
   pushStep("finish", "Mission clear", "The whole route is complete.", "success", [
     { kind: "goal", text: "Route complete." },
     {
       kind: "reward",
-      text: `Earn ${reward.gold} gold and ${reward.stars} stars.`,
+      text: `Earn ${reward.berries} berries and ${reward.stars} stars.`,
     },
   ]);
 

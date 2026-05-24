@@ -33,7 +33,7 @@ export class MissionScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.unsubscribe = gameStore.subscribe((state) => {
-      if (state.screen !== "mission") {
+      if (state.screen !== "mission" && state.screen !== "sandbox") {
         return;
       }
 

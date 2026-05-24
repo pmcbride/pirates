@@ -403,6 +403,8 @@ export class Hud {
         return this.renderMap(state);
       case "mission":
         return this.renderMission(state);
+      case "sandbox":
+        return this.renderMission(state);
       case "reward":
         return this.renderReward(state);
     }
@@ -464,7 +466,9 @@ export class Hud {
             })
             .join("")}
         </div>
-        <button data-action="open-selected-mission" class="primary-cta">⛵ Set Sail</button>
+        <button data-action="open-selected-mission" class="primary-cta">${
+          missionId === "sandbox-isle" ? "🏝️ Free Play" : "⛵ Set Sail"
+        }</button>
       </section>
     `;
   }
@@ -475,6 +479,7 @@ export class Hud {
       return "";
     }
 
+    const isSandbox = Boolean(mission.sandbox);
     const isRunning = state.missionPhase === "running";
     const queueMarkup = state.queuedCommands.length
       ? state.queuedCommands.map((command) => queueCard(command, isRunning)).join("")
@@ -502,7 +507,9 @@ export class Hud {
 
     return `
       <header class="objective-chip surface-card">
-        <p class="eyebrow">${escapeHtml(mission.sea)}</p>
+        <p class="eyebrow">${escapeHtml(mission.sea)}${
+          isSandbox ? " — Sandbox — play money" : ""
+        }</p>
         <h2>${escapeHtml(mission.label)}</h2>
         <p>${escapeHtml(mission.objective.primary)}</p>
       </header>
@@ -517,7 +524,7 @@ export class Hud {
       </nav>
 
       ${
-        state.activeHint
+        state.activeHint && !isSandbox
           ? `
             <section class="hint-banner surface-card">
               <p class="eyebrow">💬 Gentle Rewind</p>

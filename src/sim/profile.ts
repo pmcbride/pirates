@@ -3,7 +3,7 @@ import type { CaptainLogEntry, PlayerProfile, RewardBundle } from "./types";
 const profileStorageKey = "sea-of-codes/profile/v2";
 
 export const defaultProfile = (): PlayerProfile => ({
-  unlockedMissionIds: ["tutorial-cove"],
+  unlockedMissionIds: ["tutorial-cove", "sandbox-isle"],
   completedMissionIds: [],
   berries: 0,
   bounty: 0,
@@ -42,7 +42,13 @@ export const deserializeProfile = (raw: string | null): PlayerProfile => {
       // Migration: older saves used `gold` instead of `berries`.
       berries: parsed.berries ?? parsed.gold ?? merged.berries,
       bounty: parsed.bounty ?? merged.bounty,
-      unlockedMissionIds: parsed.unlockedMissionIds ?? merged.unlockedMissionIds,
+      // Always-unlocked sandbox is force-merged on load so older saves see it.
+      unlockedMissionIds: Array.from(
+        new Set([
+          ...(parsed.unlockedMissionIds ?? merged.unlockedMissionIds),
+          "sandbox-isle",
+        ]),
+      ),
       completedMissionIds:
         parsed.completedMissionIds ?? merged.completedMissionIds,
       crewRoster: parsed.crewRoster ?? merged.crewRoster,

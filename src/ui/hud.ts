@@ -9,7 +9,8 @@ import {
   missions,
 } from "../sim/content";
 import { gameStore } from "../sim/store";
-import type { AppState, PlannedCommand } from "../sim/types";
+import type { AppState, HintResult, PlannedCommand, PlayerProfile } from "../sim/types";
+import { reconcileKeys } from "./reconcile";
 
 const labelMap = {
   sail: "Sail",
@@ -61,27 +62,29 @@ const escapeHtml = (value: string): string =>
 
 const iconFor = (key: keyof typeof iconMap): string => iconMap[key] ?? "•";
 
-const queueCard = (command: PlannedCommand, isRunning: boolean): string => {
+/**
+ * Render the *inner* markup of a queue card (the contents of the <article>
+ * wrapper). The wrapper itself is created once per `instanceId` and kept
+ * across renders — see `createQueueCardElement`.
+ */
+const queueCardInnerMarkup = (command: PlannedCommand, isRunning: boolean): string => {
   const template = commandLibrary[command.templateId];
-  const accent = accentMap[template.accent as keyof typeof accentMap] ?? "accent-blue";
   const disabled = isRunning ? "disabled" : "";
 
   if (command.type === "loop") {
     const action = (command.action ?? "sail") as keyof typeof iconMap;
     return `
-      <article class="queue-card ${accent}">
-        <div class="queue-main">
-          <span class="stamp-icon">${iconFor("repeat")}</span>
-          <div class="queue-kicker">Repeat</div>
-          <button ${disabled} data-action="loop-count" data-instance-id="${command.instanceId}" class="chip-button">×${command.count ?? 2}</button>
-          <button ${disabled} data-action="loop-action" data-instance-id="${command.instanceId}" class="chip-button">${iconFor(action)} ${labelMap[action as keyof typeof labelMap]}</button>
-        </div>
-        <div class="queue-tools">
-          <button ${disabled} aria-label="Move left" data-action="move-left" data-instance-id="${command.instanceId}">◀</button>
-          <button ${disabled} aria-label="Move right" data-action="move-right" data-instance-id="${command.instanceId}">▶</button>
-          <button ${disabled} aria-label="Remove block" data-action="remove-command" data-instance-id="${command.instanceId}">✕</button>
-        </div>
-      </article>
+      <div class="queue-main">
+        <span class="stamp-icon">${iconFor("repeat")}</span>
+        <div class="queue-kicker">Repeat</div>
+        <button ${disabled} data-action="loop-count" data-instance-id="${command.instanceId}" class="chip-button">×${command.count ?? 2}</button>
+        <button ${disabled} data-action="loop-action" data-instance-id="${command.instanceId}" class="chip-button">${iconFor(action)} ${labelMap[action as keyof typeof labelMap]}</button>
+      </div>
+      <div class="queue-tools">
+        <button ${disabled} aria-label="Move left" data-action="move-left" data-instance-id="${command.instanceId}">◀</button>
+        <button ${disabled} aria-label="Move right" data-action="move-right" data-instance-id="${command.instanceId}">▶</button>
+        <button ${disabled} aria-label="Remove block" data-action="remove-command" data-instance-id="${command.instanceId}">✕</button>
+      </div>
     `;
   }
 
@@ -89,41 +92,53 @@ const queueCard = (command: PlannedCommand, isRunning: boolean): string => {
     const condition = (command.condition ?? "enemyAhead") as keyof typeof iconMap;
     const thenAction = (command.thenAction ?? "fire") as keyof typeof iconMap;
     return `
-      <article class="queue-card ${accent}">
-        <div class="queue-main">
-          <span class="stamp-icon">${iconFor("if")}</span>
-          <div class="queue-kicker">If</div>
-          <button ${disabled} data-action="if-condition" data-instance-id="${command.instanceId}" class="chip-button">${iconFor(condition)} ${labelMap[condition as keyof typeof labelMap]}</button>
-          <span class="queue-word">then</span>
-          <button ${disabled} data-action="if-action" data-instance-id="${command.instanceId}" class="chip-button">${iconFor(thenAction)} ${labelMap[thenAction as keyof typeof labelMap]}</button>
-        </div>
-        <div class="queue-tools">
-          <button ${disabled} aria-label="Move left" data-action="move-left" data-instance-id="${command.instanceId}">◀</button>
-          <button ${disabled} aria-label="Move right" data-action="move-right" data-instance-id="${command.instanceId}">▶</button>
-          <button ${disabled} aria-label="Remove block" data-action="remove-command" data-instance-id="${command.instanceId}">✕</button>
-        </div>
-      </article>
-    `;
-  }
-
-  const action = (command.action ?? template.defaultAction ?? "sail") as keyof typeof iconMap;
-  return `
-    <article class="queue-card ${accent}">
       <div class="queue-main">
-        <span class="stamp-icon" style="font-size:1.8rem">${iconFor(action)}</span>
-        <div>
-          <div class="queue-kicker">${escapeHtml(template.label)}</div>
-          <strong>${labelMap[action as keyof typeof labelMap]}</strong>
-        </div>
+        <span class="stamp-icon">${iconFor("if")}</span>
+        <div class="queue-kicker">If</div>
+        <button ${disabled} data-action="if-condition" data-instance-id="${command.instanceId}" class="chip-button">${iconFor(condition)} ${labelMap[condition as keyof typeof labelMap]}</button>
+        <span class="queue-word">then</span>
+        <button ${disabled} data-action="if-action" data-instance-id="${command.instanceId}" class="chip-button">${iconFor(thenAction)} ${labelMap[thenAction as keyof typeof labelMap]}</button>
       </div>
       <div class="queue-tools">
         <button ${disabled} aria-label="Move left" data-action="move-left" data-instance-id="${command.instanceId}">◀</button>
         <button ${disabled} aria-label="Move right" data-action="move-right" data-instance-id="${command.instanceId}">▶</button>
         <button ${disabled} aria-label="Remove block" data-action="remove-command" data-instance-id="${command.instanceId}">✕</button>
       </div>
-    </article>
+    `;
+  }
+
+  const action = (command.action ?? template.defaultAction ?? "sail") as keyof typeof iconMap;
+  return `
+    <div class="queue-main">
+      <span class="stamp-icon" style="font-size:1.8rem">${iconFor(action)}</span>
+      <div>
+        <div class="queue-kicker">${escapeHtml(template.label)}</div>
+        <strong>${labelMap[action as keyof typeof labelMap]}</strong>
+      </div>
+    </div>
+    <div class="queue-tools">
+      <button ${disabled} aria-label="Move left" data-action="move-left" data-instance-id="${command.instanceId}">◀</button>
+      <button ${disabled} aria-label="Move right" data-action="move-right" data-instance-id="${command.instanceId}">▶</button>
+      <button ${disabled} aria-label="Remove block" data-action="remove-command" data-instance-id="${command.instanceId}">✕</button>
+    </div>
   `;
 };
+
+/**
+ * Fingerprint a command + global running state to a string. Two commands with the
+ * same fingerprint render to identical inner markup, so we can skip rewriting
+ * the card body when nothing the user can see has changed.
+ */
+const commandFingerprint = (command: PlannedCommand, isRunning: boolean): string =>
+  [
+    command.templateId,
+    command.type,
+    command.action ?? "",
+    command.count ?? "",
+    command.condition ?? "",
+    command.thenAction ?? "",
+    isRunning ? "r" : "p",
+  ].join("|");
 
 const wantedCrewCard = (crewId: string): string => {
   const crew = crewMates[crewId];
@@ -238,33 +253,81 @@ const drawerContent = (state: AppState): string => {
   }
 };
 
-const statsInline = (state: AppState): string => `
+const statsInlineMarkup = (profile: PlayerProfile): string => `
   <div class="stats-inline">
-    <span class="stat-pill"><span class="stat-icon">💰</span>${escapeHtml(formatBerries(state.profile.berries))}</span>
-    <span class="stat-pill bounty" aria-label="Bounty"><span class="stat-icon" aria-hidden="true">🏴‍☠️</span>${escapeHtml(formatBounty(state.profile.bounty))}</span>
-    <span class="stat-pill"><span class="stat-icon">⭐</span>${state.profile.stars}</span>
+    <span class="stat-pill"><span class="stat-icon">💰</span>${escapeHtml(formatBerries(profile.berries))}</span>
+    <span class="stat-pill bounty" aria-label="Bounty"><span class="stat-icon" aria-hidden="true">🏴‍☠️</span>${escapeHtml(formatBounty(profile.bounty))}</span>
+    <span class="stat-pill"><span class="stat-icon">⭐</span>${profile.stars}</span>
   </div>
 `;
 
-const statusStrip = (state: AppState): string => `
-  <div class="status-strip">
-    <span class="stat-pill"><span class="stat-icon">💰</span>${escapeHtml(formatBerries(state.profile.berries))}</span>
-    <span class="stat-pill bounty" aria-label="Bounty"><span class="stat-icon" aria-hidden="true">🏴‍☠️</span>${escapeHtml(formatBounty(state.profile.bounty))}</span>
-    <span class="stat-pill"><span class="stat-icon">🧑‍🎤</span>${state.profile.crewRoster.length}</span>
-    <span class="stat-pill"><span class="stat-icon">🍎</span>${state.profile.fruitPowers.length}</span>
-  </div>
+const statusStripInnerMarkup = (profile: PlayerProfile): string => `
+  <span class="stat-pill"><span class="stat-icon">💰</span>${escapeHtml(formatBerries(profile.berries))}</span>
+  <span class="stat-pill bounty" aria-label="Bounty"><span class="stat-icon" aria-hidden="true">🏴‍☠️</span>${escapeHtml(formatBounty(profile.bounty))}</span>
+  <span class="stat-pill"><span class="stat-icon">🧑‍🎤</span>${profile.crewRoster.length}</span>
+  <span class="stat-pill"><span class="stat-icon">🍎</span>${profile.fruitPowers.length}</span>
 `;
+
+interface MissionScaffold {
+  layer: HTMLElement;
+  objective: HTMLElement;
+  status: HTMLElement;
+  rail: HTMLElement;
+  hintHost: HTMLElement;
+  dock: HTMLElement;
+  dockHead: HTMLElement;
+  queueList: HTMLElement;
+  palette: HTMLElement;
+  drawerHost: HTMLElement;
+  // Fingerprints of last-rendered inputs per region.
+  fingerprints: {
+    objective: string;
+    status: string;
+    rail: string;
+    hint: string;
+    dockHead: string;
+    palette: string;
+    drawer: string;
+    isRunning: boolean;
+  };
+  // Map of queued-command instanceId → rendered <article> + last fingerprint.
+  queueNodes: Map<string, { node: HTMLElement; fingerprint: string }>;
+  activeIndex: number;
+}
 
 export class Hud {
+  /** Which screen the layer currently shows. `null` until first render. */
+  private currentScreen: AppState["screen"] | null = null;
+
+  /** Active per-screen layer element (replaced on screen change). */
+  private currentLayer: HTMLElement | null = null;
+
+  /** Mission-screen specific cache. Only present while on the mission screen. */
+  private mission: MissionScaffold | null = null;
+
   constructor(private root: HTMLElement) {
     this.root.addEventListener("click", this.handleClick);
     this.root.addEventListener("dragstart", this.handleDragStart);
     this.root.addEventListener("dragover", this.handleDragOver);
     this.root.addEventListener("drop", this.handleDrop);
     gameStore.subscribe((state) => {
-      this.root.innerHTML = this.render(state);
+      this.render(state);
     });
   }
+
+  // ── DOM helpers ────────────────────────────────────────────
+
+  private static makeElement(html: string): HTMLElement {
+    const template = document.createElement("template");
+    template.innerHTML = html.trim();
+    const first = template.content.firstElementChild;
+    if (!(first instanceof HTMLElement)) {
+      throw new Error(`Hud: expected an element from markup: ${html.slice(0, 64)}…`);
+    }
+    return first;
+  }
+
+  // ── Event handlers (unchanged) ─────────────────────────────
 
   private handleClick = (event: Event): void => {
     const target = event.target as HTMLElement | null;
@@ -386,29 +449,60 @@ export class Hud {
     }
   };
 
-  private render(state: AppState): string {
-    return `
-      <div class="hud-layer screen-${state.screen}">
-        ${this.renderScreen(state)}
-        ${state.selectedDrawer ? `<aside class="drawer-host">${drawerContent(state)}</aside>` : ""}
-      </div>
-    `;
-  }
+  // ── Top-level render ───────────────────────────────────────
 
-  private renderScreen(state: AppState): string {
+  render(state: AppState): void {
+    if (state.screen !== this.currentScreen) {
+      this.mountScreen(state);
+    }
+
     switch (state.screen) {
       case "title":
-        return this.renderTitle();
+        // Title is static; nothing to update.
+        break;
       case "map":
-        return this.renderMap(state);
+        this.renderMapInPlace(state);
+        break;
       case "mission":
-        return this.renderMission(state);
+        this.renderMissionInPlace(state);
+        break;
       case "reward":
-        return this.renderReward(state);
+        // Reward overlay re-renders only when the reward mission id changes.
+        this.renderRewardInPlace(state);
+        break;
     }
   }
 
-  private renderTitle(): string {
+  private mountScreen(state: AppState): void {
+    this.currentScreen = state.screen;
+    this.mission = null;
+    this.root.innerHTML = "";
+
+    const layer = document.createElement("div");
+    layer.className = `hud-layer screen-${state.screen}`;
+    this.currentLayer = layer;
+
+    switch (state.screen) {
+      case "title":
+        layer.innerHTML = this.renderTitleMarkup();
+        break;
+      case "map":
+        layer.innerHTML = this.renderMapMarkup(state);
+        break;
+      case "mission":
+        this.mountMissionScaffold(layer, state);
+        break;
+      case "reward":
+        layer.innerHTML = this.renderRewardMarkup(state);
+        break;
+    }
+
+    this.root.appendChild(layer);
+  }
+
+  // ── Title ──────────────────────────────────────────────────
+
+  private renderTitleMarkup(): string {
     return `
       <section class="title-overlay">
         <div class="poster-copy">
@@ -421,11 +515,17 @@ export class Hud {
     `;
   }
 
-  private renderMap(state: AppState): string {
+  // ── Map ────────────────────────────────────────────────────
+
+  private renderMapMarkup(state: AppState): string {
     const missionId = state.selectedMissionId ?? state.profile.unlockedMissionIds[0];
     const node = missionNodes.find((entry) => entry.missionId === missionId);
     const mission = missionId ? missions[missionId] : null;
     const rank = bountyRank(state.profile.bounty);
+
+    const drawerMarkup = state.selectedDrawer
+      ? `<aside class="drawer-host">${drawerContent(state)}</aside>`
+      : "";
 
     return `
       <header class="top-strip">
@@ -434,7 +534,7 @@ export class Hud {
           <h2 style="margin:0;font-family:var(--display-font);font-size:1.8rem;">Pick the next voyage</h2>
           <p style="margin:0.2rem 0 0;color:var(--ink-soft);font-size:0.9rem;">${escapeHtml(rank)}</p>
         </div>
-        ${statsInline(state)}
+        ${statsInlineMarkup(state.profile)}
       </header>
 
       <nav class="rail-actions">
@@ -466,92 +566,23 @@ export class Hud {
         </div>
         <button data-action="open-selected-mission" class="primary-cta">⛵ Set Sail</button>
       </section>
+      ${drawerMarkup}
     `;
   }
 
-  private renderMission(state: AppState): string {
-    const mission = state.activeMissionId ? missions[state.activeMissionId] : null;
-    if (!mission) {
-      return "";
-    }
-
-    const isRunning = state.missionPhase === "running";
-    const queueMarkup = state.queuedCommands.length
-      ? state.queuedCommands.map((command) => queueCard(command, isRunning)).join("")
-      : '<div class="empty-queue">Tap stamps below to build a sailing plan.</div>';
-
-    const palette = mission.palette
-      .map((templateId) => {
-        const template = commandLibrary[templateId];
-        const icon = iconFor(templateId as keyof typeof iconMap);
-        return `
-          <button
-            ${isRunning ? "disabled" : ""}
-            class="palette-card ${accentMap[template.accent as keyof typeof accentMap] ?? "accent-blue"}"
-            data-action="add-command"
-            data-template-id="${templateId}"
-            draggable="true"
-          >
-            <span class="stamp-icon">${icon}</span>
-            <strong>${escapeHtml(template.label)}</strong>
-            <span>${escapeHtml(template.description)}</span>
-          </button>
-        `;
-      })
-      .join("");
-
-    return `
-      <header class="objective-chip surface-card">
-        <p class="eyebrow">${escapeHtml(mission.sea)}</p>
-        <h2>${escapeHtml(mission.label)}</h2>
-        <p>${escapeHtml(mission.objective.primary)}</p>
-      </header>
-
-      ${statusStrip(state)}
-
-      <nav class="rail-actions mission-rail">
-        <button data-action="leave-mission">🗺️ Map</button>
-        <button data-action="toggle-drawer" data-drawer="crew">🧑‍🎤 Crew</button>
-        <button data-action="toggle-drawer" data-drawer="log">📜 Log</button>
-        <button aria-label="Settings" data-action="toggle-drawer" data-drawer="settings">⚙️</button>
-      </nav>
-
-      ${
-        state.activeHint
-          ? `
-            <section class="hint-banner surface-card">
-              <p class="eyebrow">💬 Gentle Rewind</p>
-              <strong>${escapeHtml(state.activeHint.reason)}</strong>
-              <p>${escapeHtml(state.activeHint.suggestion)}</p>
-            </section>
-          `
-          : ""
-      }
-
-      <section class="command-dock surface-card">
-        <div class="dock-head">
-          <div>
-            <p class="eyebrow">Command Queue</p>
-            <h3>${isRunning ? "Captain's plan is sailing" : "Build the route"}</h3>
-            <p>${escapeHtml(mission.tutorial)}</p>
-          </div>
-          <div class="dock-actions">
-            <button ${isRunning ? "disabled" : ""} data-action="clear-queue">Clear</button>
-            <button ${isRunning ? "disabled" : ""} data-action="reset-queue">Reset</button>
-            <button ${isRunning ? "disabled" : ""} data-action="run-mission" class="primary-cta">▶ Run Plan</button>
-          </div>
-        </div>
-        <div class="queue-list" data-dropzone="queue">
-          ${queueMarkup}
-        </div>
-        <div class="palette-grid">
-          ${palette}
-        </div>
-      </section>
-    `;
+  /**
+   * Map screen is fast to rebuild and changes infrequently — we just refresh
+   * the whole layer in place when something changes. The screen-level identity
+   * check keeps us off the mission-screen tick storm.
+   */
+  private renderMapInPlace(state: AppState): void {
+    if (!this.currentLayer) return;
+    this.currentLayer.innerHTML = this.renderMapMarkup(state);
   }
 
-  private renderReward(state: AppState): string {
+  // ── Reward ─────────────────────────────────────────────────
+
+  private renderRewardMarkup(state: AppState): string {
     const mission = state.rewardMissionId ? missions[state.rewardMissionId] : null;
     const reward = state.lastRun?.reward;
     const lastLog = state.profile.captainLog.at(-1);
@@ -588,4 +619,337 @@ export class Hud {
       </section>
     `;
   }
+
+  private renderRewardInPlace(state: AppState): void {
+    if (!this.currentLayer) return;
+    this.currentLayer.innerHTML = this.renderRewardMarkup(state);
+  }
+
+  // ── Mission scaffold ───────────────────────────────────────
+
+  private mountMissionScaffold(layer: HTMLElement, state: AppState): void {
+    const mission = state.activeMissionId ? missions[state.activeMissionId] : null;
+    if (!mission) {
+      // No mission picked yet — just an empty layer; nothing to scaffold.
+      return;
+    }
+
+    // Build empty regions; renderMissionInPlace fills them based on state.
+    const objective = Hud.makeElement(`<header class="objective-chip surface-card"></header>`);
+    // We render the status strip's contents into this wrapper rather than
+    // replacing the wrapper itself — keeps the layer's child list stable.
+    const status = Hud.makeElement(`<div class="status-strip"></div>`);
+    const rail = Hud.makeElement(`<nav class="rail-actions mission-rail"></nav>`);
+    const hintHost = Hud.makeElement(`<div class="hint-host"></div>`);
+    const dock = Hud.makeElement(`<section class="command-dock surface-card"></section>`);
+    const dockHead = Hud.makeElement(`<div class="dock-head"></div>`);
+    const queueList = Hud.makeElement(`<div class="queue-list" data-dropzone="queue"></div>`);
+    const palette = Hud.makeElement(`<div class="palette-grid"></div>`);
+    const drawerHost = Hud.makeElement(`<aside class="drawer-host" hidden></aside>`);
+
+    dock.appendChild(dockHead);
+    dock.appendChild(queueList);
+    dock.appendChild(palette);
+
+    layer.appendChild(objective);
+    layer.appendChild(status);
+    layer.appendChild(rail);
+    layer.appendChild(hintHost);
+    layer.appendChild(dock);
+    layer.appendChild(drawerHost);
+
+    this.mission = {
+      layer,
+      objective,
+      status,
+      rail,
+      hintHost,
+      dock,
+      dockHead,
+      queueList,
+      palette,
+      drawerHost,
+      fingerprints: {
+        objective: "",
+        status: "",
+        rail: "",
+        hint: "",
+        dockHead: "",
+        palette: "",
+        drawer: "",
+        isRunning: false,
+      },
+      queueNodes: new Map(),
+      activeIndex: -1,
+    };
+  }
+
+  private renderMissionInPlace(state: AppState): void {
+    const mission = state.activeMissionId ? missions[state.activeMissionId] : null;
+    if (!mission || !this.mission) {
+      return;
+    }
+
+    const m = this.mission;
+    const isRunning = state.missionPhase === "running";
+
+    // — Objective chip
+    const objFp = `${mission.id}|${mission.label}|${mission.sea}|${mission.objective.primary}`;
+    if (objFp !== m.fingerprints.objective) {
+      m.objective.innerHTML = `
+        <p class="eyebrow">${escapeHtml(mission.sea)}</p>
+        <h2>${escapeHtml(mission.label)}</h2>
+        <p>${escapeHtml(mission.objective.primary)}</p>
+      `;
+      m.fingerprints.objective = objFp;
+    }
+
+    // — Status strip
+    const profile = state.profile;
+    const statusFp = `${profile.berries}|${profile.bounty}|${profile.crewRoster.length}|${profile.fruitPowers.length}`;
+    if (statusFp !== m.fingerprints.status) {
+      // Render the .stat-pill children straight into the wrapper.
+      m.status.innerHTML = statusStripInnerMarkup(profile);
+      m.fingerprints.status = statusFp;
+    }
+
+    // — Rail (static per mission, no inputs change it)
+    const railFp = `mission-rail`;
+    if (railFp !== m.fingerprints.rail) {
+      m.rail.innerHTML = `
+        <button data-action="leave-mission">🗺️ Map</button>
+        <button data-action="toggle-drawer" data-drawer="crew">🧑‍🎤 Crew</button>
+        <button data-action="toggle-drawer" data-drawer="log">📜 Log</button>
+        <button aria-label="Settings" data-action="toggle-drawer" data-drawer="settings">⚙️</button>
+      `;
+      m.fingerprints.rail = railFp;
+    }
+
+    // — Hint banner (toggle existence / refresh content only when hint changes)
+    const hintFp = hintFingerprint(state.activeHint);
+    if (hintFp !== m.fingerprints.hint) {
+      m.hintHost.innerHTML = state.activeHint
+        ? `
+          <section class="hint-banner surface-card">
+            <p class="eyebrow">💬 Gentle Rewind</p>
+            <strong>${escapeHtml(state.activeHint.reason)}</strong>
+            <p>${escapeHtml(state.activeHint.suggestion)}</p>
+          </section>
+        `
+        : "";
+      m.fingerprints.hint = hintFp;
+    }
+
+    // — Dock head (depends on isRunning + mission tutorial only)
+    const dockHeadFp = `${isRunning ? "r" : "p"}|${mission.tutorial}`;
+    if (dockHeadFp !== m.fingerprints.dockHead) {
+      m.dockHead.innerHTML = `
+        <div>
+          <p class="eyebrow">Command Queue</p>
+          <h3>${isRunning ? "Captain's plan is sailing" : "Build the route"}</h3>
+          <p>${escapeHtml(mission.tutorial)}</p>
+        </div>
+        <div class="dock-actions">
+          <button ${isRunning ? "disabled" : ""} data-action="clear-queue">Clear</button>
+          <button ${isRunning ? "disabled" : ""} data-action="reset-queue">Reset</button>
+          <button ${isRunning ? "disabled" : ""} data-action="run-mission" class="primary-cta">▶ Run Plan</button>
+        </div>
+      `;
+      m.fingerprints.dockHead = dockHeadFp;
+    }
+
+    // — Palette grid (depends on mission palette + isRunning)
+    const paletteFp = `${mission.id}|${isRunning ? "r" : "p"}`;
+    if (paletteFp !== m.fingerprints.palette) {
+      m.palette.innerHTML = mission.palette
+        .map((templateId) => {
+          const template = commandLibrary[templateId];
+          const icon = iconFor(templateId as keyof typeof iconMap);
+          return `
+            <button
+              ${isRunning ? "disabled" : ""}
+              class="palette-card ${accentMap[template.accent as keyof typeof accentMap] ?? "accent-blue"}"
+              data-action="add-command"
+              data-template-id="${templateId}"
+              draggable="true"
+            >
+              <span class="stamp-icon">${icon}</span>
+              <strong>${escapeHtml(template.label)}</strong>
+              <span>${escapeHtml(template.description)}</span>
+            </button>
+          `;
+        })
+        .join("");
+      m.fingerprints.palette = paletteFp;
+    }
+
+    // — Queue list (keyed reconcile + active class) — the whole point of this PR.
+    this.reconcileQueueList(state, isRunning);
+
+    // — Drawer host
+    const drawerFp = drawerFingerprint(state);
+    if (drawerFp !== m.fingerprints.drawer) {
+      if (state.selectedDrawer) {
+        m.drawerHost.hidden = false;
+        m.drawerHost.innerHTML = drawerContent(state);
+      } else {
+        m.drawerHost.hidden = true;
+        m.drawerHost.innerHTML = "";
+      }
+      m.fingerprints.drawer = drawerFp;
+    }
+  }
+
+  /**
+   * Keyed reconcile of the queue list.
+   *
+   * Three responsibilities, in order:
+   *   1. If the queue is empty, show the empty-state placeholder.
+   *   2. Otherwise, walk `state.queuedCommands`, reusing existing <article>
+   *      elements by `instanceId`. New commands are mounted; gone commands
+   *      are unmounted. Surviving elements keep their identity (and their
+   *      contained scroll position, focus, etc.).
+   *   3. Apply the `is-active` class to the card matching `state.playbackIndex`,
+   *      and remove it from the previously-active card. No full re-render
+   *      on playback ticks — that's the whole bug we're fixing.
+   */
+  private reconcileQueueList(state: AppState, isRunning: boolean): void {
+    const m = this.mission;
+    if (!m) return;
+    const list = m.queueList;
+    const commands = state.queuedCommands;
+
+    // Empty state — placeholder DIV is allowed to be torn down each time it
+    // toggles; it has no preserved state worth keeping.
+    if (commands.length === 0) {
+      m.queueNodes.clear();
+      m.activeIndex = -1;
+      list.innerHTML = '<div class="empty-queue">Tap stamps below to build a sailing plan.</div>';
+      // Bump running flag so transitioning back to non-empty re-creates cards
+      // with the right disabled state.
+      m.fingerprints.isRunning = isRunning;
+      return;
+    }
+
+    // If isRunning toggled, all card bodies need to re-render (their buttons
+    // change disabled state). We invalidate every fingerprint so the per-card
+    // step below picks the change up.
+    if (m.fingerprints.isRunning !== isRunning) {
+      m.queueNodes.forEach((entry) => {
+        entry.fingerprint = "";
+      });
+      m.fingerprints.isRunning = isRunning;
+    }
+
+    // If the placeholder DIV is currently in the list, clear it before we
+    // start placing real cards.
+    const placeholder = list.querySelector(".empty-queue");
+    if (placeholder) {
+      list.innerHTML = "";
+    }
+
+    // Desired ordering of instance IDs.
+    const desiredKeys = commands.map((c) => c.instanceId);
+    const currentKeys: string[] = [];
+    for (const child of Array.from(list.children)) {
+      const key = (child as HTMLElement).dataset?.instanceId;
+      if (key) currentKeys.push(key);
+    }
+
+    // Compute ops and apply.
+    const ops = reconcileKeys(currentKeys, desiredKeys);
+    for (const op of ops) {
+      if (op.type === "remove") {
+        const entry = m.queueNodes.get(op.key);
+        if (entry?.node.parentNode === list) {
+          list.removeChild(entry.node);
+        }
+        m.queueNodes.delete(op.key);
+      } else {
+        const command = commands.find((c) => c.instanceId === op.key);
+        if (!command) continue;
+        let entry = m.queueNodes.get(op.key);
+        if (!entry) {
+          const node = createQueueCardElement(command, isRunning);
+          entry = { node, fingerprint: commandFingerprint(command, isRunning) };
+          m.queueNodes.set(op.key, entry);
+        }
+        const before = op.beforeKey
+          ? (m.queueNodes.get(op.beforeKey)?.node ?? null)
+          : null;
+        list.insertBefore(entry.node, before);
+      }
+    }
+
+    // Now every desired card is mounted in order. Update body markup for any
+    // card whose fingerprint changed (e.g. loop count cycled).
+    for (const command of commands) {
+      const entry = m.queueNodes.get(command.instanceId);
+      if (!entry) continue;
+      const fp = commandFingerprint(command, isRunning);
+      if (fp !== entry.fingerprint) {
+        entry.node.innerHTML = queueCardInnerMarkup(command, isRunning);
+        entry.fingerprint = fp;
+      }
+    }
+
+    // Active class — surgical toggle, never rebuilds.
+    const nextActive = isRunning ? Math.min(state.playbackIndex, commands.length - 1) : -1;
+    if (nextActive !== m.activeIndex) {
+      if (m.activeIndex >= 0 && m.activeIndex < commands.length) {
+        const prevKey = commands[m.activeIndex]?.instanceId;
+        if (prevKey) {
+          m.queueNodes.get(prevKey)?.node.classList.remove("is-active");
+        }
+      }
+      if (nextActive >= 0) {
+        const key = commands[nextActive]?.instanceId;
+        if (key) {
+          m.queueNodes.get(key)?.node.classList.add("is-active");
+        }
+      }
+      m.activeIndex = nextActive;
+    } else if (nextActive >= 0) {
+      // Same index but element identity may have changed (queue rebuild). Ensure
+      // the active class is on the right node.
+      const key = commands[nextActive]?.instanceId;
+      if (key) {
+        m.queueNodes.get(key)?.node.classList.add("is-active");
+      }
+    }
+  }
 }
+
+const hintFingerprint = (hint: HintResult | null): string =>
+  hint ? `${hint.reason}|${hint.suggestion}|${hint.focusTemplateId ?? ""}` : "";
+
+const drawerFingerprint = (state: AppState): string => {
+  if (!state.selectedDrawer) return "none";
+  const profile = state.profile;
+  return [
+    state.selectedDrawer,
+    profile.crewRoster.join(","),
+    profile.fruitPowers.join(","),
+    profile.captainLog.length,
+    profile.captainLog.at(-1)?.oneLine ?? "",
+    profile.settings.reducedMotion ? "rm-on" : "rm-off",
+    profile.unlockedMissionIds.join(","),
+    profile.completedMissionIds.join(","),
+  ].join("|");
+};
+
+/**
+ * Create the <article> wrapper for a queue card and fill it with the inner
+ * markup. The wrapper is what we keep across renders — its identity is the
+ * thing that preserves focus, scroll, and CSS transitions on the card.
+ */
+const createQueueCardElement = (command: PlannedCommand, isRunning: boolean): HTMLElement => {
+  const template = commandLibrary[command.templateId];
+  const accent = accentMap[template.accent as keyof typeof accentMap] ?? "accent-blue";
+  const article = document.createElement("article");
+  article.className = `queue-card ${accent}`;
+  article.dataset.instanceId = command.instanceId;
+  article.innerHTML = queueCardInnerMarkup(command, isRunning);
+  return article;
+};
+

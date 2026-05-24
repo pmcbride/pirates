@@ -1,3 +1,5 @@
+import { getActiveTheme, themes } from "../themes";
+import type { ThemeId } from "../themes/types";
 import {
   commandLibrary,
   defaultSandboxPalette,
@@ -671,6 +673,7 @@ export class GameStore {
       missions[missionId],
       cloneQueuedCommands(this.state.queuedCommands),
       this.state.profile,
+      getActiveTheme(this.state.profile),
     );
 
     const predicted = this.state.predictedEndPosition;
@@ -831,6 +834,32 @@ export class GameStore {
     };
     this.persistProfile(profile);
 
+    this.update((state) => ({
+      ...state,
+      profile,
+    }));
+  }
+
+  setTheme(themeId: ThemeId): void {
+    // Defensive: only accept known theme ids.
+    if (!themes[themeId]) {
+      return;
+    }
+    if (this.state.profile.settings.themeId === themeId) {
+      return;
+    }
+
+    const profile: PlayerProfile = {
+      ...this.state.profile,
+      settings: {
+        ...this.state.profile.settings,
+        themeId,
+      },
+    };
+    this.persistProfile(profile);
+
+    // Plain setState — every subscriber (HUD + Phaser scenes) will re-render
+    // and read strings from the new active theme.
     this.update((state) => ({
       ...state,
       profile,

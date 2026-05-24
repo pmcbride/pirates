@@ -409,6 +409,22 @@ export class GameStore {
       profile,
     }));
   }
+
+  toggleMuted(): void {
+    const profile: PlayerProfile = {
+      ...this.state.profile,
+      settings: {
+        ...this.state.profile.settings,
+        muted: !this.state.profile.settings.muted,
+      },
+    };
+    this.persistProfile(profile);
+
+    this.update((state) => ({
+      ...state,
+      profile,
+    }));
+  }
 }
 
 export const gameStore = new GameStore();

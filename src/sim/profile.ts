@@ -16,6 +16,7 @@ export const defaultProfile = (): PlayerProfile => ({
   settings: {
     reducedMotion: false,
     soundOn: true,
+    muted: false,
   },
 });
 

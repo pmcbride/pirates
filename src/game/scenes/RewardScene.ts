@@ -69,7 +69,7 @@ export class RewardScene extends Phaser.Scene {
         .text(
           width / 2,
           560,
-          `💰 +${formatBerries(reward?.berries ?? 0)}\n📜 +${formatBounty(reward?.bounty ?? 0)}\n⭐ +${reward?.stars ?? 0}`,
+          `💰 +${formatBerries(reward?.berries ?? 0)}\n🏴‍☠️ +${formatBounty(reward?.bounty ?? 0)}\n⭐ +${reward?.stars ?? 0}`,
           {
             align: "center",
             lineSpacing: 16,

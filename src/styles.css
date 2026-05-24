@@ -495,7 +495,7 @@ canvas {
   font-size: 1.05rem;
 }
 
-.palette-card span {
+.palette-card span:not(.stamp-icon) {
   font-size: 0.78rem;
   color: var(--ink-soft);
   font-weight: 700;
@@ -716,9 +716,11 @@ canvas {
 /* ── Responsive (tablet portrait + phone) ──────────────────── */
 
 @media (max-width: 920px) {
+  /* Keep the status-strip anchored to the top — the codex draft's
+     bottom-anchored variant collided with the hint-banner on portrait
+     tablets (768×1024). The action zone in the middle must stay clear. */
   .status-strip {
-    top: auto;
-    bottom: 22rem;
+    top: 11rem;
   }
 
   .dock-head,

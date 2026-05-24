@@ -77,9 +77,9 @@ const queueCard = (command: PlannedCommand, isRunning: boolean): string => {
           <button ${disabled} data-action="loop-action" data-instance-id="${command.instanceId}" class="chip-button">${iconFor(action)} ${labelMap[action as keyof typeof labelMap]}</button>
         </div>
         <div class="queue-tools">
-          <button ${disabled} data-action="move-left" data-instance-id="${command.instanceId}">◀</button>
-          <button ${disabled} data-action="move-right" data-instance-id="${command.instanceId}">▶</button>
-          <button ${disabled} data-action="remove-command" data-instance-id="${command.instanceId}">✕</button>
+          <button ${disabled} aria-label="Move left" data-action="move-left" data-instance-id="${command.instanceId}">◀</button>
+          <button ${disabled} aria-label="Move right" data-action="move-right" data-instance-id="${command.instanceId}">▶</button>
+          <button ${disabled} aria-label="Remove block" data-action="remove-command" data-instance-id="${command.instanceId}">✕</button>
         </div>
       </article>
     `;
@@ -98,9 +98,9 @@ const queueCard = (command: PlannedCommand, isRunning: boolean): string => {
           <button ${disabled} data-action="if-action" data-instance-id="${command.instanceId}" class="chip-button">${iconFor(thenAction)} ${labelMap[thenAction as keyof typeof labelMap]}</button>
         </div>
         <div class="queue-tools">
-          <button ${disabled} data-action="move-left" data-instance-id="${command.instanceId}">◀</button>
-          <button ${disabled} data-action="move-right" data-instance-id="${command.instanceId}">▶</button>
-          <button ${disabled} data-action="remove-command" data-instance-id="${command.instanceId}">✕</button>
+          <button ${disabled} aria-label="Move left" data-action="move-left" data-instance-id="${command.instanceId}">◀</button>
+          <button ${disabled} aria-label="Move right" data-action="move-right" data-instance-id="${command.instanceId}">▶</button>
+          <button ${disabled} aria-label="Remove block" data-action="remove-command" data-instance-id="${command.instanceId}">✕</button>
         </div>
       </article>
     `;
@@ -117,9 +117,9 @@ const queueCard = (command: PlannedCommand, isRunning: boolean): string => {
         </div>
       </div>
       <div class="queue-tools">
-        <button ${disabled} data-action="move-left" data-instance-id="${command.instanceId}">◀</button>
-        <button ${disabled} data-action="move-right" data-instance-id="${command.instanceId}">▶</button>
-        <button ${disabled} data-action="remove-command" data-instance-id="${command.instanceId}">✕</button>
+        <button ${disabled} aria-label="Move left" data-action="move-left" data-instance-id="${command.instanceId}">◀</button>
+        <button ${disabled} aria-label="Move right" data-action="move-right" data-instance-id="${command.instanceId}">▶</button>
+        <button ${disabled} aria-label="Remove block" data-action="remove-command" data-instance-id="${command.instanceId}">✕</button>
       </div>
     </article>
   `;
@@ -241,7 +241,7 @@ const drawerContent = (state: AppState): string => {
 const statsInline = (state: AppState): string => `
   <div class="stats-inline">
     <span class="stat-pill"><span class="stat-icon">💰</span>${escapeHtml(formatBerries(state.profile.berries))}</span>
-    <span class="stat-pill bounty"><span class="stat-icon">📜</span>${escapeHtml(formatBounty(state.profile.bounty))}</span>
+    <span class="stat-pill bounty" aria-label="Bounty"><span class="stat-icon" aria-hidden="true">🏴‍☠️</span>${escapeHtml(formatBounty(state.profile.bounty))}</span>
     <span class="stat-pill"><span class="stat-icon">⭐</span>${state.profile.stars}</span>
   </div>
 `;
@@ -249,7 +249,7 @@ const statsInline = (state: AppState): string => `
 const statusStrip = (state: AppState): string => `
   <div class="status-strip">
     <span class="stat-pill"><span class="stat-icon">💰</span>${escapeHtml(formatBerries(state.profile.berries))}</span>
-    <span class="stat-pill bounty"><span class="stat-icon">📜</span>${escapeHtml(formatBounty(state.profile.bounty))}</span>
+    <span class="stat-pill bounty" aria-label="Bounty"><span class="stat-icon" aria-hidden="true">🏴‍☠️</span>${escapeHtml(formatBounty(state.profile.bounty))}</span>
     <span class="stat-pill"><span class="stat-icon">🧑‍🎤</span>${state.profile.crewRoster.length}</span>
     <span class="stat-pill"><span class="stat-icon">🍎</span>${state.profile.fruitPowers.length}</span>
   </div>
@@ -450,7 +450,7 @@ export class Hud {
         <p>${escapeHtml(node?.preview ?? mission?.briefing ?? "")}</p>
         <div class="map-reward-row">
           <span>💰 ${escapeHtml(formatBerries(node?.rewards.berries ?? 0))}</span>
-          <span>📜 ${escapeHtml(formatBounty(node?.rewards.bounty ?? 0))}</span>
+          <span>🏴‍☠️ ${escapeHtml(formatBounty(node?.rewards.bounty ?? 0))}</span>
           <span>⭐ ${node?.rewards.stars ?? 0}</span>
           ${node?.rewards.crewId ? `<span>🧑‍🎤 ${escapeHtml(crewMates[node.rewards.crewId]?.name ?? "")}</span>` : ""}
           ${node?.rewards.fruitPowerId ? `<span>🍎 ${escapeHtml(fruitPowers[node.rewards.fruitPowerId]?.name ?? "")}</span>` : ""}
@@ -478,7 +478,7 @@ export class Hud {
     const isRunning = state.missionPhase === "running";
     const queueMarkup = state.queuedCommands.length
       ? state.queuedCommands.map((command) => queueCard(command, isRunning)).join("")
-      : '<div class="empty-queue">Tap or drag stamps here to build a sailing plan.</div>';
+      : '<div class="empty-queue">Tap stamps below to build a sailing plan.</div>';
 
     const palette = mission.palette
       .map((templateId) => {
@@ -513,7 +513,7 @@ export class Hud {
         <button data-action="leave-mission">🗺️ Map</button>
         <button data-action="toggle-drawer" data-drawer="crew">🧑‍🎤 Crew</button>
         <button data-action="toggle-drawer" data-drawer="log">📜 Log</button>
-        <button data-action="toggle-drawer" data-drawer="settings">⚙️</button>
+        <button aria-label="Settings" data-action="toggle-drawer" data-drawer="settings">⚙️</button>
       </nav>
 
       ${
@@ -563,7 +563,7 @@ export class Hud {
           <h2>${escapeHtml(mission?.label ?? "Voyage Clear")}</h2>
           <div class="reward-row">
             <span class="stat-pill">💰 ${escapeHtml(formatBerries(reward?.berries ?? 0))}</span>
-            <span class="stat-pill bounty">📜 +${escapeHtml(formatBounty(reward?.bounty ?? 0))}</span>
+            <span class="stat-pill bounty" aria-label="Bounty">🏴‍☠️ +${escapeHtml(formatBounty(reward?.bounty ?? 0))}</span>
             <span class="stat-pill">⭐ +${reward?.stars ?? 0}</span>
           </div>
           ${

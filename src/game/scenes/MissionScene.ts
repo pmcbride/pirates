@@ -23,11 +23,11 @@ export class MissionScene extends Phaser.Scene {
   create(): void {
     this.boardLayer = this.add.container(0, 0);
     this.statusText = this.add
-      .text(this.scale.width / 2, 120, "", {
-        fontFamily: "Trebuchet MS, Avenir Next, Segoe UI, sans-serif",
-        fontSize: "28px",
-        color: "#fff6d6",
-        backgroundColor: "#163b52",
+      .text(this.scale.width / 2, 220, "", {
+        fontFamily: "Nunito, Trebuchet MS, sans-serif",
+        fontSize: "26px",
+        color: "#2b1d0e",
+        backgroundColor: "#fff1cf",
         padding: { x: 22, y: 14 },
       })
       .setOrigin(0.5);
@@ -86,21 +86,23 @@ export class MissionScene extends Phaser.Scene {
     const { tileSize, offsetX, offsetY } = this.boardMetrics(mission);
 
     const water = this.add.graphics();
-    water.fillGradientStyle(
-      uiColors.sea,
-      uiColors.seaDeep,
-      uiColors.sea,
-      uiColors.storm,
-      1,
-    );
+    water.fillGradientStyle(uiColors.sky, uiColors.sun, uiColors.sea, uiColors.seaDeep, 1);
     water.fillRect(0, 0, this.scale.width, this.scale.height);
     this.boardLayer?.add(water);
 
     const grid = this.add.graphics();
     for (let y = 0; y < mission.height; y += 1) {
       for (let x = 0; x < mission.width; x += 1) {
-        grid.fillStyle((x + y) % 2 === 0 ? 0x12435f : 0x10374f, 1);
+        grid.fillStyle((x + y) % 2 === 0 ? 0x6fd0e8 : 0x4ec3df, 1);
         grid.fillRoundedRect(
+          offsetX + x * tileSize,
+          offsetY + y * tileSize,
+          tileSize - 8,
+          tileSize - 8,
+          24,
+        );
+        grid.lineStyle(3, uiColors.ink, 0.18);
+        grid.strokeRoundedRect(
           offsetX + x * tileSize,
           offsetY + y * tileSize,
           tileSize - 8,
@@ -137,9 +139,9 @@ export class MissionScene extends Phaser.Scene {
           .setDisplaySize(tileSize - 22, tileSize - 22);
         const text = this.add
           .text(image.x, image.y, tile.label.slice(0, 2).toUpperCase(), {
-            fontFamily: "Trebuchet MS, Avenir Next, Segoe UI, sans-serif",
+            fontFamily: "Fredoka, Georgia, serif",
             fontSize: `${Math.max(tileSize * 0.18, 18)}px`,
-            color: "#08273a",
+            color: "#2b1d0e",
             fontStyle: "bold",
           })
           .setOrigin(0.5);

@@ -30,7 +30,7 @@ export const commandLibrary: Record<string, CommandBlock> = {
     label: "Sail",
     shortLabel: "Sail",
     accent: "blue",
-    description: "Move one water tile forward.",
+    description: "Move one wave forward.",
     defaultAction: "sail",
   },
   "turn-left": {
@@ -39,7 +39,7 @@ export const commandLibrary: Record<string, CommandBlock> = {
     label: "Turn Left",
     shortLabel: "Left",
     accent: "teal",
-    description: "Turn the bow to port.",
+    description: "Swing the bow to port.",
     defaultAction: "turn-left",
   },
   "turn-right": {
@@ -48,7 +48,7 @@ export const commandLibrary: Record<string, CommandBlock> = {
     label: "Turn Right",
     shortLabel: "Right",
     accent: "teal",
-    description: "Turn the bow to starboard.",
+    description: "Swing the bow to starboard.",
     defaultAction: "turn-right",
   },
   dodge: {
@@ -57,7 +57,7 @@ export const commandLibrary: Record<string, CommandBlock> = {
     label: "Dodge",
     shortLabel: "Dodge",
     accent: "coral",
-    description: "Slide into a safe lane when trouble is ahead.",
+    description: "Slide into a safe lane.",
     defaultAction: "dodge",
   },
   fire: {
@@ -66,7 +66,7 @@ export const commandLibrary: Record<string, CommandBlock> = {
     label: "Fire",
     shortLabel: "Fire",
     accent: "gold",
-    description: "Splash an enemy in front of the ship.",
+    description: "Splash the Marine in front of you.",
     defaultAction: "fire",
   },
   collect: {
@@ -75,7 +75,7 @@ export const commandLibrary: Record<string, CommandBlock> = {
     label: "Collect",
     shortLabel: "Collect",
     accent: "mint",
-    description: "Pick up a treasure on the ship tile.",
+    description: "Scoop the treasure on this wave.",
     defaultAction: "collect",
   },
   talk: {
@@ -84,7 +84,7 @@ export const commandLibrary: Record<string, CommandBlock> = {
     label: "Talk",
     shortLabel: "Talk",
     accent: "plum",
-    description: "Invite a waiting crew mate aboard.",
+    description: "Invite a new Straw Hat aboard.",
     defaultAction: "talk",
   },
   repeat: {
@@ -93,7 +93,7 @@ export const commandLibrary: Record<string, CommandBlock> = {
     label: "Repeat",
     shortLabel: "Repeat",
     accent: "sunset",
-    description: "Repeat one action two or three times.",
+    description: "Repeat one move two or three times.",
     defaultCount: 2,
     defaultAction: "sail",
     actionOptions: ["sail", "fire", "collect", "talk"],
@@ -118,28 +118,28 @@ export const commandLibrary: Record<string, CommandBlock> = {
 };
 
 export const crewMates: Record<string, CrewMate> = {
-  sunny: {
-    id: "sunny",
-    name: "Sunny",
-    title: "Lookout",
-    description: "Adds a brighter hint when a ship bumps into trouble.",
+  zoro: {
+    id: "zoro",
+    name: "Zoro",
+    title: "Swordsman",
+    description: "Adds a sparkly hint whenever the crew bumps into trouble.",
     passiveType: "hint",
   },
-  pebble: {
-    id: "pebble",
-    name: "Pebble",
-    title: "Quartermaster",
-    description: "Finds one bonus coin whenever a mission is cleared.",
+  nami: {
+    id: "nami",
+    name: "Nami",
+    title: "Navigator",
+    description: "Finds one extra berry every time a voyage is cleared.",
     passiveType: "gold",
   },
 };
 
 export const fruitPowers: Record<string, FruitPower> = {
-  emberfruit: {
-    id: "emberfruit",
-    name: "Ember Fruit",
-    title: "Long Splash",
-    description: "Fire can splash enemies two tiles away.",
+  gumgum: {
+    id: "gumgum",
+    name: "Gum-Gum Fruit",
+    title: "Stretchy Strike",
+    description: "Fire reaches two waves ahead.",
     modifier: "extraFireRange",
   },
 };
@@ -148,61 +148,89 @@ export const missionNodes: MissionNode[] = [
   {
     id: "tutorial-cove",
     missionId: "tutorial-cove",
-    label: "Tutorial Cove",
+    label: "Foosha Cove",
     sea: "Starter Cove",
     x: 12,
     y: 78,
     difficulty: "cove",
-    preview: "Sail to the first chest and learn how the queue works.",
-    rewards: { gold: 6, stars: 1, unlockCommandIds: ["fire"] },
+    preview: "Hoist the sail and grab the first chest.",
+    rewards: {
+      berries: 60,
+      bounty: 0,
+      stars: 1,
+      unlockCommandIds: ["fire"],
+    },
     unlockMissionIds: [],
   },
   {
     id: "spark-shoals",
     missionId: "spark-shoals",
-    label: "Spark Shoals",
-    sea: "Sea 1",
+    label: "Shells Town",
+    sea: "East Blue",
     x: 30,
     y: 64,
     difficulty: "breeze",
-    preview: "Use sequencing and a splash cannon to clear a lane.",
-    rewards: { gold: 10, stars: 2, crewId: "sunny", unlockCommandIds: ["dodge"] },
+    preview: "Splash a Marine skiff and bring Zoro aboard.",
+    rewards: {
+      berries: 100,
+      bounty: 1_000_000,
+      stars: 2,
+      crewId: "zoro",
+      unlockCommandIds: ["dodge"],
+    },
     unlockMissionIds: ["tutorial-cove"],
   },
   {
     id: "current-crescent",
     missionId: "current-crescent",
-    label: "Current Crescent",
-    sea: "Sea 2",
+    label: "Reverse Mountain",
+    sea: "Grand Line entry",
     x: 51,
     y: 48,
     difficulty: "breeze",
-    preview: "Meet repeat blocks and surf a long stream of shiny water.",
-    rewards: { gold: 14, stars: 2, unlockCommandIds: ["repeat"] },
+    preview: "Surf a long current using a Repeat plan.",
+    rewards: {
+      berries: 140,
+      bounty: 0,
+      stars: 2,
+      unlockCommandIds: ["repeat"],
+    },
     unlockMissionIds: ["spark-shoals"],
   },
   {
     id: "coral-lookout",
     missionId: "coral-lookout",
-    label: "Coral Lookout",
-    sea: "Sea 3",
+    label: "Skypiea Lookout",
+    sea: "Sky Island",
     x: 71,
     y: 36,
     difficulty: "brave",
-    preview: "Teach the crew to react with if-then plans.",
-    rewards: { gold: 18, stars: 3, fruitPowerId: "emberfruit", unlockCommandIds: ["if", "talk"] },
+    preview: "Teach the crew to react with If-then plans.",
+    rewards: {
+      berries: 180,
+      bounty: 2_000_000,
+      stars: 3,
+      fruitPowerId: "gumgum",
+      unlockCommandIds: ["if", "talk"],
+    },
     unlockMissionIds: ["current-crescent"],
   },
   {
     id: "treasure-isle",
     missionId: "treasure-isle",
-    label: "Treasure Isle",
-    sea: "Final",
+    label: "Raftel",
+    sea: "Final Voyage",
     x: 87,
     y: 22,
     difficulty: "captain",
-    preview: "Mix repeat and if blocks to reach the glowing grand prize.",
-    rewards: { gold: 24, stars: 3, crewId: "pebble", unlockCommandIds: [] },
+    preview: "Mix Repeat and If to reach the One Piece.",
+    rewards: {
+      berries: 240,
+      bounty: 5_000_000,
+      stars: 3,
+      crewId: "nami",
+      unlockCommandIds: [],
+    },
     unlockMissionIds: ["coral-lookout"],
   },
 ];
@@ -211,10 +239,10 @@ export const missions: Record<string, MissionDefinition> = {
   "tutorial-cove": {
     id: "tutorial-cove",
     nodeId: "tutorial-cove",
-    label: "Tutorial Cove",
+    label: "Foosha Cove",
     sea: "Starter Cove",
-    briefing: "Line up your first sailing plan and scoop up the chest.",
-    tutorial: "Try adding Sail, Sail, Sail, Collect, Sail, Sail.",
+    briefing: "Line up a sailing plan and scoop the first chest.",
+    tutorial: "Try Sail, Sail, Sail, Collect, Sail, Sail.",
     width: 6,
     height: 3,
     start: {
@@ -223,12 +251,17 @@ export const missions: Record<string, MissionDefinition> = {
     },
     goal: { x: 5, y: 1 },
     objective: {
-      primary: "Collect the chest and sail to the lighthouse.",
+      primary: "Collect the chest, then sail to the lighthouse.",
       short: "Collect chest, then reach the lighthouse.",
     },
     palette: ["sail", "collect"],
     requiredTileIds: ["cove-chest"],
-    reward: { gold: 6, stars: 1, unlockCommandIds: ["fire"] },
+    reward: {
+      berries: 60,
+      bounty: 0,
+      stars: 1,
+      unlockCommandIds: ["fire"],
+    },
     tiles: [
       {
         id: "cove-chest",
@@ -250,10 +283,10 @@ export const missions: Record<string, MissionDefinition> = {
   "spark-shoals": {
     id: "spark-shoals",
     nodeId: "spark-shoals",
-    label: "Spark Shoals",
-    sea: "Sea 1",
-    briefing: "One splashy gull-bot blocks the gold lane. Fire first, then sail.",
-    tutorial: "If a crab skiff is in front, Fire before you Sail.",
+    label: "Shells Town",
+    sea: "East Blue",
+    briefing: "A Marine skiff blocks the gold lane. Fire first, then sail.",
+    tutorial: "If a Marine is ahead, Fire before you Sail.",
     width: 7,
     height: 3,
     start: {
@@ -262,18 +295,24 @@ export const missions: Record<string, MissionDefinition> = {
     },
     goal: { x: 6, y: 1 },
     objective: {
-      primary: "Clear the enemy, collect the chest, and sail home.",
-      short: "Fire, collect, and reach the dock.",
+      primary: "Splash the Marine, grab the chest, dock at the bay.",
+      short: "Fire, collect, then reach the dock.",
     },
     palette: ["fire", "sail", "collect"],
     requiredTileIds: ["spark-chest"],
-    reward: { gold: 10, stars: 2, crewId: "sunny", unlockCommandIds: ["dodge"] },
+    reward: {
+      berries: 100,
+      bounty: 1_000_000,
+      stars: 2,
+      crewId: "zoro",
+      unlockCommandIds: ["dodge"],
+    },
     tiles: [
       {
         id: "spark-enemy",
         kind: "enemy",
         position: { x: 1, y: 1 },
-        label: "Skiff",
+        label: "Marine",
         active: true,
       },
       {
@@ -298,10 +337,10 @@ export const missions: Record<string, MissionDefinition> = {
   "current-crescent": {
     id: "current-crescent",
     nodeId: "current-crescent",
-    label: "Current Crescent",
-    sea: "Sea 2",
-    briefing: "The sea sparkles in a long ribbon. Use Repeat to speed through it.",
-    tutorial: "Try Repeat Sail 4, Collect, Repeat Sail 3.",
+    label: "Reverse Mountain",
+    sea: "Grand Line entry",
+    briefing: "The current shoots into the Grand Line. Use Repeat to ride it.",
+    tutorial: "Try Repeat Sail x3, Collect, Repeat Sail x3.",
     width: 8,
     height: 5,
     start: {
@@ -310,12 +349,17 @@ export const missions: Record<string, MissionDefinition> = {
     },
     goal: { x: 7, y: 2 },
     objective: {
-      primary: "Use Repeat to cross the crescent and grab the bright chest.",
+      primary: "Repeat Sail to ride the current, then collect the chest.",
       short: "Repeat Sail, Collect, Repeat Sail.",
     },
     palette: ["sail", "collect", "repeat"],
     requiredTileIds: ["current-chest"],
-    reward: { gold: 14, stars: 2, unlockCommandIds: ["repeat"] },
+    reward: {
+      berries: 140,
+      bounty: 0,
+      stars: 2,
+      unlockCommandIds: ["repeat"],
+    },
     tiles: [
       {
         id: "current-chest",
@@ -341,11 +385,12 @@ export const missions: Record<string, MissionDefinition> = {
     ],
     suggestedQueue: [
       makeCommand("current-1", "repeat", {
-        count: 4,
+        count: 3,
         action: "sail",
       }),
-      makeCommand("current-2", "collect", { action: "collect" }),
-      makeCommand("current-3", "repeat", {
+      makeCommand("current-2", "sail", { action: "sail" }),
+      makeCommand("current-3", "collect", { action: "collect" }),
+      makeCommand("current-4", "repeat", {
         count: 3,
         action: "sail",
       }),
@@ -354,10 +399,10 @@ export const missions: Record<string, MissionDefinition> = {
   "coral-lookout": {
     id: "coral-lookout",
     nodeId: "coral-lookout",
-    label: "Coral Lookout",
-    sea: "Sea 3",
-    briefing: "Teach the crew to react when danger shows up in front of the bow.",
-    tutorial: "Use If Enemy then Fire before sailing into the lookout lane.",
+    label: "Skypiea Lookout",
+    sea: "Sky Island",
+    briefing: "Train the crew to react when danger pops up in front.",
+    tutorial: "Use If Enemy then Fire before sailing the lookout lane.",
     width: 8,
     height: 3,
     start: {
@@ -366,15 +411,16 @@ export const missions: Record<string, MissionDefinition> = {
     },
     goal: { x: 7, y: 1 },
     objective: {
-      primary: "React with If Enemy, then grab the coral treasure.",
+      primary: "React with If Enemy, then grab the sky treasure.",
       short: "If Enemy Fire, Collect, then dock.",
     },
     palette: ["if", "fire", "sail", "collect"],
     requiredTileIds: ["coral-chest"],
     reward: {
-      gold: 18,
+      berries: 180,
+      bounty: 2_000_000,
       stars: 3,
-      fruitPowerId: "emberfruit",
+      fruitPowerId: "gumgum",
       unlockCommandIds: ["if", "talk"],
     },
     tiles: [
@@ -382,14 +428,14 @@ export const missions: Record<string, MissionDefinition> = {
         id: "coral-enemy",
         kind: "enemy",
         position: { x: 1, y: 1 },
-        label: "Lookout Skiff",
+        label: "Sky Marine",
         active: true,
       },
       {
         id: "coral-chest",
         kind: "treasure",
         position: { x: 5, y: 1 },
-        label: "Coral Chest",
+        label: "Sky Chest",
         active: true,
       },
     ],
@@ -399,11 +445,13 @@ export const missions: Record<string, MissionDefinition> = {
         thenAction: "fire",
       }),
       makeCommand("coral-2", "repeat", {
-        count: 5,
+        count: 3,
         action: "sail",
       }),
-      makeCommand("coral-3", "collect", { action: "collect" }),
-      makeCommand("coral-4", "repeat", {
+      makeCommand("coral-3", "sail", { action: "sail" }),
+      makeCommand("coral-4", "sail", { action: "sail" }),
+      makeCommand("coral-5", "collect", { action: "collect" }),
+      makeCommand("coral-6", "repeat", {
         count: 2,
         action: "sail",
       }),
@@ -412,10 +460,10 @@ export const missions: Record<string, MissionDefinition> = {
   "treasure-isle": {
     id: "treasure-isle",
     nodeId: "treasure-isle",
-    label: "Treasure Isle",
-    sea: "Final",
-    briefing: "The last voyage needs smart reactions and a repeated push through open water.",
-    tutorial: "If Obstacle then Dodge, Repeat Sail, If Enemy then Fire, Talk, then sail home.",
+    label: "Raftel",
+    sea: "Final Voyage",
+    briefing: "The last voyage needs smart reactions and a long push.",
+    tutorial: "Dodge the reef, Fire the boss, Talk to the guide.",
     width: 10,
     height: 5,
     start: {
@@ -424,12 +472,18 @@ export const missions: Record<string, MissionDefinition> = {
     },
     goal: { x: 9, y: 2 },
     objective: {
-      primary: "Dodge the reef, splash the boss skiff, recruit the island guide, and reach the treasure.",
+      primary: "Dodge the reef, splash the boss, recruit the guide, reach the treasure.",
       short: "If Obstacle, Repeat Sail, If Enemy, Talk, then finish.",
     },
     palette: ["sail", "dodge", "fire", "talk", "repeat", "if"],
     requiredTileIds: ["isle-guide"],
-    reward: { gold: 24, stars: 3, crewId: "pebble", unlockCommandIds: [] },
+    reward: {
+      berries: 240,
+      bounty: 5_000_000,
+      stars: 3,
+      crewId: "nami",
+      unlockCommandIds: [],
+    },
     tiles: [
       {
         id: "isle-reef",
@@ -442,14 +496,14 @@ export const missions: Record<string, MissionDefinition> = {
         id: "isle-boss",
         kind: "enemy",
         position: { x: 7, y: 2 },
-        label: "Boss Skiff",
+        label: "Boss",
         active: true,
       },
       {
         id: "isle-guide",
         kind: "crew",
         position: { x: 8, y: 2 },
-        label: "Island Guide",
+        label: "Guide",
         active: true,
       },
     ],
@@ -460,19 +514,36 @@ export const missions: Record<string, MissionDefinition> = {
         thenAction: "dodge",
       }),
       makeCommand("isle-3", "repeat", {
-        count: 5,
+        count: 3,
         action: "sail",
       }),
-      makeCommand("isle-4", "if", {
+      makeCommand("isle-4", "sail", { action: "sail" }),
+      makeCommand("isle-5", "if", {
         condition: "enemyAhead",
         thenAction: "fire",
       }),
-      makeCommand("isle-5", "sail", { action: "sail" }),
       makeCommand("isle-6", "sail", { action: "sail" }),
-      makeCommand("isle-7", "talk", { action: "talk" }),
-      makeCommand("isle-8", "sail", { action: "sail" }),
+      makeCommand("isle-7", "sail", { action: "sail" }),
+      makeCommand("isle-8", "talk", { action: "talk" }),
+      makeCommand("isle-9", "sail", { action: "sail" }),
     ],
   },
 };
 
 export const orderedMissionIds = missionNodes.map((node) => node.missionId);
+
+export const bountyRank = (bounty: number): string => {
+  if (bounty >= 100_000_000) return "Yonko-class";
+  if (bounty >= 50_000_000) return "Grand Line Captain";
+  if (bounty >= 10_000_000) return "East Blue Champion";
+  if (bounty > 0) return "Wanted Rookie";
+  return "Rookie Pirate";
+};
+
+export const formatBerries = (amount: number): string =>
+  `${amount.toLocaleString("en-US")} ฿`;
+
+export const formatBounty = (amount: number): string =>
+  amount >= 1_000_000
+    ? `${(amount / 1_000_000).toFixed(amount % 1_000_000 === 0 ? 0 : 1)}M ฿`
+    : `${amount.toLocaleString("en-US")} ฿`;

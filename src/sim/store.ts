@@ -1,3 +1,5 @@
+import { getActiveTheme, themes } from "../themes";
+import type { ThemeId } from "../themes/types";
 import { commandLibrary, missionNodes, missions, orderedMissionIds } from "./content";
 import { cloneQueuedCommands, getMission, runMission } from "./engine";
 import { applyReward, defaultProfile, loadProfile, saveProfile } from "./profile";
@@ -321,6 +323,7 @@ export class GameStore {
       missions[missionId],
       cloneQueuedCommands(this.state.queuedCommands),
       this.state.profile,
+      getActiveTheme(this.state.profile),
     );
 
     this.update((state) => ({
@@ -404,6 +407,32 @@ export class GameStore {
     };
     this.persistProfile(profile);
 
+    this.update((state) => ({
+      ...state,
+      profile,
+    }));
+  }
+
+  setTheme(themeId: ThemeId): void {
+    // Defensive: only accept known theme ids.
+    if (!themes[themeId]) {
+      return;
+    }
+    if (this.state.profile.settings.themeId === themeId) {
+      return;
+    }
+
+    const profile: PlayerProfile = {
+      ...this.state.profile,
+      settings: {
+        ...this.state.profile.settings,
+        themeId,
+      },
+    };
+    this.persistProfile(profile);
+
+    // Plain setState — every subscriber (HUD + Phaser scenes) will re-render
+    // and read strings from the new active theme.
     this.update((state) => ({
       ...state,
       profile,

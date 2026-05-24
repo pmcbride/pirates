@@ -16,6 +16,9 @@ export const defaultProfile = (): PlayerProfile => ({
   settings: {
     reducedMotion: false,
     soundOn: true,
+    // New players start in the default "original" pirate theme; the One Piece
+    // overlay is opt-in via the Settings drawer.
+    themeId: "original",
   },
 });
 
@@ -36,6 +39,19 @@ export const deserializeProfile = (raw: string | null): PlayerProfile => {
     };
     const merged = defaultProfile();
 
+    const completedMissionIds =
+      parsed.completedMissionIds ?? merged.completedMissionIds;
+
+    // Theme migration:
+    // - If the saved profile already has settings.themeId, respect it.
+    // - Otherwise, infer: a profile with progress predates the theme system,
+    //   so it was implicitly playing the One Piece-flavored copy. Keep that
+    //   world so a returning player doesn't see strange new names.
+    // - A fresh profile (no progress) gets the new default "original" theme.
+    const inheritedThemeId =
+      parsed.settings?.themeId ??
+      (completedMissionIds.length > 0 ? "one-piece" : merged.settings.themeId);
+
     return {
       ...merged,
       ...parsed,
@@ -43,8 +59,7 @@ export const deserializeProfile = (raw: string | null): PlayerProfile => {
       berries: parsed.berries ?? parsed.gold ?? merged.berries,
       bounty: parsed.bounty ?? merged.bounty,
       unlockedMissionIds: parsed.unlockedMissionIds ?? merged.unlockedMissionIds,
-      completedMissionIds:
-        parsed.completedMissionIds ?? merged.completedMissionIds,
+      completedMissionIds,
       crewRoster: parsed.crewRoster ?? merged.crewRoster,
       fruitPowers: parsed.fruitPowers ?? merged.fruitPowers,
       commandUnlocks: parsed.commandUnlocks ?? merged.commandUnlocks,
@@ -53,6 +68,7 @@ export const deserializeProfile = (raw: string | null): PlayerProfile => {
       settings: {
         ...merged.settings,
         ...(parsed.settings ?? {}),
+        themeId: inheritedThemeId,
       },
     };
   } catch {

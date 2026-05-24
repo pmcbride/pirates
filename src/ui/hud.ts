@@ -1,10 +1,14 @@
 import {
-  bountyRank,
+  bountyRankFor,
+  formatBountyFor,
+  formatCurrency,
+  getActiveTheme,
+  orderedThemeIds,
+  themes,
+} from "../themes";
+import type { Theme, ThemeId } from "../themes/types";
+import {
   commandLibrary,
-  crewMates,
-  formatBerries,
-  formatBounty,
-  fruitPowers,
   missionNodes,
   missions,
 } from "../sim/content";
@@ -19,7 +23,7 @@ const labelMap = {
   fire: "Fire",
   collect: "Collect",
   talk: "Talk",
-  enemyAhead: "Marine Ahead",
+  enemyAhead: "Foe Ahead",
   obstacleAhead: "Reef Ahead",
   treasureHere: "Treasure Here",
   crewHere: "Crew Here",
@@ -60,6 +64,25 @@ const escapeHtml = (value: string): string =>
     .replaceAll('"', "&quot;");
 
 const iconFor = (key: keyof typeof iconMap): string => iconMap[key] ?? "•";
+
+// Helpers — resolve mission/sea/crew/fruit display strings against a theme.
+const missionLabel = (theme: Theme, missionId: string): string =>
+  theme.missions[missionId]?.label ?? missionId;
+
+const missionSea = (theme: Theme, missionId: string): string =>
+  theme.missions[missionId]?.sea ?? "";
+
+const missionPreview = (theme: Theme, missionId: string): string =>
+  theme.missions[missionId]?.preview ?? "";
+
+const missionBriefing = (theme: Theme, missionId: string): string =>
+  theme.missions[missionId]?.briefing ?? "";
+
+const missionTutorial = (theme: Theme, missionId: string): string =>
+  theme.missions[missionId]?.tutorial ?? "";
+
+const missionObjective = (theme: Theme, missionId: string): string =>
+  theme.missions[missionId]?.objective.primary ?? "";
 
 const queueCard = (command: PlannedCommand, isRunning: boolean): string => {
   const template = commandLibrary[command.templateId];
@@ -125,8 +148,8 @@ const queueCard = (command: PlannedCommand, isRunning: boolean): string => {
   `;
 };
 
-const wantedCrewCard = (crewId: string): string => {
-  const crew = crewMates[crewId];
+const wantedCrewCard = (theme: Theme, crewId: string): string => {
+  const crew = theme.crew[crewId];
   if (!crew) return "";
   return `
     <li>
@@ -140,8 +163,8 @@ const wantedCrewCard = (crewId: string): string => {
   `;
 };
 
-const wantedFruitCard = (fruitId: string): string => {
-  const fruit = fruitPowers[fruitId];
+const wantedFruitCard = (theme: Theme, fruitId: string): string => {
+  const fruit = theme.fruits[fruitId];
   if (!fruit) return "";
   return `
     <li>
@@ -155,16 +178,41 @@ const wantedFruitCard = (fruitId: string): string => {
   `;
 };
 
-const drawerContent = (state: AppState): string => {
+const themePickerMarkup = (currentThemeId: ThemeId): string => {
+  const options = orderedThemeIds
+    .map((id) => {
+      const theme = themes[id];
+      const active = id === currentThemeId;
+      return `
+        <button
+          data-action="set-theme"
+          data-theme-id="${id}"
+          class="drawer-toggle${active ? " is-active" : ""}"
+          aria-pressed="${active}"
+        >
+          ${escapeHtml(theme.meta.label)}${active ? " ✓" : ""}
+        </button>
+        <p class="drawer-copy">${escapeHtml(theme.meta.description)}</p>
+      `;
+    })
+    .join("");
+
+  return `
+    <h4 class="drawer-subhead">Theme</h4>
+    ${options}
+  `;
+};
+
+const drawerContent = (state: AppState, theme: Theme): string => {
   switch (state.selectedDrawer) {
     case "crew": {
       const crewList = state.profile.crewRoster.length
-        ? state.profile.crewRoster.map(wantedCrewCard).join("")
-        : `<li><div class="wanted-card"><p class="wanted-name">No crew yet</p><p class="wanted-line">Win voyages to invite Straw Hats aboard.</p></div></li>`;
+        ? state.profile.crewRoster.map((id) => wantedCrewCard(theme, id)).join("")
+        : `<li><div class="wanted-card"><p class="wanted-name">No crew yet</p><p class="wanted-line">Win voyages to invite shipmates aboard.</p></div></li>`;
 
       const fruitList = state.profile.fruitPowers.length
-        ? state.profile.fruitPowers.map(wantedFruitCard).join("")
-        : `<li><div class="wanted-card"><p class="wanted-name">No Devil Fruits yet</p><p class="wanted-line">Skypiea Lookout hides the first glowing fruit.</p></div></li>`;
+        ? state.profile.fruitPowers.map((id) => wantedFruitCard(theme, id)).join("")
+        : `<li><div class="wanted-card"><p class="wanted-name">No Devil Fruits yet</p><p class="wanted-line">A lookout in the sky hides the first glowing fruit.</p></div></li>`;
 
       return `
         <section class="drawer-panel">
@@ -208,6 +256,7 @@ const drawerContent = (state: AppState): string => {
             Reduced Motion: ${state.profile.settings.reducedMotion ? "On" : "Off"}
           </button>
           <p class="drawer-copy">Cuts cosmetic motion and speeds up the plan playback while keeping every gameplay beat readable.</p>
+          ${themePickerMarkup(state.profile.settings.themeId)}
         </section>
       `;
     case "map": {
@@ -219,7 +268,7 @@ const drawerContent = (state: AppState): string => {
           return `
             <li>
               <button ${unlocked ? "" : "disabled"} data-action="select-mission" data-mission-id="${node.missionId}">
-                ${escapeHtml(node.label)} — ${status}
+                ${escapeHtml(missionLabel(theme, node.missionId))} — ${status}
               </button>
             </li>
           `;
@@ -238,18 +287,18 @@ const drawerContent = (state: AppState): string => {
   }
 };
 
-const statsInline = (state: AppState): string => `
+const statsInline = (state: AppState, theme: Theme): string => `
   <div class="stats-inline">
-    <span class="stat-pill"><span class="stat-icon">💰</span>${escapeHtml(formatBerries(state.profile.berries))}</span>
-    <span class="stat-pill bounty" aria-label="Bounty"><span class="stat-icon" aria-hidden="true">🏴‍☠️</span>${escapeHtml(formatBounty(state.profile.bounty))}</span>
+    <span class="stat-pill"><span class="stat-icon">💰</span>${escapeHtml(formatCurrency(theme, state.profile.berries))}</span>
+    <span class="stat-pill bounty" aria-label="Bounty"><span class="stat-icon" aria-hidden="true">🏴‍☠️</span>${escapeHtml(formatBountyFor(theme, state.profile.bounty))}</span>
     <span class="stat-pill"><span class="stat-icon">⭐</span>${state.profile.stars}</span>
   </div>
 `;
 
-const statusStrip = (state: AppState): string => `
+const statusStrip = (state: AppState, theme: Theme): string => `
   <div class="status-strip">
-    <span class="stat-pill"><span class="stat-icon">💰</span>${escapeHtml(formatBerries(state.profile.berries))}</span>
-    <span class="stat-pill bounty" aria-label="Bounty"><span class="stat-icon" aria-hidden="true">🏴‍☠️</span>${escapeHtml(formatBounty(state.profile.bounty))}</span>
+    <span class="stat-pill"><span class="stat-icon">💰</span>${escapeHtml(formatCurrency(theme, state.profile.berries))}</span>
+    <span class="stat-pill bounty" aria-label="Bounty"><span class="stat-icon" aria-hidden="true">🏴‍☠️</span>${escapeHtml(formatBountyFor(theme, state.profile.bounty))}</span>
     <span class="stat-pill"><span class="stat-icon">🧑‍🎤</span>${state.profile.crewRoster.length}</span>
     <span class="stat-pill"><span class="stat-icon">🍎</span>${state.profile.fruitPowers.length}</span>
   </div>
@@ -278,6 +327,7 @@ export class Hud {
     const instanceId = button.dataset.instanceId;
     const templateId = button.dataset.templateId;
     const drawer = button.dataset.drawer as AppState["selectedDrawer"] | undefined;
+    const themeId = button.dataset.themeId as ThemeId | undefined;
 
     switch (action) {
       case "start-adventure":
@@ -303,6 +353,11 @@ export class Hud {
         break;
       case "toggle-reduced-motion":
         gameStore.toggleReducedMotion();
+        break;
+      case "set-theme":
+        if (themeId) {
+          gameStore.setTheme(themeId);
+        }
         break;
       case "add-command":
         if (templateId) {
@@ -387,45 +442,45 @@ export class Hud {
   };
 
   private render(state: AppState): string {
+    const theme = getActiveTheme(state.profile);
     return `
       <div class="hud-layer screen-${state.screen}">
-        ${this.renderScreen(state)}
-        ${state.selectedDrawer ? `<aside class="drawer-host">${drawerContent(state)}</aside>` : ""}
+        ${this.renderScreen(state, theme)}
+        ${state.selectedDrawer ? `<aside class="drawer-host">${drawerContent(state, theme)}</aside>` : ""}
       </div>
     `;
   }
 
-  private renderScreen(state: AppState): string {
+  private renderScreen(state: AppState, theme: Theme): string {
     switch (state.screen) {
       case "title":
-        return this.renderTitle();
+        return this.renderTitle(theme);
       case "map":
-        return this.renderMap(state);
+        return this.renderMap(state, theme);
       case "mission":
-        return this.renderMission(state);
+        return this.renderMission(state, theme);
       case "reward":
-        return this.renderReward(state);
+        return this.renderReward(state, theme);
     }
   }
 
-  private renderTitle(): string {
+  private renderTitle(theme: Theme): string {
     return `
       <section class="title-overlay">
         <div class="poster-copy">
           <p class="eyebrow">An early-coding pirate voyage</p>
-          <h1>Set sail for the One Piece.</h1>
-          <p class="support-copy">Drag big command stamps to plan a route. Splash Marines, scoop berries, recruit Straw Hats, and chase Devil Fruits across the Grand Line.</p>
-          <button data-action="start-adventure" class="primary-cta">⛵ Set Sail</button>
+          <h1>${escapeHtml(theme.taglines.titleHeadline)}</h1>
+          <p class="support-copy">${escapeHtml(theme.taglines.titleSupport)}</p>
+          <button data-action="start-adventure" class="primary-cta">${escapeHtml(theme.taglines.setSailCta)}</button>
         </div>
       </section>
     `;
   }
 
-  private renderMap(state: AppState): string {
+  private renderMap(state: AppState, theme: Theme): string {
     const missionId = state.selectedMissionId ?? state.profile.unlockedMissionIds[0];
     const node = missionNodes.find((entry) => entry.missionId === missionId);
-    const mission = missionId ? missions[missionId] : null;
-    const rank = bountyRank(state.profile.bounty);
+    const rank = bountyRankFor(theme, state.profile.bounty);
 
     return `
       <header class="top-strip">
@@ -434,7 +489,7 @@ export class Hud {
           <h2 style="margin:0;font-family:var(--display-font);font-size:1.8rem;">Pick the next voyage</h2>
           <p style="margin:0.2rem 0 0;color:var(--ink-soft);font-size:0.9rem;">${escapeHtml(rank)}</p>
         </div>
-        ${statsInline(state)}
+        ${statsInline(state, theme)}
       </header>
 
       <nav class="rail-actions">
@@ -445,31 +500,31 @@ export class Hud {
       </nav>
 
       <section class="map-docket surface-card">
-        <p class="eyebrow">${escapeHtml(node?.sea ?? "Starter Cove")}</p>
-        <h3>${escapeHtml(node?.label ?? "Foosha Cove")}</h3>
-        <p>${escapeHtml(node?.preview ?? mission?.briefing ?? "")}</p>
+        <p class="eyebrow">${escapeHtml(node ? missionSea(theme, node.missionId) : "")}</p>
+        <h3>${escapeHtml(node ? missionLabel(theme, node.missionId) : "")}</h3>
+        <p>${escapeHtml(node ? missionPreview(theme, node.missionId) || missionBriefing(theme, node.missionId) : "")}</p>
         <div class="map-reward-row">
-          <span>💰 ${escapeHtml(formatBerries(node?.rewards.berries ?? 0))}</span>
-          <span>🏴‍☠️ ${escapeHtml(formatBounty(node?.rewards.bounty ?? 0))}</span>
+          <span>💰 ${escapeHtml(formatCurrency(theme, node?.rewards.berries ?? 0))}</span>
+          <span>🏴‍☠️ ${escapeHtml(formatBountyFor(theme, node?.rewards.bounty ?? 0))}</span>
           <span>⭐ ${node?.rewards.stars ?? 0}</span>
-          ${node?.rewards.crewId ? `<span>🧑‍🎤 ${escapeHtml(crewMates[node.rewards.crewId]?.name ?? "")}</span>` : ""}
-          ${node?.rewards.fruitPowerId ? `<span>🍎 ${escapeHtml(fruitPowers[node.rewards.fruitPowerId]?.name ?? "")}</span>` : ""}
+          ${node?.rewards.crewId ? `<span>🧑‍🎤 ${escapeHtml(theme.crew[node.rewards.crewId]?.name ?? "")}</span>` : ""}
+          ${node?.rewards.fruitPowerId ? `<span>🍎 ${escapeHtml(theme.fruits[node.rewards.fruitPowerId]?.name ?? "")}</span>` : ""}
         </div>
         <div class="mission-pill-row">
           ${missionNodes
             .map((entry) => {
               const unlocked = state.profile.unlockedMissionIds.includes(entry.missionId);
               const current = missionId === entry.missionId;
-              return `<button ${unlocked ? "" : "disabled"} data-action="select-mission" data-mission-id="${entry.missionId}" class="route-pill ${current ? "is-current" : ""}">${escapeHtml(entry.label)}</button>`;
+              return `<button ${unlocked ? "" : "disabled"} data-action="select-mission" data-mission-id="${entry.missionId}" class="route-pill ${current ? "is-current" : ""}">${escapeHtml(missionLabel(theme, entry.missionId))}</button>`;
             })
             .join("")}
         </div>
-        <button data-action="open-selected-mission" class="primary-cta">⛵ Set Sail</button>
+        <button data-action="open-selected-mission" class="primary-cta">${escapeHtml(theme.taglines.setSailCta)}</button>
       </section>
     `;
   }
 
-  private renderMission(state: AppState): string {
+  private renderMission(state: AppState, theme: Theme): string {
     const mission = state.activeMissionId ? missions[state.activeMissionId] : null;
     if (!mission) {
       return "";
@@ -502,12 +557,12 @@ export class Hud {
 
     return `
       <header class="objective-chip surface-card">
-        <p class="eyebrow">${escapeHtml(mission.sea)}</p>
-        <h2>${escapeHtml(mission.label)}</h2>
-        <p>${escapeHtml(mission.objective.primary)}</p>
+        <p class="eyebrow">${escapeHtml(missionSea(theme, mission.id))}</p>
+        <h2>${escapeHtml(missionLabel(theme, mission.id))}</h2>
+        <p>${escapeHtml(missionObjective(theme, mission.id))}</p>
       </header>
 
-      ${statusStrip(state)}
+      ${statusStrip(state, theme)}
 
       <nav class="rail-actions mission-rail">
         <button data-action="leave-mission">🗺️ Map</button>
@@ -533,7 +588,7 @@ export class Hud {
           <div>
             <p class="eyebrow">Command Queue</p>
             <h3>${isRunning ? "Captain's plan is sailing" : "Build the route"}</h3>
-            <p>${escapeHtml(mission.tutorial)}</p>
+            <p>${escapeHtml(missionTutorial(theme, mission.id))}</p>
           </div>
           <div class="dock-actions">
             <button ${isRunning ? "disabled" : ""} data-action="clear-queue">Clear</button>
@@ -551,26 +606,28 @@ export class Hud {
     `;
   }
 
-  private renderReward(state: AppState): string {
-    const mission = state.rewardMissionId ? missions[state.rewardMissionId] : null;
+  private renderReward(state: AppState, theme: Theme): string {
     const reward = state.lastRun?.reward;
     const lastLog = state.profile.captainLog.at(-1);
+    const rewardLabel = state.rewardMissionId
+      ? missionLabel(theme, state.rewardMissionId)
+      : "Voyage Clear";
 
     return `
       <section class="reward-overlay">
         <div class="reward-copy">
           <p class="eyebrow">Treasure Recovered</p>
-          <h2>${escapeHtml(mission?.label ?? "Voyage Clear")}</h2>
+          <h2>${escapeHtml(rewardLabel)}</h2>
           <div class="reward-row">
-            <span class="stat-pill">💰 ${escapeHtml(formatBerries(reward?.berries ?? 0))}</span>
-            <span class="stat-pill bounty" aria-label="Bounty">🏴‍☠️ +${escapeHtml(formatBounty(reward?.bounty ?? 0))}</span>
+            <span class="stat-pill">💰 ${escapeHtml(formatCurrency(theme, reward?.berries ?? 0))}</span>
+            <span class="stat-pill bounty" aria-label="Bounty">🏴‍☠️ +${escapeHtml(formatBountyFor(theme, reward?.bounty ?? 0))}</span>
             <span class="stat-pill">⭐ +${reward?.stars ?? 0}</span>
           </div>
           ${
             reward?.crewId
-              ? `<ul class="drawer-list" style="margin:0;">${wantedCrewCard(reward.crewId)}</ul>`
+              ? `<ul class="drawer-list" style="margin:0;">${wantedCrewCard(theme, reward.crewId)}</ul>`
               : reward?.fruitPowerId
-                ? `<ul class="drawer-list" style="margin:0;">${wantedFruitCard(reward.fruitPowerId)}</ul>`
+                ? `<ul class="drawer-list" style="margin:0;">${wantedFruitCard(theme, reward.fruitPowerId)}</ul>`
                 : ""
           }
           ${

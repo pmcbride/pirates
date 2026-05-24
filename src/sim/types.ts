@@ -33,6 +33,10 @@ export interface Position {
 export interface PlayerSettings {
   reducedMotion: boolean;
   soundOn: boolean;
+  // Which visual/copy theme to render. "original" is the default for new
+  // profiles; "one-piece" is the direct-IP theme for personal/family use.
+  // See src/themes/* and DESIGN.md §7.
+  themeId: "original" | "one-piece";
 }
 
 export interface CaptainLogEntry {
@@ -65,31 +69,25 @@ export interface RewardBundle {
   logLine?: string;
 }
 
+// Crew and fruit definitions are structural only — names/titles/descriptions
+// come from the active Theme (see src/themes/types.ts).
 export interface CrewMate {
   id: string;
-  name: string;
-  title: string;
-  description: string;
   passiveType: "hint" | "gold" | "range" | "safeCollect";
 }
 
 export interface FruitPower {
   id: string;
-  name: string;
-  title: string;
-  description: string;
   modifier: "extraFireRange" | "bonusGold" | "safeCollect";
 }
 
 export interface MissionNode {
   id: string;
   missionId: string;
-  label: string;
-  sea: string;
+  // Map coordinates (percent of screen width/height).
   x: number;
   y: number;
   difficulty: "cove" | "breeze" | "brave" | "captain";
-  preview: string;
   rewards: RewardBundle;
   unlockMissionIds: string[];
 }
@@ -98,7 +96,6 @@ export interface MissionTile {
   id: string;
   kind: TileKind;
   position: Position;
-  label: string;
   active: boolean;
 }
 
@@ -131,13 +128,14 @@ export interface PlannedCommand {
   thenAction?: ActionCommandId;
 }
 
+// MissionDefinition is the *structural* spec of a mission — board geometry,
+// starting state, tile positions, palette, rewards, and the suggested queue.
+// All player-facing strings (label, sea, briefing, tutorial, objective, tile
+// labels) live in the active Theme — see src/themes/types.ts. Resolve a
+// mission's labels via getMissionStrings(theme, mission.id).
 export interface MissionDefinition {
   id: string;
   nodeId: string;
-  label: string;
-  sea: string;
-  briefing: string;
-  tutorial: string;
   width: number;
   height: number;
   start: {
@@ -145,7 +143,6 @@ export interface MissionDefinition {
     facing: Direction;
   };
   goal: Position;
-  objective: MissionObjective;
   palette: string[];
   requiredTileIds: string[];
   reward: RewardBundle;
@@ -167,7 +164,6 @@ export interface MissionState {
   queuedCommands: PlannedCommand[];
   currentBeat: number;
   status: "planning" | "running" | "success" | "failed";
-  objective: MissionObjective;
   collectedBerries: number;
   defeatedEnemyIds: string[];
 }

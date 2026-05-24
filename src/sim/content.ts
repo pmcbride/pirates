@@ -7,6 +7,12 @@ import type {
   PlannedCommand,
 } from "./types";
 
+// content.ts is the *structural* content layer — mission boards, tile
+// positions, palettes, suggested queues, rewards, and the catalog of crew
+// and fruit ids. All player-facing strings (mission labels, sea names, crew
+// names, fruit names, tile labels, currency formatting, bounty ranks) live in
+// the Theme layer at src/themes/*. See DESIGN.md §7 for the IP/theming note.
+
 const makeCommand = (
   instanceId: string,
   templateId: string,
@@ -23,6 +29,10 @@ const makeCommand = (
   ...partial,
 });
 
+// Command block labels/descriptions are intentionally NOT theme-driven for
+// now — they're code-level concepts (Sail, Fire, Repeat, If) that should read
+// the same in any theme. If a future theme wants to recolor "Fire" -> "Splash"
+// we can promote these strings into the Theme interface.
 export const commandLibrary: Record<string, CommandBlock> = {
   sail: {
     id: "sail",
@@ -66,7 +76,7 @@ export const commandLibrary: Record<string, CommandBlock> = {
     label: "Fire",
     shortLabel: "Fire",
     accent: "gold",
-    description: "Splash the Marine in front of you.",
+    description: "Splash the foe in front of you.",
     defaultAction: "fire",
   },
   collect: {
@@ -84,7 +94,7 @@ export const commandLibrary: Record<string, CommandBlock> = {
     label: "Talk",
     shortLabel: "Talk",
     accent: "plum",
-    description: "Invite a new Straw Hat aboard.",
+    description: "Invite a new shipmate aboard.",
     defaultAction: "talk",
   },
   repeat: {
@@ -120,16 +130,10 @@ export const commandLibrary: Record<string, CommandBlock> = {
 export const crewMates: Record<string, CrewMate> = {
   zoro: {
     id: "zoro",
-    name: "Zoro",
-    title: "Swordsman",
-    description: "Adds a sparkly hint whenever the crew bumps into trouble.",
     passiveType: "hint",
   },
   nami: {
     id: "nami",
-    name: "Nami",
-    title: "Navigator",
-    description: "Finds one extra berry every time a voyage is cleared.",
     passiveType: "gold",
   },
 };
@@ -137,9 +141,6 @@ export const crewMates: Record<string, CrewMate> = {
 export const fruitPowers: Record<string, FruitPower> = {
   gumgum: {
     id: "gumgum",
-    name: "Gum-Gum Fruit",
-    title: "Stretchy Strike",
-    description: "Fire reaches two waves ahead.",
     modifier: "extraFireRange",
   },
 };
@@ -148,12 +149,9 @@ export const missionNodes: MissionNode[] = [
   {
     id: "tutorial-cove",
     missionId: "tutorial-cove",
-    label: "Foosha Cove",
-    sea: "Starter Cove",
     x: 12,
     y: 78,
     difficulty: "cove",
-    preview: "Hoist the sail and grab the first chest.",
     rewards: {
       berries: 60,
       bounty: 0,
@@ -165,12 +163,9 @@ export const missionNodes: MissionNode[] = [
   {
     id: "spark-shoals",
     missionId: "spark-shoals",
-    label: "Shells Town",
-    sea: "East Blue",
     x: 30,
     y: 64,
     difficulty: "breeze",
-    preview: "Splash a Marine skiff and bring Zoro aboard.",
     rewards: {
       berries: 100,
       bounty: 1_000_000,
@@ -183,12 +178,9 @@ export const missionNodes: MissionNode[] = [
   {
     id: "current-crescent",
     missionId: "current-crescent",
-    label: "Reverse Mountain",
-    sea: "Grand Line entry",
     x: 51,
     y: 48,
     difficulty: "breeze",
-    preview: "Surf a long current using a Repeat plan.",
     rewards: {
       berries: 140,
       bounty: 0,
@@ -200,12 +192,9 @@ export const missionNodes: MissionNode[] = [
   {
     id: "coral-lookout",
     missionId: "coral-lookout",
-    label: "Skypiea Lookout",
-    sea: "Sky Island",
     x: 71,
     y: 36,
     difficulty: "brave",
-    preview: "Teach the crew to react with If-then plans.",
     rewards: {
       berries: 180,
       bounty: 2_000_000,
@@ -218,12 +207,9 @@ export const missionNodes: MissionNode[] = [
   {
     id: "treasure-isle",
     missionId: "treasure-isle",
-    label: "Raftel",
-    sea: "Final Voyage",
     x: 87,
     y: 22,
     difficulty: "captain",
-    preview: "Mix Repeat and If to reach the One Piece.",
     rewards: {
       berries: 240,
       bounty: 5_000_000,
@@ -239,10 +225,6 @@ export const missions: Record<string, MissionDefinition> = {
   "tutorial-cove": {
     id: "tutorial-cove",
     nodeId: "tutorial-cove",
-    label: "Foosha Cove",
-    sea: "Starter Cove",
-    briefing: "Line up a sailing plan and scoop the first chest.",
-    tutorial: "Try Sail, Sail, Sail, Collect, Sail, Sail.",
     width: 6,
     height: 3,
     start: {
@@ -250,10 +232,6 @@ export const missions: Record<string, MissionDefinition> = {
       facing: "east",
     },
     goal: { x: 5, y: 1 },
-    objective: {
-      primary: "Collect the chest, then sail to the lighthouse.",
-      short: "Collect chest, then reach the lighthouse.",
-    },
     palette: ["sail", "collect"],
     requiredTileIds: ["cove-chest"],
     reward: {
@@ -267,7 +245,6 @@ export const missions: Record<string, MissionDefinition> = {
         id: "cove-chest",
         kind: "treasure",
         position: { x: 3, y: 1 },
-        label: "Chest",
         active: true,
       },
     ],
@@ -283,10 +260,6 @@ export const missions: Record<string, MissionDefinition> = {
   "spark-shoals": {
     id: "spark-shoals",
     nodeId: "spark-shoals",
-    label: "Shells Town",
-    sea: "East Blue",
-    briefing: "A Marine skiff blocks the gold lane. Fire first, then sail.",
-    tutorial: "If a Marine is ahead, Fire before you Sail.",
     width: 7,
     height: 3,
     start: {
@@ -294,10 +267,6 @@ export const missions: Record<string, MissionDefinition> = {
       facing: "east",
     },
     goal: { x: 6, y: 1 },
-    objective: {
-      primary: "Splash the Marine, grab the chest, dock at the bay.",
-      short: "Fire, collect, then reach the dock.",
-    },
     palette: ["fire", "sail", "collect"],
     requiredTileIds: ["spark-chest"],
     reward: {
@@ -312,14 +281,12 @@ export const missions: Record<string, MissionDefinition> = {
         id: "spark-enemy",
         kind: "enemy",
         position: { x: 1, y: 1 },
-        label: "Marine",
         active: true,
       },
       {
         id: "spark-chest",
         kind: "treasure",
         position: { x: 4, y: 1 },
-        label: "Sun Chest",
         active: true,
       },
     ],
@@ -337,10 +304,6 @@ export const missions: Record<string, MissionDefinition> = {
   "current-crescent": {
     id: "current-crescent",
     nodeId: "current-crescent",
-    label: "Reverse Mountain",
-    sea: "Grand Line entry",
-    briefing: "The current shoots into the Grand Line. Use Repeat to ride it.",
-    tutorial: "Try Repeat Sail x3, Collect, Repeat Sail x3.",
     width: 8,
     height: 5,
     start: {
@@ -348,10 +311,6 @@ export const missions: Record<string, MissionDefinition> = {
       facing: "east",
     },
     goal: { x: 7, y: 2 },
-    objective: {
-      primary: "Repeat Sail to ride the current, then collect the chest.",
-      short: "Repeat Sail, Collect, Repeat Sail.",
-    },
     palette: ["sail", "collect", "repeat"],
     requiredTileIds: ["current-chest"],
     reward: {
@@ -365,21 +324,18 @@ export const missions: Record<string, MissionDefinition> = {
         id: "current-chest",
         kind: "treasure",
         position: { x: 4, y: 2 },
-        label: "Moon Chest",
         active: true,
       },
       {
         id: "current-wave-1",
         kind: "current",
         position: { x: 2, y: 2 },
-        label: "Current",
         active: true,
       },
       {
         id: "current-wave-2",
         kind: "current",
         position: { x: 3, y: 2 },
-        label: "Current",
         active: true,
       },
     ],
@@ -399,10 +355,6 @@ export const missions: Record<string, MissionDefinition> = {
   "coral-lookout": {
     id: "coral-lookout",
     nodeId: "coral-lookout",
-    label: "Skypiea Lookout",
-    sea: "Sky Island",
-    briefing: "Train the crew to react when danger pops up in front.",
-    tutorial: "Use If Enemy then Fire before sailing the lookout lane.",
     width: 8,
     height: 3,
     start: {
@@ -410,10 +362,6 @@ export const missions: Record<string, MissionDefinition> = {
       facing: "east",
     },
     goal: { x: 7, y: 1 },
-    objective: {
-      primary: "React with If Enemy, then grab the sky treasure.",
-      short: "If Enemy Fire, Collect, then dock.",
-    },
     palette: ["if", "fire", "sail", "collect"],
     requiredTileIds: ["coral-chest"],
     reward: {
@@ -428,14 +376,12 @@ export const missions: Record<string, MissionDefinition> = {
         id: "coral-enemy",
         kind: "enemy",
         position: { x: 1, y: 1 },
-        label: "Sky Marine",
         active: true,
       },
       {
         id: "coral-chest",
         kind: "treasure",
         position: { x: 5, y: 1 },
-        label: "Sky Chest",
         active: true,
       },
     ],
@@ -460,10 +406,6 @@ export const missions: Record<string, MissionDefinition> = {
   "treasure-isle": {
     id: "treasure-isle",
     nodeId: "treasure-isle",
-    label: "Raftel",
-    sea: "Final Voyage",
-    briefing: "The last voyage needs smart reactions and a long push.",
-    tutorial: "Dodge the reef, Fire the boss, Talk to the guide.",
     width: 10,
     height: 5,
     start: {
@@ -471,10 +413,6 @@ export const missions: Record<string, MissionDefinition> = {
       facing: "east",
     },
     goal: { x: 9, y: 2 },
-    objective: {
-      primary: "Dodge the reef, splash the boss, recruit the guide, reach the treasure.",
-      short: "If Obstacle, Repeat Sail, If Enemy, Talk, then finish.",
-    },
     palette: ["sail", "dodge", "fire", "talk", "repeat", "if"],
     requiredTileIds: ["isle-guide"],
     reward: {
@@ -489,21 +427,18 @@ export const missions: Record<string, MissionDefinition> = {
         id: "isle-reef",
         kind: "obstacle",
         position: { x: 2, y: 3 },
-        label: "Reef",
         active: true,
       },
       {
         id: "isle-boss",
         kind: "enemy",
         position: { x: 7, y: 2 },
-        label: "Boss",
         active: true,
       },
       {
         id: "isle-guide",
         kind: "crew",
         position: { x: 8, y: 2 },
-        label: "Guide",
         active: true,
       },
     ],
@@ -531,19 +466,3 @@ export const missions: Record<string, MissionDefinition> = {
 };
 
 export const orderedMissionIds = missionNodes.map((node) => node.missionId);
-
-export const bountyRank = (bounty: number): string => {
-  if (bounty >= 100_000_000) return "Yonko-class";
-  if (bounty >= 50_000_000) return "Grand Line Captain";
-  if (bounty >= 10_000_000) return "East Blue Champion";
-  if (bounty > 0) return "Wanted Rookie";
-  return "Rookie Pirate";
-};
-
-export const formatBerries = (amount: number): string =>
-  `${amount.toLocaleString("en-US")} ฿`;
-
-export const formatBounty = (amount: number): string =>
-  amount >= 1_000_000
-    ? `${(amount / 1_000_000).toFixed(amount % 1_000_000 === 0 ? 0 : 1)}M ฿`
-    : `${amount.toLocaleString("en-US")} ฿`;

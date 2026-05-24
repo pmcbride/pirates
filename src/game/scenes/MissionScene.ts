@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import { missions } from "../../sim/content";
 import { createMissionState } from "../../sim/engine";
 import { gameStore } from "../../sim/store";
+import { getActiveTheme } from "../../themes";
 import type { MissionDefinition, MissionTile, RunStep } from "../../sim/types";
 import { kindTextureMap, textureKeys, uiColors } from "../assets/manifest";
 
@@ -43,6 +44,7 @@ export class MissionScene extends Phaser.Scene {
       }
 
       const mission = missions[missionId];
+      const theme = getActiveTheme(state.profile);
       if (this.renderedMissionId !== missionId || state.missionPhase === "planning") {
         this.activePlaybackToken += 1;
         this.renderedMissionId = missionId;
@@ -51,7 +53,7 @@ export class MissionScene extends Phaser.Scene {
           createMissionState(mission, state.queuedCommands).ship,
           createMissionState(mission, state.queuedCommands).tiles,
         );
-        this.statusText?.setText(mission.briefing);
+        this.statusText?.setText(theme.missions[mission.id]?.briefing ?? "");
       }
 
       if (state.missionPhase === "running" && state.lastRun) {
@@ -84,6 +86,8 @@ export class MissionScene extends Phaser.Scene {
   ): void {
     this.boardLayer?.removeAll(true);
     const { tileSize, offsetX, offsetY } = this.boardMetrics(mission);
+    const theme = getActiveTheme(gameStore.getState().profile);
+    const tileLabels = theme.tileLabels[mission.id] ?? {};
 
     const water = this.add.graphics();
     water.fillGradientStyle(uiColors.sky, uiColors.sun, uiColors.sea, uiColors.seaDeep, 1);
@@ -137,8 +141,9 @@ export class MissionScene extends Phaser.Scene {
             key,
           )
           .setDisplaySize(tileSize - 22, tileSize - 22);
+        const label = tileLabels[tile.id] ?? "";
         const text = this.add
-          .text(image.x, image.y, tile.label.slice(0, 2).toUpperCase(), {
+          .text(image.x, image.y, label.slice(0, 2).toUpperCase(), {
             fontFamily: "Fredoka, Georgia, serif",
             fontSize: `${Math.max(tileSize * 0.18, 18)}px`,
             color: "#2b1d0e",

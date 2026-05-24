@@ -537,24 +537,58 @@ export const runMission = (
 
     if (command.type === "loop") {
       const count = command.count ?? 2;
-      const action = command.action ?? "sail";
+      const body =
+        command.body && command.body.length > 0
+          ? command.body
+          : null;
+      const fallbackAction = command.action ?? "sail";
 
+      let loopFailure: MissionRunResult | null = null;
       for (let index = 0; index < count; index += 1) {
-        pushStep(
-          command.instanceId,
-          `Repeat ${index + 1}/${count}`,
-          `The crew prepares to ${action} again.`,
-          "running",
-          [{ kind: "repeat", text: `Repeat ${action}.` }],
-        );
-        const result = applyAction(
-          command.instanceId,
-          `Repeat ${index + 1}/${count}`,
-          action,
-        );
-        if (result) {
-          return result;
+        if (body) {
+          for (const inner of body) {
+            const innerAction = inner.action ?? fallbackAction;
+            pushStep(
+              command.instanceId,
+              `Repeat ${index + 1}/${count}`,
+              `The crew runs ${innerAction} (step ${index + 1} of ${count}).`,
+              "running",
+              [{ kind: "repeat", text: `Repeat ${innerAction}.` }],
+            );
+            const result = applyAction(
+              command.instanceId,
+              `Repeat ${index + 1}/${count}`,
+              innerAction,
+            );
+            if (result) {
+              loopFailure = result;
+              break;
+            }
+          }
+          if (loopFailure) {
+            break;
+          }
+        } else {
+          pushStep(
+            command.instanceId,
+            `Repeat ${index + 1}/${count}`,
+            `The crew prepares to ${fallbackAction} again.`,
+            "running",
+            [{ kind: "repeat", text: `Repeat ${fallbackAction}.` }],
+          );
+          const result = applyAction(
+            command.instanceId,
+            `Repeat ${index + 1}/${count}`,
+            fallbackAction,
+          );
+          if (result) {
+            loopFailure = result;
+            break;
+          }
         }
+      }
+      if (loopFailure) {
+        return loopFailure;
       }
       continue;
     }

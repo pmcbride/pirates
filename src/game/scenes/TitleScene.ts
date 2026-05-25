@@ -1,11 +1,15 @@
 import Phaser from "phaser";
-import { gameStore } from "../../sim/store";
-import { getActiveTheme } from "../../themes";
 import { uiColors } from "../assets/manifest";
 
+/**
+ * Title-screen *background* scene. The actual title affordance (heading +
+ * Set Sail CTA) is rendered by the DOM HUD's `renderTitleMarkup` — the
+ * parchment poster card — so this scene intentionally renders no text and
+ * no tap handler. Two stacked title overlays + two "tap to sail" buttons
+ * confused first-time players badly (see PR #16 brief). Now it's pure
+ * atmosphere: sky-to-sea gradient + foam bubbles, behind the DOM card.
+ */
 export class TitleScene extends Phaser.Scene {
-  private pulse?: Phaser.Tweens.Tween;
-
   constructor() {
     super("title");
   }
@@ -13,7 +17,6 @@ export class TitleScene extends Phaser.Scene {
   create(): void {
     const width = this.scale.width;
     const height = this.scale.height;
-    const theme = getActiveTheme(gameStore.getState().profile);
 
     const sky = this.add.graphics();
     sky.fillGradientStyle(uiColors.sky, uiColors.sun, uiColors.sea, uiColors.seaDeep, 1);
@@ -24,69 +27,5 @@ export class TitleScene extends Phaser.Scene {
     for (let index = 0; index < 22; index += 1) {
       sky.fillCircle(60 + index * 42, 720 + (index % 4) * 180, 28 + (index % 5) * 8);
     }
-
-    this.add
-      .text(width / 2, 240, "SEA OF CODES", {
-        fontFamily: "Fredoka, Georgia, Times New Roman, serif",
-        fontSize: "108px",
-        color: "#2b1d0e",
-        fontStyle: "bold",
-        stroke: "#fff1cf",
-        strokeThickness: 12,
-      })
-      .setOrigin(0.5);
-
-    this.add
-      .text(width / 2, 360, "A pirate coding voyage for young captains", {
-        fontFamily: "Nunito, Trebuchet MS, sans-serif",
-        fontSize: "30px",
-        color: "#2b1d0e",
-      })
-      .setOrigin(0.5);
-
-    this.add
-      .text(
-        width / 2,
-        600,
-        theme.taglines.titlePoster,
-        {
-          align: "center",
-          lineSpacing: 14,
-          fontFamily: "Nunito, Trebuchet MS, sans-serif",
-          fontSize: "48px",
-          color: "#2b1d0e",
-        },
-      )
-      .setOrigin(0.5);
-
-    const startText = this.add
-      .text(width / 2, height - 220, "⛵  Tap to set sail  ⛵", {
-        fontFamily: "Fredoka, Georgia, serif",
-        fontSize: "36px",
-        color: "#2b1d0e",
-        backgroundColor: "#ffb24a",
-        padding: { x: 32, y: 20 },
-      })
-      .setOrigin(0.5)
-      .setInteractive({ useHandCursor: true });
-
-    this.pulse = this.tweens.add({
-      targets: startText,
-      scaleX: 1.05,
-      scaleY: 1.05,
-      duration: 900,
-      yoyo: true,
-      repeat: -1,
-      ease: "Sine.InOut",
-    });
-
-    this.input.once("pointerdown", () => {
-      gameStore.startAdventure();
-      this.scene.start("world-map");
-    });
-  }
-
-  shutdown(): void {
-    this.pulse?.stop();
   }
 }

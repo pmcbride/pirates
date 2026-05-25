@@ -1048,3 +1048,227 @@ canvas {
   font-weight: 600;
   color: var(--ink);
 }
+
+/* ── Captain picker (pre-mount overlay + in-drawer panel) ────── */
+
+.captain-overlay-host {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+
+.captain-overlay {
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% -10%, var(--sky) 0%, transparent 42%),
+    linear-gradient(180deg, var(--sea) 0%, var(--sea-deep) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  z-index: 200;
+}
+
+.captain-card {
+  width: min(560px, 100%);
+  padding: 1.5rem 1.8rem;
+  text-align: center;
+}
+
+.captain-card h1 {
+  font-family: var(--display-font);
+  font-size: 2.2rem;
+  margin: 0.4rem 0 0.2rem;
+}
+
+.captain-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  margin-top: 1rem;
+}
+
+.captain-input {
+  width: 100%;
+  font-family: var(--body-font);
+  font-size: 1.1rem;
+  padding: 0.9rem 1rem;
+  border: var(--border-ink);
+  border-radius: var(--radius-md);
+  background: #fff;
+  color: var(--ink);
+  min-height: 56px;
+}
+
+.captain-input:focus {
+  outline: 3px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.captain-error {
+  margin: 0;
+  color: var(--bounty);
+  font-weight: 700;
+  font-size: 0.95rem;
+  min-height: 1.2em;
+}
+
+.captain-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.8rem;
+  margin-top: 1rem;
+}
+
+.captain-pick {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 120px;
+  padding: 1rem 0.8rem;
+  background: var(--parchment);
+  border: var(--border-ink);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sticker);
+  color: var(--ink);
+  font-family: var(--body-font);
+  cursor: pointer;
+}
+
+.captain-pick:hover,
+.captain-pick:focus-visible {
+  background: var(--parchment-deep);
+  outline: none;
+}
+
+.captain-pick-icon {
+  font-size: 2rem;
+}
+
+.captain-pick strong {
+  font-family: var(--display-font);
+  font-size: 1.15rem;
+}
+
+.captain-pick-meta {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.captain-pick-new {
+  background: var(--sea-foam);
+}
+
+/* In-drawer captains panel (Settings) */
+
+.captain-list {
+  list-style: none;
+  margin: 0.5rem 0 0.8rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.captain-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.4rem;
+}
+
+.captain-row-main {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.7rem 0.9rem;
+  min-height: 64px;
+  background: var(--parchment);
+  border: var(--border-ink);
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  font-family: var(--body-font);
+  cursor: pointer;
+  text-align: left;
+}
+
+.captain-row.is-active .captain-row-main {
+  background: var(--gold);
+}
+
+.captain-row-icon {
+  font-size: 1.4rem;
+}
+
+.captain-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.captain-row-text strong {
+  font-family: var(--display-font);
+  font-size: 1.05rem;
+}
+
+.captain-row-meta {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+
+.captain-row-delete {
+  flex: 0 0 auto;
+  width: 48px;
+  min-height: 64px;
+  background: var(--parchment);
+  border: var(--border-ink);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 1.1rem;
+}
+
+.captain-row-delete:hover {
+  background: var(--coral);
+  color: #fff;
+}
+
+.captain-new-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0.4rem 0 0.8rem;
+}
+
+.captain-new-label {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.captain-new-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+/* Active-captain pill in map top strip */
+
+.captain-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.8rem;
+  background: var(--parchment);
+  border: var(--border-ink);
+  border-radius: 999px;
+  font-family: var(--display-font);
+  font-size: 0.95rem;
+  color: var(--ink);
+  box-shadow: var(--shadow-sticker);
+  white-space: nowrap;
+}

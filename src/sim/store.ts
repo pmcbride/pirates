@@ -9,7 +9,13 @@ import {
   sandboxMissionId,
 } from "./content";
 import { cloneQueuedCommands, getMission, runMission } from "./engine";
-import { applyReward, defaultProfile, loadProfile, saveProfile } from "./profile";
+import {
+  getActiveProfile,
+  resetActiveProfile as resetActiveCaptainProfile,
+  saveActiveProfile,
+  setActiveProfile as setActiveCaptainProfile,
+} from "./captains";
+import { applyReward, defaultProfile } from "./profile";
 import type {
   ActionCommandId,
   AppState,
@@ -141,9 +147,15 @@ const nextMissionId = (missionId: string): string | undefined => {
   return orderedMissionIds[index + 1];
 };
 
+const loadActiveOrDefault = (): PlayerProfile => {
+  if (typeof window === "undefined") {
+    return defaultProfile();
+  }
+  return getActiveProfile() ?? defaultProfile();
+};
+
 const initialState = (): AppState => {
-  const profile =
-    typeof window === "undefined" ? defaultProfile() : loadProfile();
+  const profile = loadActiveOrDefault();
 
   return {
     screen: "title",
@@ -191,8 +203,75 @@ export class GameStore {
 
   private persistProfile(profile: PlayerProfile): void {
     if (typeof window !== "undefined") {
-      saveProfile(profile);
+      saveActiveProfile(profile);
     }
+  }
+
+  /**
+   * Switch to a different captain (by name). Reloads the active profile from
+   * storage and resets transient screen state back to the title. No-op if the
+   * captain doesn't exist.
+   */
+  switchCaptain(name: string): void {
+    if (typeof window === "undefined") return;
+    if (!setActiveCaptainProfile(name)) return;
+    const profile = getActiveProfile() ?? defaultProfile();
+    this.update((state) => ({
+      ...state,
+      profile,
+      screen: "title",
+      selectedMissionId: firstUnlockedMissionId(profile),
+      activeMissionId: null,
+      queuedCommands: [],
+      missionPhase: "planning",
+      lastRun: null,
+      activeHint: null,
+      selectedDrawer: null,
+      playbackIndex: 0,
+      rewardMissionId: null,
+      openPicker: null,
+      predictedEndPosition: null,
+      lastPredictionCorrect: null,
+    }));
+  }
+
+  /**
+   * Reload the active captain from storage without changing identity. Used
+   * after the captain-picker overlay creates a new captain on first launch.
+   */
+  reloadActiveProfile(): void {
+    if (typeof window === "undefined") return;
+    const profile = getActiveProfile() ?? defaultProfile();
+    this.update((state) => ({
+      ...state,
+      profile,
+      selectedMissionId: firstUnlockedMissionId(profile),
+    }));
+  }
+
+  /**
+   * "Start over" — reset just the active captain's profile to defaults.
+   */
+  resetActiveProfile(): void {
+    if (typeof window === "undefined") return;
+    const fresh = resetActiveCaptainProfile() ?? defaultProfile();
+    this.update((state) => ({
+      ...state,
+      profile: fresh,
+      screen: "title",
+      selectedMissionId: firstUnlockedMissionId(fresh),
+      activeMissionId: null,
+      queuedCommands: [],
+      missionPhase: "planning",
+      lastRun: null,
+      activeHint: null,
+      selectedDrawer: null,
+      playbackIndex: 0,
+      rewardMissionId: null,
+      openPicker: null,
+      predictedEndPosition: null,
+      lastPredictionCorrect: null,
+    }));
   }
 
   startAdventure(): void {

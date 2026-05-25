@@ -8,6 +8,14 @@ import {
 } from "../themes";
 import type { Theme, ThemeId } from "../themes/types";
 import {
+  MAX_NAME_LENGTH,
+  createProfile,
+  deleteProfile,
+  getActiveProfileName,
+  listProfiles,
+  validateCaptainName,
+} from "../sim/captains";
+import {
   commandLibrary,
   missionNodes,
   missions,
@@ -72,6 +80,23 @@ const escapeHtml = (value: string): string =>
     .replaceAll('"', "&quot;");
 
 const iconFor = (key: keyof typeof iconMap): string => iconMap[key] ?? "";
+
+const errorMessageFor = (
+  error: "empty" | "too-long" | "invalid-chars" | "duplicate" | undefined,
+): string => {
+  switch (error) {
+    case "empty":
+      return "Pick a name to add this captain.";
+    case "too-long":
+      return `Names are ${MAX_NAME_LENGTH} letters or fewer.`;
+    case "invalid-chars":
+      return "Letters, numbers, and spaces only.";
+    case "duplicate":
+      return "A captain with that name already exists.";
+    default:
+      return "";
+  }
+};
 
 // Helpers — resolve mission/sea/crew/fruit display strings against a theme.
 const missionLabel = (theme: Theme, missionId: string): string =>
@@ -223,6 +248,92 @@ const wantedFruitCard = (theme: Theme, fruitId: string): string => {
   `;
 };
 
+interface CaptainsPanelState {
+  /** True while the player is typing a new captain name in-drawer. */
+  showNewInput: boolean;
+  /** Last-entered name (preserved across re-renders so an error message
+   *  doesn't wipe the input). */
+  newDraft: string;
+  /** Validation error to show under the input. */
+  newError: string;
+}
+
+const captainsPanelMarkup = (
+  activeName: string | null,
+  state: CaptainsPanelState,
+): string => {
+  const records = listProfiles();
+  const rows = records
+    .map((record) => {
+      const active = activeName?.toLowerCase() === record.name.toLowerCase();
+      const cleared = record.profile.completedMissionIds.length;
+      return `
+        <li class="captain-row${active ? " is-active" : ""}">
+          <button
+            type="button"
+            data-action="switch-captain"
+            data-captain-name="${escapeHtml(record.name)}"
+            class="captain-row-main"
+            ${active ? 'aria-current="true"' : ""}
+          >
+            <span class="captain-row-icon" aria-hidden="true">🏴‍☠️</span>
+            <span class="captain-row-text">
+              <strong>${escapeHtml(record.name)}</strong>
+              <span class="captain-row-meta">${cleared} voyages cleared${active ? " · sailing" : ""}</span>
+            </span>
+          </button>
+          <button
+            type="button"
+            data-action="delete-captain"
+            data-captain-name="${escapeHtml(record.name)}"
+            class="captain-row-delete"
+            aria-label="Delete captain ${escapeHtml(record.name)}"
+          >🗑️</button>
+        </li>
+      `;
+    })
+    .join("");
+
+  const newCaptainSection = state.showNewInput
+    ? `
+        <form class="captain-new-form" data-captain-new-form>
+          <label class="captain-new-label" for="captain-new-input">New captain name</label>
+          <input
+            id="captain-new-input"
+            type="text"
+            name="captainName"
+            maxlength="${MAX_NAME_LENGTH}"
+            autocomplete="off"
+            autocapitalize="words"
+            spellcheck="false"
+            class="captain-input"
+            value="${escapeHtml(state.newDraft)}"
+            required
+          />
+          ${state.newError ? `<p class="captain-error">${escapeHtml(state.newError)}</p>` : ""}
+          <div class="captain-new-actions">
+            <button type="submit" class="primary-cta">⛵ Add captain</button>
+            <button type="button" class="ghost-link" data-action="cancel-new-captain">Cancel</button>
+          </div>
+        </form>
+      `
+    : `
+        <button type="button" class="drawer-toggle" data-action="show-new-captain">
+          ＋ New captain
+        </button>
+      `;
+
+  return `
+    <h4 class="drawer-subhead">Captain</h4>
+    <ul class="captain-list">${rows}</ul>
+    ${newCaptainSection}
+    <button type="button" class="drawer-toggle" data-action="reset-active-profile">
+      🧹 Start over (this captain)
+    </button>
+    <p class="drawer-copy">Wipes only the active captain's progress. Other captains keep their voyages.</p>
+  `;
+};
+
 const themePickerMarkup = (currentThemeId: ThemeId): string => {
   const options = orderedThemeIds
     .map((id) => {
@@ -248,7 +359,12 @@ const themePickerMarkup = (currentThemeId: ThemeId): string => {
   `;
 };
 
-const drawerContent = (state: AppState, theme: Theme): string => {
+const drawerContent = (
+  state: AppState,
+  theme: Theme,
+  captainsPanel: CaptainsPanelState,
+  activeCaptainName: string | null,
+): string => {
   switch (state.selectedDrawer) {
     case "crew": {
       const crewList = state.profile.crewRoster.length
@@ -313,6 +429,7 @@ const drawerContent = (state: AppState, theme: Theme): string => {
             Always Pre-load Full Plan: ${state.profile.settings.alwaysShowSuggested ? "On" : "Off"}
           </button>
           <p class="drawer-copy">After the first try at a voyage the dock only shows the first stamp. Turn this on to always start from the full suggested plan.</p>
+          ${captainsPanelMarkup(activeCaptainName, captainsPanel)}
           ${themePickerMarkup(state.profile.settings.themeId)}
         </section>
       `;
@@ -488,9 +605,18 @@ export class Hud {
    */
   private pendingFocusInstanceId: string | null = null;
 
+  /** Transient state for the captains panel in the Settings drawer. */
+  private captainsPanel: CaptainsPanelState = {
+    showNewInput: false,
+    newDraft: "",
+    newError: "",
+  };
+
   constructor(private root: HTMLElement) {
     this.root.addEventListener("click", this.handleClick);
     this.root.addEventListener("keydown", this.handleKeydown);
+    this.root.addEventListener("submit", this.handleSubmit);
+    this.root.addEventListener("input", this.handleInput);
     this.root.addEventListener("dragstart", this.handleDragStart);
     this.root.addEventListener("dragover", this.handleDragOver);
     this.root.addEventListener("drop", this.handleDrop);
@@ -508,6 +634,58 @@ export class Hud {
       this.positionHintBubble(this.lastState);
     }
   };
+
+  /** Force a re-render of just the drawer body. Used after captains-panel
+   *  transient state changes (showing/hiding new-input, error messages) so
+   *  we don't need to round-trip through the store. */
+  private rerenderDrawer(state: AppState): void {
+    const theme = getActiveTheme(state.profile);
+    const activeName =
+      typeof window === "undefined" ? null : getActiveProfileName();
+
+    // Map screen: re-render the whole layer (cheap).
+    if (state.screen === "map") {
+      this.renderMapInPlace(state);
+      // Restore focus to the new-name input if it's visible — keeps typing
+      // smooth after the markup rebuild.
+      if (this.captainsPanel.showNewInput) {
+        const input = this.root.querySelector<HTMLInputElement>(
+          "#captain-new-input",
+        );
+        input?.focus();
+        if (input && this.captainsPanel.newDraft) {
+          const len = this.captainsPanel.newDraft.length;
+          input.setSelectionRange(len, len);
+        }
+      }
+      return;
+    }
+
+    // Mission screen: only the drawer body changes.
+    if (this.mission && state.selectedDrawer) {
+      this.mission.drawerHost.hidden = false;
+      this.mission.drawerHost.innerHTML = drawerContent(
+        state,
+        theme,
+        this.captainsPanel,
+        activeName,
+      );
+      // Bust the cached fingerprint so the next state-driven render still
+      // refreshes correctly when the player toggles another setting.
+      this.mission.fingerprints.drawer = "";
+
+      if (this.captainsPanel.showNewInput) {
+        const input = this.root.querySelector<HTMLInputElement>(
+          "#captain-new-input",
+        );
+        input?.focus();
+        if (input && this.captainsPanel.newDraft) {
+          const len = this.captainsPanel.newDraft.length;
+          input.setSelectionRange(len, len);
+        }
+      }
+    }
+  }
 
   // ── DOM helpers ────────────────────────────────────────────
 
@@ -686,6 +864,84 @@ export class Hud {
         }
         break;
       }
+      case "switch-captain": {
+        const name = button.dataset.captainName;
+        if (name) {
+          this.captainsPanel = {
+            showNewInput: false,
+            newDraft: "",
+            newError: "",
+          };
+          haptic("tap");
+          gameStore.switchCaptain(name);
+        }
+        break;
+      }
+      case "delete-captain": {
+        const name = button.dataset.captainName;
+        if (!name) break;
+        const ok =
+          typeof window === "undefined"
+            ? true
+            : window.confirm(
+                `Delete captain "${name}"? Their voyages will be gone for good.`,
+              );
+        if (!ok) break;
+        const remaining = deleteProfile(name);
+        const activeName = getActiveProfileName();
+        // If we deleted the active captain, the captains layer already
+        // promoted the next one in line; tell the store to reload.
+        if (remaining.length === 0) {
+          // No captains left — gameStore can't survive without a profile;
+          // reload the page so the welcome-name flow runs again.
+          if (typeof window !== "undefined") {
+            window.location.reload();
+          }
+          break;
+        }
+        this.captainsPanel = {
+          showNewInput: false,
+          newDraft: "",
+          newError: "",
+        };
+        if (activeName) {
+          // Reload state (the deleted captain may have been the active one,
+          // in which case the captains layer already promoted the next).
+          gameStore.switchCaptain(activeName);
+        }
+        // Force-refresh the drawer body so the captain list reflects the
+        // deletion even when the active captain didn't change.
+        this.rerenderDrawer(gameStore.getState());
+        break;
+      }
+      case "show-new-captain":
+        this.captainsPanel = {
+          showNewInput: true,
+          newDraft: "",
+          newError: "",
+        };
+        this.rerenderDrawer(gameStore.getState());
+        break;
+      case "cancel-new-captain":
+        this.captainsPanel = {
+          showNewInput: false,
+          newDraft: "",
+          newError: "",
+        };
+        this.rerenderDrawer(gameStore.getState());
+        break;
+      case "reset-active-profile": {
+        const activeName = getActiveProfileName() ?? "this captain";
+        const ok =
+          typeof window === "undefined"
+            ? true
+            : window.confirm(
+                `Start over for "${activeName}"? Their progress will be wiped, but other captains keep theirs.`,
+              );
+        if (!ok) break;
+        gameStore.resetActiveProfile();
+        break;
+      }
     }
   };
 
@@ -742,6 +998,57 @@ export class Hud {
         return;
       }
     }
+  };
+
+  private handleSubmit = (event: Event): void => {
+    const form = event.target as HTMLElement | null;
+    if (!(form instanceof HTMLFormElement)) return;
+    if (!form.hasAttribute("data-captain-new-form")) return;
+    event.preventDefault();
+
+    const input = form.querySelector<HTMLInputElement>(
+      "input[name=captainName]",
+    );
+    const raw = input?.value ?? "";
+    const existing = listProfiles().map((record) => record.name);
+    const validation = validateCaptainName(raw, existing);
+    if (!validation.ok) {
+      this.captainsPanel = {
+        showNewInput: true,
+        newDraft: raw,
+        newError: errorMessageFor(validation.error),
+      };
+      this.rerenderDrawer(gameStore.getState());
+      return;
+    }
+
+    const result = createProfile(validation.cleaned);
+    if (!result.ok) {
+      this.captainsPanel = {
+        showNewInput: true,
+        newDraft: raw,
+        newError: errorMessageFor(result.error),
+      };
+      this.rerenderDrawer(gameStore.getState());
+      return;
+    }
+
+    this.captainsPanel = {
+      showNewInput: false,
+      newDraft: "",
+      newError: "",
+    };
+    // createProfile already set this new captain as active. Reload the
+    // store so the title/map etc. show the fresh profile.
+    gameStore.switchCaptain(validation.cleaned);
+  };
+
+  private handleInput = (event: Event): void => {
+    const target = event.target as HTMLInputElement | null;
+    if (!target || target.id !== "captain-new-input") return;
+    // Preserve typed text across drawer re-renders without re-rendering on
+    // every keystroke (we only re-render on submit / show / cancel).
+    this.captainsPanel.newDraft = target.value;
   };
 
   private handleDragStart = (event: DragEvent): void => {
@@ -852,9 +1159,15 @@ export class Hud {
     const missionId = state.selectedMissionId ?? state.profile.unlockedMissionIds[0];
     const node = missionNodes.find((entry) => entry.missionId === missionId);
     const rank = bountyRankFor(theme, state.profile.bounty);
+    const activeName =
+      typeof window === "undefined" ? null : getActiveProfileName();
 
     const drawerMarkup = state.selectedDrawer
-      ? `<aside class="drawer-host">${drawerContent(state, theme)}</aside>`
+      ? `<aside class="drawer-host">${drawerContent(state, theme, this.captainsPanel, activeName)}</aside>`
+      : "";
+
+    const captainPill = activeName
+      ? `<span class="captain-pill" title="Active captain">🏴‍☠️ ${escapeHtml(activeName)}</span>`
       : "";
 
     return `
@@ -864,6 +1177,7 @@ export class Hud {
           <h2 style="margin:0;font-family:var(--display-font);font-size:1.8rem;">Pick the next voyage</h2>
           <p style="margin:0.2rem 0 0;color:var(--ink-soft);font-size:0.9rem;">${escapeHtml(rank)}</p>
         </div>
+        ${captainPill}
         ${statsInlineMarkup(state.profile, theme)}
       </header>
 
@@ -1208,11 +1522,18 @@ export class Hud {
     this.positionHintBubble(state);
 
     // — Drawer host
-    const drawerFp = `${theme.meta.id}|${drawerFingerprint(state)}`;
+    const activeName =
+      typeof window === "undefined" ? null : getActiveProfileName();
+    const drawerFp = `${theme.meta.id}|${drawerFingerprint(state)}|${activeName ?? ""}`;
     if (drawerFp !== m.fingerprints.drawer) {
       if (state.selectedDrawer) {
         m.drawerHost.hidden = false;
-        m.drawerHost.innerHTML = drawerContent(state, theme);
+        m.drawerHost.innerHTML = drawerContent(
+          state,
+          theme,
+          this.captainsPanel,
+          activeName,
+        );
       } else {
         m.drawerHost.hidden = true;
         m.drawerHost.innerHTML = "";

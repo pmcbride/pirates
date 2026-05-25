@@ -466,17 +466,45 @@ const drawerContent = (
   }
 };
 
+/**
+ * Top-right stat cluster (map screen).
+ *
+ * Reference-game inspired (Dragon Coding Games for Kids): a single, prominent
+ * coin chip is the headline number. A small star count sits to its left, and
+ * the bounty appears as a sub-line under the coin chip so the player still
+ * sees it without it competing for the eye. Replaces the three equal-weight
+ * pills (berries / bounty / stars) that used to dominate the strip.
+ *
+ * Layout:
+ *   ⭐ 12   [ 🪙 1,250 D ]
+ *           Bounty: 5M D
+ */
 const statsInlineMarkup = (profile: PlayerProfile, theme: Theme): string => `
   <div class="stats-inline">
-    <span class="stat-pill"><span class="stat-icon">💰</span>${escapeHtml(formatCurrency(theme, profile.berries))}</span>
-    <span class="stat-pill bounty" aria-label="Bounty"><span class="stat-icon" aria-hidden="true">🏴‍☠️</span>${escapeHtml(formatBountyFor(theme, profile.bounty))}</span>
-    <span class="stat-pill"><span class="stat-icon">⭐</span>${profile.stars}</span>
+    <span class="stat-pill stat-pill-star" aria-label="Stars earned">
+      <span class="stat-icon" aria-hidden="true">⭐</span>${profile.stars}
+    </span>
+    <span class="stat-cluster">
+      <span class="stat-pill stat-pill-coin" aria-label="Berries">
+        <span class="stat-icon" aria-hidden="true">🪙</span>${escapeHtml(formatCurrency(theme, profile.berries))}
+      </span>
+      <span class="stat-pill-sub" aria-label="Bounty">Bounty: ${escapeHtml(formatBountyFor(theme, profile.bounty))}</span>
+    </span>
   </div>
 `;
 
+/**
+ * Mission-screen status strip. Same consolidation idea as the map: one big
+ * coin chip is the headline; bounty drops to a sub-line; crew + fruit counts
+ * stay as compact pills next to it.
+ */
 const statusStripInnerMarkup = (profile: PlayerProfile, theme: Theme): string => `
-  <span class="stat-pill"><span class="stat-icon">💰</span>${escapeHtml(formatCurrency(theme, profile.berries))}</span>
-  <span class="stat-pill bounty" aria-label="Bounty"><span class="stat-icon" aria-hidden="true">🏴‍☠️</span>${escapeHtml(formatBountyFor(theme, profile.bounty))}</span>
+  <span class="stat-cluster">
+    <span class="stat-pill stat-pill-coin" aria-label="Berries">
+      <span class="stat-icon" aria-hidden="true">🪙</span>${escapeHtml(formatCurrency(theme, profile.berries))}
+    </span>
+    <span class="stat-pill-sub" aria-label="Bounty">Bounty: ${escapeHtml(formatBountyFor(theme, profile.bounty))}</span>
+  </span>
   <span class="stat-pill"><span class="stat-icon">🧑‍🎤</span>${profile.crewRoster.length}</span>
   <span class="stat-pill"><span class="stat-icon">🍎</span>${profile.fruitPowers.length}</span>
 `;
@@ -546,7 +574,9 @@ interface MissionScaffold {
   hintHost: HTMLElement;
   dock: HTMLElement;
   dockHead: HTMLElement;
+  queueRow: HTMLElement;
   queueList: HTMLElement;
+  playButton: HTMLElement;
   palette: HTMLElement;
   drawerHost: HTMLElement;
   pickerHost: HTMLElement;
@@ -558,6 +588,7 @@ interface MissionScaffold {
     rail: string;
     hint: string;
     dockHead: string;
+    playButton: string;
     palette: string;
     drawer: string;
     picker: string;
@@ -1458,7 +1489,14 @@ export class Hud {
     const hintHost = Hud.makeElement(`<div class="hint-host"></div>`);
     const dock = Hud.makeElement(`<section class="command-dock surface-card"></section>`);
     const dockHead = Hud.makeElement(`<div class="dock-head"></div>`);
+    // Queue row: the horizontal queue strip on the left, the hex Play button
+    // anchored to the right. Both share the same row so the Play button stays
+    // glued to the queue (Dragon Coding-inspired "go" affordance).
+    const queueRow = Hud.makeElement(`<div class="queue-row"></div>`);
     const queueList = Hud.makeElement(`<div class="queue-list" data-dropzone="queue"></div>`);
+    const playButton = Hud.makeElement(`<div class="play-host"></div>`);
+    queueRow.appendChild(queueList);
+    queueRow.appendChild(playButton);
     const palette = Hud.makeElement(`<div class="palette-grid"></div>`);
     const drawerHost = Hud.makeElement(`<aside class="drawer-host" hidden></aside>`);
     // Picker host stays in the DOM but only has content while a picker is open;
@@ -1469,7 +1507,7 @@ export class Hud {
     const predictHost = Hud.makeElement(`<div class="predict-host"></div>`);
 
     dock.appendChild(dockHead);
-    dock.appendChild(queueList);
+    dock.appendChild(queueRow);
     dock.appendChild(palette);
 
     layer.appendChild(objective);
@@ -1489,7 +1527,9 @@ export class Hud {
       hintHost,
       dock,
       dockHead,
+      queueRow,
       queueList,
+      playButton,
       palette,
       drawerHost,
       pickerHost,
@@ -1500,6 +1540,7 @@ export class Hud {
         rail: "",
         hint: "",
         dockHead: "",
+        playButton: "",
         palette: "",
         drawer: "",
         picker: "",
@@ -1634,10 +1675,21 @@ export class Hud {
         <div class="dock-actions">
           <button ${locked ? "disabled" : ""} data-action="clear-queue">Clear</button>
           <button ${locked ? "disabled" : ""} data-action="reset-queue">Reset</button>
-          <button ${locked ? "disabled" : ""} data-action="run-mission" class="primary-cta">▶ Run Plan</button>
         </div>
       `;
       m.fingerprints.dockHead = dockHeadFp;
+    }
+
+    // — Hex Play button (right of the queue list)
+    // Disabled while running / predicting. Pulses gently when the queue has
+    // commands ready to run. Keyboard-accessible: it's a real <button> so Enter
+    // / Space synthesizes the click that routes through `handleClick`.
+    const hasQueue = state.queuedCommands.length > 0;
+    const canRun = !locked && hasQueue;
+    const playFp = `${locked ? "l" : "u"}|${hasQueue ? "q" : "e"}`;
+    if (playFp !== m.fingerprints.playButton) {
+      m.playButton.innerHTML = renderHexPlayButton(canRun, locked);
+      m.fingerprints.playButton = playFp;
     }
 
     // — Palette grid (depends on mission palette + locked)
@@ -1964,6 +2016,47 @@ export class Hud {
     bubble.style.setProperty("--hint-tail-offset", `${Math.round(tailOffset)}px`);
   }
 }
+
+/**
+ * Big hex "Play" button anchored to the right of the queue strip. Inspired by
+ * Dragon Coding Games for Kids — the hex shape reads as a "go" affordance
+ * for early readers far better than a text button. The button is ~88px tall
+ * (well above the 64px touch-target floor) with a sunset-yellow fill, ink
+ * border, and a centered white play triangle.
+ *
+ * Behavior toggles:
+ *   - `canRun` true  → active, gentle pulse glow so the eye is drawn to it.
+ *   - `canRun` false + `locked` → disabled (running / predicting).
+ *   - `canRun` false + `!locked` → idle (no commands in the queue yet).
+ *
+ * Real native <button> so Enter / Space keyboard activation works for free,
+ * routed through the existing `data-action="run-mission"` click handler.
+ */
+const renderHexPlayButton = (canRun: boolean, locked: boolean): string => {
+  const disabled = !canRun;
+  const stateClass = canRun ? "is-ready" : locked ? "is-locked" : "is-idle";
+  return `
+    <button
+      type="button"
+      class="hex-play ${stateClass}"
+      data-action="run-mission"
+      aria-label="Run plan"
+      title="Run plan"
+      ${disabled ? "disabled" : ""}
+    >
+      <svg class="hex-play-svg" viewBox="0 0 100 110" aria-hidden="true" focusable="false">
+        <polygon
+          class="hex-play-shape"
+          points="50,4 94,30 94,80 50,106 6,80 6,30"
+        />
+        <polygon
+          class="hex-play-triangle"
+          points="40,32 76,55 40,78"
+        />
+      </svg>
+    </button>
+  `;
+};
 
 const hintFingerprint = (hint: HintResult | null): string =>
   hint ? `${hint.reason}|${hint.suggestion}|${hint.focusTemplateId ?? ""}` : "";

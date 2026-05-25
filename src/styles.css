@@ -268,6 +268,7 @@ canvas {
   gap: 0.6rem;
   flex-wrap: wrap;
   justify-content: flex-end;
+  align-items: center;
 }
 
 .stats-inline .stat-pill,
@@ -288,6 +289,47 @@ canvas {
 .stat-pill.bounty {
   background: var(--bounty);
   color: var(--parchment);
+}
+
+/* Consolidated coin chip — the *headline* number in the top-right stat
+   cluster. Larger, brighter than the supporting stars/crew pills so the
+   player's eye goes straight to their berry count (the reward they care
+   about). Inspired by Dragon Coding Games for Kids' single big coin chip. */
+.stat-pill-coin {
+  background: linear-gradient(180deg, var(--sun) 0%, var(--sunset) 100%);
+  font-family: var(--display-font);
+  font-size: 1.25rem;
+  padding: 0.65rem 1.15rem;
+  letter-spacing: 0.02em;
+}
+
+.stat-pill-coin .stat-icon {
+  font-size: 1.35rem;
+  margin-right: 0.45rem;
+}
+
+/* Small star count — sits left of the coin chip as a supporting stat. */
+.stat-pill-star {
+  font-size: 0.95rem;
+  padding: 0.4rem 0.75rem;
+}
+
+/* Two-line stat cluster: the headline coin chip on top, the bounty sub-line
+   tucked underneath so it stays visible without competing for the eye. */
+.stat-cluster {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.2rem;
+}
+
+.stat-pill-sub {
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+  letter-spacing: 0.06em;
+  text-align: center;
+  font-weight: 800;
+  text-transform: uppercase;
 }
 
 /* ── Side rail ─────────────────────────────────────────────── */
@@ -532,6 +574,117 @@ canvas {
   /* Visual hint that this is a drop zone for the dragged palette card
      or for reordering an existing queue card. */
   scroll-snap-type: x proximity;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Queue row: horizontal queue strip on the left, big hex Play button glued
+   to the right edge. Inspired by Dragon Coding Games for Kids' anchored
+   "go" affordance — kids see the queue and the way to launch it on the
+   same line, no scrolling required. */
+.queue-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.play-host {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+/* ── Hex Play button ──────────────────────────────────────────
+   Big sunset-yellow hexagon with an ink border and a centered white play
+   triangle. Replaces the small text "▶ Run Plan" CTA. Always ≥ 80px tall
+   (DESIGN.md §5 touch-target floor is 64px; primary CTAs are 72px+). */
+.hex-play {
+  width: 88px;
+  height: 96px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  filter: drop-shadow(0 4px 0 rgba(43, 29, 14, 0.35));
+  transition: transform 0.08s ease, filter 0.12s ease;
+}
+
+.hex-play:disabled {
+  cursor: default;
+  filter: drop-shadow(0 2px 0 rgba(43, 29, 14, 0.2));
+}
+
+.hex-play-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.hex-play-shape {
+  fill: var(--sun);
+  stroke: var(--ink);
+  stroke-width: 4;
+  stroke-linejoin: round;
+  transition: fill 0.12s ease;
+}
+
+.hex-play-triangle {
+  fill: #fff8e6;
+  stroke: var(--ink);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+}
+
+.hex-play.is-ready .hex-play-shape {
+  fill: url(#hex-play-gradient), linear-gradient(180deg, var(--sun) 0%, var(--sunset) 100%);
+  fill: var(--sun);
+}
+
+.hex-play.is-ready {
+  animation: hex-play-pulse 1.8s ease-in-out infinite;
+}
+
+.hex-play.is-idle .hex-play-shape {
+  fill: var(--parchment-deep);
+}
+
+.hex-play.is-locked .hex-play-shape {
+  fill: #d9c8a3;
+}
+
+.hex-play.is-locked .hex-play-triangle {
+  fill: #ece4cf;
+}
+
+.hex-play:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.hex-play:active:not(:disabled) {
+  transform: translateY(2px);
+  filter: drop-shadow(0 1px 0 rgba(43, 29, 14, 0.35));
+}
+
+@keyframes hex-play-pulse {
+  0%, 100% {
+    filter: drop-shadow(0 4px 0 rgba(43, 29, 14, 0.35))
+            drop-shadow(0 0 0 rgba(255, 178, 74, 0));
+  }
+  50% {
+    filter: drop-shadow(0 4px 0 rgba(43, 29, 14, 0.35))
+            drop-shadow(0 0 14px rgba(255, 178, 74, 0.75));
+  }
+}
+
+.hex-play:focus-visible {
+  outline: none;
+}
+
+.hex-play:focus-visible .hex-play-shape {
+  stroke: var(--sunset);
+  stroke-width: 6;
 }
 
 .empty-queue {

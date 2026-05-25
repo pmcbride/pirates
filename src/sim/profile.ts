@@ -2,6 +2,25 @@ import type { CaptainLogEntry, PlayerProfile, RewardBundle } from "./types";
 
 const profileStorageKey = "sea-of-codes/profile/v2";
 
+/**
+ * Read the OS-level `prefers-reduced-motion` media query. Returns false in
+ * SSR / non-browser environments (no `window` or no `matchMedia`).
+ *
+ * Exported so tests can stub it and so callers other than `loadProfile` can
+ * reuse the same SSR-safe guard.
+ */
+export const detectReducedMotionPreference = (): boolean => {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    return false;
+  }
+  try {
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  } catch {
+    // Some older browsers / weird envs throw on malformed queries — be safe.
+    return false;
+  }
+};
+
 export const defaultProfile = (): PlayerProfile => ({
   unlockedMissionIds: ["tutorial-cove", "sandbox-isle"],
   completedMissionIds: [],
@@ -87,8 +106,21 @@ export const deserializeProfile = (raw: string | null): PlayerProfile => {
   }
 };
 
-export const loadProfile = (): PlayerProfile =>
-  deserializeProfile(window.localStorage.getItem(profileStorageKey));
+export const loadProfile = (): PlayerProfile => {
+  const raw = window.localStorage.getItem(profileStorageKey);
+  const profile = deserializeProfile(raw);
+
+  // First-launch seeding: when there's no saved profile yet, honor the OS-level
+  // `prefers-reduced-motion` preference so kids on tablets with reduced motion
+  // turned on at the OS get calmer playback without ever opening Settings.
+  // We only do this on a true cold-start; an existing player's stored choice
+  // is preserved verbatim, even if it's the default `false`.
+  if (raw === null && detectReducedMotionPreference()) {
+    profile.settings.reducedMotion = true;
+  }
+
+  return profile;
+};
 
 export const saveProfile = (profile: PlayerProfile): void => {
   window.localStorage.setItem(profileStorageKey, serializeProfile(profile));

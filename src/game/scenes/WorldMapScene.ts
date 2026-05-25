@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { missionNodes, sandboxMissionId } from "../../sim/content";
+import { missionPortraits } from "../../sim/portraits";
 import { gameStore } from "../../sim/store";
 import { getActiveTheme } from "../../themes";
 import { uiColors } from "../assets/manifest";
@@ -130,26 +131,65 @@ export class WorldMapScene extends Phaser.Scene {
         }
       });
 
-      // X-marks-the-spot for the final island, palm tree for sandbox,
-      // lock for the rest.
-      const marker = isSandbox
-        ? "🌴"
-        : node.missionId === "treasure-isle"
-          ? "✕"
-          : complete
-            ? "✓"
-            : unlocked
-              ? "★"
-              : "🔒";
-      const markerText = this.add
-        .text(x, y, marker, {
+      // Portrait glyph hints at what awaits on this island — visible even
+      // when locked so the player gets pulled toward the boss/treasure ahead.
+      // Locked islands render dimmer with a tiny padlock badge; completed
+      // islands get a small checkmark badge.
+      const portrait = missionPortraits[node.missionId] ?? "★";
+      const portraitText = this.add
+        .text(x, y, portrait, {
           fontFamily: "Fredoka, Georgia, serif",
-          fontSize: "28px",
+          fontSize: "44px",
           color: "#2b1d0e",
           fontStyle: "bold",
         })
         .setOrigin(0.5);
-      this.layer?.add([nodeGraphics, markerText]);
+      // Desaturate locked portraits (sandbox is always "unlocked-ish" in feel).
+      if (!unlocked && !isSandbox) {
+        portraitText.setAlpha(0.55);
+      }
+      this.layer?.add([nodeGraphics, portraitText]);
+
+      // Corner badge: small lock for locked nodes, small check for completed.
+      // Rendered as a contrasting circle + glyph in the bottom-right corner
+      // of the portrait so the portrait itself stays the dominant visual.
+      const badgeOffsetX = selected ? 32 : 26;
+      const badgeOffsetY = selected ? 32 : 26;
+      if (!unlocked && !isSandbox) {
+        const badgeBg = this.add.circle(
+          x + badgeOffsetX,
+          y + badgeOffsetY,
+          12,
+          uiColors.ink,
+          0.85,
+        );
+        const badgeText = this.add
+          .text(x + badgeOffsetX, y + badgeOffsetY, "🔒", {
+            fontFamily: "Fredoka, Georgia, serif",
+            fontSize: "14px",
+            color: "#fff1cf",
+          })
+          .setOrigin(0.5);
+        this.layer?.add([badgeBg, badgeText]);
+      } else if (complete) {
+        const badgeBg = this.add.circle(
+          x + badgeOffsetX,
+          y + badgeOffsetY,
+          12,
+          uiColors.mint,
+          1,
+        );
+        badgeBg.setStrokeStyle(2, uiColors.ink, 1);
+        const badgeText = this.add
+          .text(x + badgeOffsetX, y + badgeOffsetY, "✓", {
+            fontFamily: "Fredoka, Georgia, serif",
+            fontSize: "16px",
+            color: "#2b1d0e",
+            fontStyle: "bold",
+          })
+          .setOrigin(0.5);
+        this.layer?.add([badgeBg, badgeText]);
+      }
 
       const nodeLabel = theme.missions[node.missionId]?.label ?? node.missionId;
       const label = this.add.text(x, y + 56, nodeLabel, {

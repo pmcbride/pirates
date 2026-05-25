@@ -6,3 +6,17 @@ vite.config.d.ts
 
 # Claude Code local settings (per-user, never committed)
 .claude/settings.local.json
+
+# Local secrets — never commit
+.env
+.env.local
+.env.*.local
+
+# Build / tooling output
+*.log
+.vite/
+.DS_Store
+
+# AI-generated art workspace (Phase B asset pipeline)
+art/generated/
+art/cache/

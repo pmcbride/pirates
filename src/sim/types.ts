@@ -1,9 +1,10 @@
 export type Direction = "north" | "east" | "south" | "west";
 
 export type ActionCommandId =
-  | "sail"
-  | "turn-left"
-  | "turn-right"
+  | "move-up"
+  | "move-down"
+  | "move-left"
+  | "move-right"
   | "dodge"
   | "fire"
   | "collect"

@@ -22,19 +22,19 @@ export const originalTheme: Theme = {
     "tutorial-cove": {
       label: "Foglight Cove",
       sea: "Starter Cove",
-      briefing: "Line up a sailing plan and scoop the first chest.",
-      tutorial: "Try Sail, Sail, Sail, Collect, Sail, Sail.",
-      preview: "Hoist the sail and grab the first chest.",
+      briefing: "Tap arrows to plot the route, then scoop the first chest.",
+      tutorial: "Try Right, Right, Right, Collect, Right, Right.",
+      preview: "Tap arrows and grab the first chest.",
       objective: {
-        primary: "Collect the chest, then sail to the lighthouse.",
+        primary: "Collect the chest, then move to the lighthouse.",
         short: "Collect chest, then reach the lighthouse.",
       },
     },
     "spark-shoals": {
       label: "Shellrock Bay",
       sea: "Eastern Reach",
-      briefing: "A patrol skiff blocks the gold lane. Splash it first, then sail.",
-      tutorial: "If a patrol skiff is ahead, Splash before you Sail.",
+      briefing: "A patrol skiff blocks the gold lane. Splash it first, then move.",
+      tutorial: "If a patrol skiff is ahead, Splash before you Move.",
       preview: "Splash a patrol skiff and bring Saber aboard.",
       objective: {
         primary: "Splash the skiff, grab the chest, dock at the bay.",
@@ -44,12 +44,12 @@ export const originalTheme: Theme = {
     "windrise-cove": {
       label: "Windrise Cove",
       sea: "Eastern Reach",
-      briefing: "Two patrol skiffs guard the cove. Splash one, sail through, splash the next.",
-      tutorial: "Fire when a skiff is ahead, then Sail through the gap.",
-      preview: "Two patrol skiffs guard the lane. Fire, sail, fire, sail.",
+      briefing: "Two patrol skiffs guard the cove. Splash one, move through, splash the next.",
+      tutorial: "Fire when a skiff is ahead, then Move through the gap.",
+      preview: "Two patrol skiffs guard the lane. Move, fire, move, fire.",
       objective: {
         primary: "Splash both patrol skiffs, then dock at the cove.",
-        short: "Fire, Sail, Fire, Sail to the dock.",
+        short: "Move, Fire, Move, Fire to the dock.",
       },
     },
     "barrel-bay": {
@@ -67,13 +67,13 @@ export const originalTheme: Theme = {
       label: "Harbor Bend",
       sea: "Eastern Reach",
       briefing:
-        "The chest sits up the bay, off the straight lane. Turn the bow before you sail to reach it.",
-      tutorial: "Sail, Sail, Turn Left, Sail, Collect, Turn Right, Sail, Sail.",
-      preview: "Bend the route — turn the ship to grab the chest.",
+        "The chest sits up the bay, off the straight lane. Tap Up to reach it before docking.",
+      tutorial: "Right, Right, Up, Collect, Right, Right.",
+      preview: "Tap Up to grab the chest off the main lane.",
       objective: {
         primary:
-          "Turn the ship to reach the side chest, then dock at the far buoy.",
-        short: "Turn Left, Collect, Turn Right, then dock.",
+          "Use Up to reach the side chest, then continue Right to the far buoy.",
+        short: "Right, Right, Up, Collect, Right, Right.",
       },
     },
     "sandbox-isle": {
@@ -91,18 +91,18 @@ export const originalTheme: Theme = {
       label: "Crescent Falls",
       sea: "Crescent Pass",
       briefing: "The current shoots into the open sea. Use Repeat to ride it.",
-      tutorial: "Try Repeat Sail x3, Collect, Repeat Sail x3.",
+      tutorial: "Try Repeat Right x3, Right, Collect, Repeat Right x3.",
       preview: "Surf a long current using a Repeat plan.",
       objective: {
-        primary: "Repeat Sail to ride the current, then collect the chest.",
-        short: "Repeat Sail, Collect, Repeat Sail.",
+        primary: "Repeat Right to ride the current, then collect the chest.",
+        short: "Repeat Right, Collect, Repeat Right.",
       },
     },
     "coral-lookout": {
       label: "Cloudtop Lookout",
       sea: "Sky Reach",
       briefing: "Train the crew to react when danger pops up in front.",
-      tutorial: "Use If Patrol then Splash before sailing the lookout lane.",
+      tutorial: "Use If Patrol then Splash before moving the lookout lane.",
       preview: "Teach the crew to react with If-then plans.",
       objective: {
         primary: "React with If Patrol, then grab the sky treasure.",
@@ -118,7 +118,7 @@ export const originalTheme: Theme = {
       objective: {
         primary:
           "Dodge the reef, splash the captain, recruit the guide, reach the treasure.",
-        short: "If Obstacle, Repeat Sail, If Patrol, Talk, then finish.",
+        short: "If Obstacle, Repeat Right, If Patrol, Talk, then finish.",
       },
     },
   },

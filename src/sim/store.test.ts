@@ -192,7 +192,7 @@ describe("GameStore.moveCommand", () => {
     gameStore.openSandbox();
     gameStore.clearQueue();
     for (let i = 0; i < count; i += 1) {
-      gameStore.addCommand("sail");
+      gameStore.addCommand("move-right");
     }
     return gameStore.getState().queuedCommands.map((c) => c.instanceId);
   };

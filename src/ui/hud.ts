@@ -28,9 +28,10 @@ import { iconSvgMap, type IconKey } from "./icons";
 import { reconcileKeys } from "./reconcile";
 
 const labelMap = {
-  sail: "Sail",
-  "turn-left": "Turn Left",
-  "turn-right": "Turn Right",
+  "move-up": "Up",
+  "move-down": "Down",
+  "move-left": "Left",
+  "move-right": "Right",
   dodge: "Dodge",
   fire: "Fire",
   collect: "Collect",
@@ -153,7 +154,7 @@ const queueCardInnerMarkup = (command: PlannedCommand, isRunning: boolean): stri
     const bodyChips = body.length
       ? body
           .map((inner) => {
-            const innerAction = (inner.action ?? "sail") as keyof typeof iconMap;
+            const innerAction = (inner.action ?? "move-right") as keyof typeof iconMap;
             return `
               <span class="loop-body-chip">
                 <button ${disabled} aria-label="${escapeHtml(labelMap[innerAction as keyof typeof labelMap] ?? innerAction)}" data-action="cycle-loop-body" data-instance-id="${command.instanceId}" data-inner-id="${inner.instanceId}" class="chip-button chip-icon-only">${iconFor(innerAction)}</button>
@@ -163,7 +164,7 @@ const queueCardInnerMarkup = (command: PlannedCommand, isRunning: boolean): stri
           })
           .join("")
       : `
-        <button ${disabled} aria-label="${escapeHtml(labelMap[(command.action ?? "sail") as keyof typeof labelMap] ?? "Sail")}" data-action="loop-action" data-instance-id="${command.instanceId}" class="chip-button chip-icon-only">${iconFor((command.action ?? "sail") as keyof typeof iconMap)}</button>
+        <button ${disabled} aria-label="${escapeHtml(labelMap[(command.action ?? "move-right") as keyof typeof labelMap] ?? "Right")}" data-action="loop-action" data-instance-id="${command.instanceId}" class="chip-button chip-icon-only">${iconFor((command.action ?? "move-right") as keyof typeof iconMap)}</button>
       `;
 
     return `
@@ -197,7 +198,7 @@ const queueCardInnerMarkup = (command: PlannedCommand, isRunning: boolean): stri
     `;
   }
 
-  const action = (command.action ?? template.defaultAction ?? "sail") as keyof typeof iconMap;
+  const action = (command.action ?? template.defaultAction ?? "move-right") as keyof typeof iconMap;
   const actionLabel = labelMap[action as keyof typeof labelMap] ?? action;
   return `
     <div class="queue-main queue-action" aria-label="${escapeHtml(actionLabel)}">
@@ -861,7 +862,7 @@ export class Hud {
         break;
       case "add-loop-body":
         if (instanceId) {
-          gameStore.addLoopBodyAction(instanceId, "sail");
+          gameStore.addLoopBodyAction(instanceId, "move-right");
         }
         break;
       case "remove-loop-body": {

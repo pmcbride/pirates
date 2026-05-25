@@ -61,7 +61,7 @@ describe("mission runner", () => {
   it("branches with if-enemy and clears the lookout mission", () => {
     const profile = {
       ...defaultProfile(),
-      commandUnlocks: ["sail", "collect", "fire", "repeat", "if"],
+      commandUnlocks: ["move-right", "collect", "fire", "repeat", "if"],
     };
     const mission = missions["coral-lookout"];
 
@@ -96,7 +96,7 @@ describe("mission runner", () => {
   it("awards bounty per defeated foe on success (one-piece theme)", () => {
     const profile = {
       ...defaultProfile(),
-      commandUnlocks: ["sail", "collect", "fire", "dodge"],
+      commandUnlocks: ["move-right", "collect", "fire", "dodge"],
     };
     const mission = missions["spark-shoals"];
 
@@ -118,7 +118,7 @@ describe("mission runner", () => {
     const profile = defaultProfile();
     const mission = missions["current-crescent"];
 
-    // Replace the first Repeat x3 Sail + Sail with Repeat x2 [Sail, Sail] —
+    // Replace the first Repeat x3 Right + Right with Repeat x2 [Right, Right] —
     // same 4 forward moves to reach the chest at (4,2), but exercises the
     // new body path instead of the legacy single-action loop.
     const customQueue: PlannedCommand[] = [
@@ -130,15 +130,15 @@ describe("mission runner", () => {
         body: [
           {
             instanceId: "loop-1a",
-            templateId: "sail",
+            templateId: "move-right",
             type: "action",
-            action: "sail",
+            action: "move-right",
           },
           {
             instanceId: "loop-1b",
-            templateId: "sail",
+            templateId: "move-right",
             type: "action",
-            action: "sail",
+            action: "move-right",
           },
         ],
       },
@@ -153,7 +153,7 @@ describe("mission runner", () => {
         templateId: "repeat",
         type: "loop",
         count: 3,
-        action: "sail",
+        action: "move-right",
       },
     ];
 
@@ -167,7 +167,8 @@ describe("mission runner", () => {
     const profile = defaultProfile();
     const mission = missions["current-crescent"];
 
-    // Body is explicitly empty; the legacy action `sail` must drive each iteration.
+    // Body is explicitly empty; the legacy action `move-right` must drive
+    // each iteration.
     const customQueue = cloneQueuedCommands(mission.suggestedQueue).map((command) => {
       if (command.instanceId !== "current-1") return command;
       return { ...command, body: [] };
@@ -183,8 +184,8 @@ describe("mission runner", () => {
     const profile = defaultProfile();
     const mission = missions["spark-shoals"];
 
-    // First action is Sail directly into the Marine at (1,1) — should fail
-    // on the first inner action with the "fire" hint.
+    // First action is Move-Right directly into the Marine at (1,1) — should
+    // fail on the first inner action with the "fire" hint.
     const queue: PlannedCommand[] = [
       {
         instanceId: "loop-x",
@@ -194,9 +195,9 @@ describe("mission runner", () => {
         body: [
           {
             instanceId: "loop-x-a",
-            templateId: "sail",
+            templateId: "move-right",
             type: "action",
-            action: "sail",
+            action: "move-right",
           },
         ],
       },
@@ -211,7 +212,7 @@ describe("mission runner", () => {
   it("treasure-isle suggested queue uses a loop body and completes", () => {
     const profile = {
       ...defaultProfile(),
-      commandUnlocks: ["sail", "fire", "dodge", "talk", "repeat", "if"],
+      commandUnlocks: ["move-right", "fire", "dodge", "talk", "repeat", "if"],
     };
     const mission = missions["treasure-isle"];
 
@@ -268,7 +269,7 @@ describe("mission runner", () => {
   it("clears the windrise-cove East Blue practice with its sample queue", () => {
     const profile = {
       ...defaultProfile(),
-      commandUnlocks: ["sail", "collect", "fire", "dodge"],
+      commandUnlocks: ["move-right", "collect", "fire", "dodge"],
     };
     const mission = missions["windrise-cove"];
 
@@ -288,7 +289,7 @@ describe("mission runner", () => {
   it("clears the barrel-bay East Blue practice with its sample queue", () => {
     const profile = {
       ...defaultProfile(),
-      commandUnlocks: ["sail", "collect", "fire", "dodge"],
+      commandUnlocks: ["move-right", "collect", "fire", "dodge"],
     };
     const mission = missions["barrel-bay"];
 
@@ -340,21 +341,22 @@ describe("mission runner", () => {
     expect(result.finalState.ship.position).toEqual(mission.start.position);
   });
 
-  it("clears the harbor-bend turn-rehab mission with its sample queue", () => {
+  it("clears the harbor-bend Up/Down rehab mission with its sample queue", () => {
     const profile = {
       ...defaultProfile(),
-      commandUnlocks: ["sail", "collect", "turn-left", "turn-right"],
+      commandUnlocks: ["move-right", "move-up", "move-down", "collect"],
     };
     const mission = missions["harbor-bend"];
 
-    // The palette must include both turn blocks — that's the lesson.
-    expect(mission.palette).toContain("turn-left");
-    expect(mission.palette).toContain("turn-right");
+    // The palette must include the Up direction block — that's the lesson:
+    // the chest sits off the main east lane, so Right alone can't reach it.
+    expect(mission.palette).toContain("move-up");
+    expect(mission.palette).toContain("move-right");
     expect(
-      mission.suggestedQueue.some((command) => command.action === "turn-left"),
+      mission.suggestedQueue.some((command) => command.action === "move-up"),
     ).toBe(true);
     expect(
-      mission.suggestedQueue.some((command) => command.action === "turn-right"),
+      mission.suggestedQueue.some((command) => command.action === "move-right"),
     ).toBe(true);
 
     const result = runMission(
@@ -373,7 +375,7 @@ describe("mission runner", () => {
   it("emits a warning beat when fire has no target, but still succeeds", () => {
     const profile = {
       ...defaultProfile(),
-      commandUnlocks: ["sail", "fire", "collect"],
+      commandUnlocks: ["move-right", "fire", "collect"],
     };
     const mission = missions["tutorial-cove"];
 
@@ -415,7 +417,7 @@ describe("mission runner", () => {
   it("emits a warning beat when talk finds no crew, but still succeeds", () => {
     const profile = {
       ...defaultProfile(),
-      commandUnlocks: ["sail", "talk", "collect"],
+      commandUnlocks: ["move-right", "talk", "collect"],
     };
     const mission = missions["tutorial-cove"];
 

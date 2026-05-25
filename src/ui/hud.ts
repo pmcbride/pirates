@@ -440,7 +440,27 @@ interface MissionScaffold {
   // Map of queued-command instanceId → rendered <article> + last fingerprint.
   queueNodes: Map<string, { node: HTMLElement; fingerprint: string }>;
   activeIndex: number;
+  /** instanceId of the queue card currently flagged as the hint target, or null. */
+  hintTargetInstanceId: string | null;
 }
+
+/**
+ * Find the first queued command whose `templateId` matches `focusTemplateId`.
+ * Walks top-level commands only — loop bodies aren't queue cards of their own.
+ * Returns null if no match (or no focus id was set by the engine).
+ */
+export const findHintTargetInstanceId = (
+  queuedCommands: PlannedCommand[],
+  focusTemplateId: string | undefined,
+): string | null => {
+  if (!focusTemplateId) return null;
+  for (const command of queuedCommands) {
+    if (command.templateId === focusTemplateId) {
+      return command.instanceId;
+    }
+  }
+  return null;
+};
 
 export class Hud {
   /** Which screen the layer currently shows. `null` until first render. */
@@ -452,16 +472,28 @@ export class Hud {
   /** Mission-screen specific cache. Only present while on the mission screen. */
   private mission: MissionScaffold | null = null;
 
+  /** Last AppState we rendered — needed to reposition the hint bubble on resize. */
+  private lastState: AppState | null = null;
+
   constructor(private root: HTMLElement) {
     this.root.addEventListener("click", this.handleClick);
     this.root.addEventListener("dragstart", this.handleDragStart);
     this.root.addEventListener("dragover", this.handleDragOver);
     this.root.addEventListener("drop", this.handleDrop);
+    if (typeof window !== "undefined") {
+      window.addEventListener("resize", this.handleResize);
+    }
     gameStore.subscribe((state) => {
       setMuted(state.profile.settings.muted);
       this.render(state);
     });
   }
+
+  private handleResize = (): void => {
+    if (this.lastState && this.mission) {
+      this.positionHintBubble(this.lastState);
+    }
+  };
 
   // ── DOM helpers ────────────────────────────────────────────
 
@@ -678,6 +710,7 @@ export class Hud {
   // ── Top-level render ───────────────────────────────────────
 
   render(state: AppState): void {
+    this.lastState = state;
     if (state.screen !== this.currentScreen) {
       this.mountScreen(state);
     }
@@ -939,6 +972,7 @@ export class Hud {
       },
       queueNodes: new Map(),
       activeIndex: -1,
+      hintTargetInstanceId: null,
     };
   }
 
@@ -1007,7 +1041,7 @@ export class Hud {
           : "";
       m.hintHost.innerHTML = state.activeHint && !isSandbox
         ? `
-          <section class="hint-banner surface-card">
+          <section class="hint-banner surface-card" data-hint-bubble>
             <p class="eyebrow">💬 Gentle Rewind</p>
             <strong>${escapeHtml(state.activeHint.reason)}</strong>
             <p>${escapeHtml(state.activeHint.suggestion)}</p>
@@ -1097,6 +1131,12 @@ export class Hud {
 
     // — Queue list (keyed reconcile + active class) — the whole point of this PR.
     this.reconcileQueueList(state, locked);
+
+    // — Hint target: flag the failing queue card so the speech bubble can
+    // anchor a dotted tail at it, and so the card itself gets a subtle glow.
+    // Sandbox missions never show a hint, so they never get a hint target.
+    this.applyHintTarget(state, isSandbox);
+    this.positionHintBubble(state);
 
     // — Drawer host
     const drawerFp = `${theme.meta.id}|${drawerFingerprint(state)}`;
@@ -1256,6 +1296,110 @@ export class Hud {
         }
       }
     }
+  }
+
+  /**
+   * Apply / clear the `.is-hint-target` highlight on the queue card whose
+   * `templateId` matches `activeHint.focusTemplateId`. Cheap to call every
+   * render — bails out when the target hasn't changed.
+   *
+   * Also scrolls the focused card into horizontal view so the player can see
+   * which block the rewind is asking them to fix.
+   */
+  private applyHintTarget(state: AppState, isSandbox: boolean): void {
+    const m = this.mission;
+    if (!m) return;
+
+    const focusTemplateId =
+      state.activeHint && !isSandbox ? state.activeHint.focusTemplateId : undefined;
+    const nextTargetId = findHintTargetInstanceId(state.queuedCommands, focusTemplateId);
+
+    if (nextTargetId === m.hintTargetInstanceId) {
+      // Same target — but the node may have been rebuilt (e.g. queue reordered).
+      // Re-apply the class to be safe; it's idempotent.
+      if (nextTargetId) {
+        m.queueNodes.get(nextTargetId)?.node.classList.add("is-hint-target");
+      }
+      return;
+    }
+
+    // Drop the highlight from the previous target.
+    if (m.hintTargetInstanceId) {
+      m.queueNodes.get(m.hintTargetInstanceId)?.node.classList.remove("is-hint-target");
+    }
+    m.hintTargetInstanceId = nextTargetId;
+
+    if (nextTargetId) {
+      const targetNode = m.queueNodes.get(nextTargetId)?.node;
+      if (targetNode) {
+        targetNode.classList.add("is-hint-target");
+        // Reduced-motion: jump instead of smooth-scroll, per DESIGN.md §4.4.
+        const reduced = state.profile.settings.reducedMotion;
+        try {
+          targetNode.scrollIntoView({
+            behavior: reduced ? "auto" : "smooth",
+            block: "nearest",
+            inline: "center",
+          });
+        } catch {
+          // JSDOM and some older browsers throw on options — fall back silently.
+        }
+      }
+    }
+  }
+
+  /**
+   * Position the hint bubble above the targeted queue card with a dotted
+   * tail pointing down at it. Falls back to the static anchor when there's
+   * no target (or no bubble in the DOM).
+   *
+   * Called both on render and on window resize so the bubble stays glued
+   * to the card as the layout changes.
+   */
+  private positionHintBubble(state: AppState): void {
+    const m = this.mission;
+    if (!m) return;
+
+    const bubble = m.hintHost.querySelector<HTMLElement>("[data-hint-bubble]");
+    if (!bubble) return;
+
+    const targetId = m.hintTargetInstanceId;
+    const targetNode = targetId ? m.queueNodes.get(targetId)?.node : null;
+
+    if (!targetNode) {
+      // Fall back to static-anchor mode — clear any inline overrides and the
+      // tail-offset variable so CSS defaults take over.
+      bubble.classList.remove("is-anchored");
+      bubble.style.removeProperty("left");
+      bubble.style.removeProperty("top");
+      bubble.style.removeProperty("--hint-tail-offset");
+      void state; // explicit no-op — accepted for API symmetry / future use.
+      return;
+    }
+
+    const cardRect = targetNode.getBoundingClientRect();
+    const bubbleRect = bubble.getBoundingClientRect();
+
+    // Center the bubble horizontally on the card, clamped 8px from each edge.
+    const viewportWidth =
+      typeof window !== "undefined" ? window.innerWidth : 1024;
+    const cardCenterX = cardRect.left + cardRect.width / 2;
+    const bubbleWidth = bubbleRect.width || 320;
+    let left = cardCenterX - bubbleWidth / 2;
+    left = Math.max(8, Math.min(left, viewportWidth - bubbleWidth - 8));
+
+    // Sit above the card, with a small gap for the tail.
+    const tailGap = 18;
+    const bubbleHeight = bubbleRect.height || 140;
+    const top = Math.max(8, cardRect.top - bubbleHeight - tailGap);
+
+    bubble.classList.add("is-anchored");
+    bubble.style.left = `${Math.round(left)}px`;
+    bubble.style.top = `${Math.round(top)}px`;
+
+    // Position the dotted tail under the bubble so it points at the card.
+    const tailOffset = Math.max(16, Math.min(cardCenterX - left, bubbleWidth - 24));
+    bubble.style.setProperty("--hint-tail-offset", `${Math.round(tailOffset)}px`);
   }
 }
 

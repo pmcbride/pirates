@@ -5,6 +5,7 @@ import { cloneQueuedCommands, runMission } from "./engine";
 import { defaultProfile, deserializeProfile } from "./profile";
 import {
   computePredictionCorrect,
+  gameStore,
   pickInitialQueue,
   shipEndPositionForPrediction,
   shouldPredictForMission,
@@ -180,5 +181,56 @@ describe("profile migration for attemptCounts and new settings", () => {
     // so older saves see the always-unlocked free-play island on next load.
     expect(profile.unlockedMissionIds).toContain("tutorial-cove");
     expect(profile.unlockedMissionIds).toContain("sandbox-isle");
+  });
+});
+
+describe("GameStore.moveCommand", () => {
+  // Use the sandbox mission — it pulls in every unlocked command, so we can
+  // stack any palette we want without bumping into per-mission filters.
+  const seedQueue = (count: number): string[] => {
+    gameStore.startAdventure();
+    gameStore.openSandbox();
+    gameStore.clearQueue();
+    for (let i = 0; i < count; i += 1) {
+      gameStore.addCommand("sail");
+    }
+    return gameStore.getState().queuedCommands.map((c) => c.instanceId);
+  };
+
+  it("moves a card by directional delta (-1 / 1) — keyboard path", () => {
+    const ids = seedQueue(3);
+    gameStore.moveCommand(ids[2], -1);
+    const after = gameStore.getState().queuedCommands.map((c) => c.instanceId);
+    expect(after).toEqual([ids[0], ids[2], ids[1]]);
+  });
+
+  it("ignores directional moves at the edges", () => {
+    const ids = seedQueue(2);
+    gameStore.moveCommand(ids[0], -1);
+    const after = gameStore.getState().queuedCommands.map((c) => c.instanceId);
+    expect(after).toEqual(ids);
+  });
+
+  it("moveCommandToIndex moves a card to an absolute target index — drag-and-drop path", () => {
+    const ids = seedQueue(4);
+    // Move the last card (index 3) to index 0.
+    gameStore.moveCommandToIndex(ids[3], 0);
+    const after = gameStore.getState().queuedCommands.map((c) => c.instanceId);
+    expect(after).toEqual([ids[3], ids[0], ids[1], ids[2]]);
+  });
+
+  it("moveCommandToIndex clamps the target index to the queue range", () => {
+    const ids = seedQueue(3);
+    // 99 is way past the end — should clamp to last slot.
+    gameStore.moveCommandToIndex(ids[0], 99);
+    const after = gameStore.getState().queuedCommands.map((c) => c.instanceId);
+    expect(after).toEqual([ids[1], ids[2], ids[0]]);
+  });
+
+  it("moveCommandToIndex is a no-op when the target equals the current index", () => {
+    const ids = seedQueue(3);
+    gameStore.moveCommandToIndex(ids[1], 1);
+    const after = gameStore.getState().queuedCommands.map((c) => c.instanceId);
+    expect(after).toEqual(ids);
   });
 });

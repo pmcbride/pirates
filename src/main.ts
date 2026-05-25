@@ -21,18 +21,25 @@ const bootstrap = async (): Promise<void> => {
 
   // Tear down the pre-mount overlay before the game shell takes over the root.
   pickerHost.remove();
+  // Two-row grid: the playfield (canvas + HUD overlay) takes the remaining
+  // height, and the bottom dock row carries the command queue + palette so
+  // they never overlap the board. See `.app-shell` rules in `styles.css`.
   app.innerHTML = `
     <main class="app-shell">
-      <section id="game-root" class="game-root" aria-label="Sea of Codes playfield"></section>
-      <section id="hud-root" class="hud-root" aria-label="Sea of Codes controls"></section>
+      <div class="playfield-region">
+        <section id="game-root" class="game-root" aria-label="Sea of Codes playfield"></section>
+        <section id="hud-root" class="hud-root" aria-label="Sea of Codes controls"></section>
+      </div>
+      <section id="dock-root" class="dock-root" aria-label="Command dock"></section>
     </main>
   `;
 
   const gameRoot = document.querySelector<HTMLDivElement>("#game-root");
   const hudRoot = document.querySelector<HTMLDivElement>("#hud-root");
+  const dockRoot = document.querySelector<HTMLDivElement>("#dock-root");
   const appShell = app.querySelector<HTMLElement>(".app-shell");
 
-  if (!gameRoot || !hudRoot || !appShell) {
+  if (!gameRoot || !hudRoot || !dockRoot || !appShell) {
     throw new Error("Game shell failed to mount.");
   }
 
@@ -57,7 +64,7 @@ const bootstrap = async (): Promise<void> => {
   ]);
 
   const game = createGame(gameRoot);
-  new Hud(hudRoot);
+  new Hud(hudRoot, dockRoot);
 
   // Screen-reader narration channel. Mounted in the app shell so it survives
   // every screen swap (the HUD layer is replaced when the screen changes).

@@ -328,7 +328,8 @@ export class GameStore {
     }
 
     // Build the sandbox palette from what the player has unlocked. Brand-new
-    // players (no unlocks beyond defaults) still get sail/turn/collect.
+    // players (no unlocks beyond defaults) still get the four direction
+    // arrows and collect.
     const unlockSet = new Set<string>(this.state.profile.commandUnlocks);
     defaultSandboxPalette.forEach((id) => unlockSet.add(id));
     const palette = Object.keys(commandLibrary).filter((id) => unlockSet.has(id));
@@ -525,9 +526,9 @@ export class GameStore {
           return command;
         }
 
-        const currentIndex = allowedActions.indexOf(command.action ?? "sail");
+        const currentIndex = allowedActions.indexOf(command.action ?? "move-right");
         const nextAction =
-          allowedActions[(currentIndex + 1) % allowedActions.length] ?? "sail";
+          allowedActions[(currentIndex + 1) % allowedActions.length] ?? "move-right";
 
         return {
           ...command,
@@ -615,7 +616,7 @@ export class GameStore {
           instanceId: commandCounter(),
           templateId: template.id,
           type: "action",
-          action: template.defaultAction ?? "sail",
+          action: template.defaultAction ?? "move-right",
         };
         return {
           ...command,
@@ -673,9 +674,9 @@ export class GameStore {
             if (inner.instanceId !== innerInstanceId) {
               return inner;
             }
-            const currentIndex = allowedActions.indexOf(inner.action ?? "sail");
+            const currentIndex = allowedActions.indexOf(inner.action ?? "move-right");
             const nextAction =
-              allowedActions[(currentIndex + 1) % allowedActions.length] ?? "sail";
+              allowedActions[(currentIndex + 1) % allowedActions.length] ?? "move-right";
             return {
               ...inner,
               templateId: nextAction,

@@ -17,9 +17,10 @@
  * attribute is added by the consumer (`iconFor`) so screen readers see
  * the adjacent label, not the icon.
  */
-import sailSvg from "./sail.svg?raw";
-import turnLeftSvg from "./turn-left.svg?raw";
-import turnRightSvg from "./turn-right.svg?raw";
+import moveUpSvg from "./move-up.svg?raw";
+import moveDownSvg from "./move-down.svg?raw";
+import moveLeftSvg from "./move-left.svg?raw";
+import moveRightSvg from "./move-right.svg?raw";
 import dodgeSvg from "./dodge.svg?raw";
 import fireSvg from "./fire.svg?raw";
 import collectSvg from "./collect.svg?raw";
@@ -50,9 +51,10 @@ const decorate = (raw: string, label: string): string =>
   );
 
 export const iconSvgMap = {
-  sail: decorate(sailSvg, "Sail"),
-  "turn-left": decorate(turnLeftSvg, "Turn left"),
-  "turn-right": decorate(turnRightSvg, "Turn right"),
+  "move-up": decorate(moveUpSvg, "Move up"),
+  "move-down": decorate(moveDownSvg, "Move down"),
+  "move-left": decorate(moveLeftSvg, "Move left"),
+  "move-right": decorate(moveRightSvg, "Move right"),
   dodge: decorate(dodgeSvg, "Dodge"),
   fire: decorate(fireSvg, "Fire"),
   collect: decorate(collectSvg, "Collect"),

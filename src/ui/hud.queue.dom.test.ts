@@ -92,8 +92,8 @@ describe("compact queue chip — sizing", () => {
 
   it("renders queue cards with NO ◀ / ▶ move buttons", () => {
     const { root } = mountMissionHud();
-    gameStore.addCommand("sail");
-    gameStore.addCommand("sail");
+    gameStore.addCommand("move-right");
+    gameStore.addCommand("move-right");
 
     const cards = root.querySelectorAll(".queue-card");
     expect(cards.length).toBeGreaterThan(0);
@@ -107,7 +107,7 @@ describe("compact queue chip — sizing", () => {
 
   it("renders queue cards as draggable", () => {
     const { root } = mountMissionHud();
-    gameStore.addCommand("sail");
+    gameStore.addCommand("move-right");
 
     const card = root.querySelector<HTMLElement>(".queue-card");
     expect(card).not.toBeNull();
@@ -124,7 +124,7 @@ describe("compact queue chip — drag-and-drop reorder payload", () => {
 
   it("dragstart on a queue card writes the reorder MIME with the instanceId", () => {
     const { root } = mountMissionHud();
-    gameStore.addCommand("sail");
+    gameStore.addCommand("move-right");
 
     const card = root.querySelector<HTMLElement>(".queue-card");
     expect(card).not.toBeNull();
@@ -163,7 +163,7 @@ describe("compact queue chip — drag-and-drop reorder payload", () => {
     const { root } = mountMissionHud();
 
     const palette = root.querySelector<HTMLElement>(
-      '.palette-card[data-template-id="sail"]',
+      '.palette-card[data-template-id="move-right"]',
     );
     expect(palette).not.toBeNull();
 
@@ -183,8 +183,8 @@ describe("compact queue chip — drag-and-drop reorder payload", () => {
     Object.defineProperty(event, "dataTransfer", { value: dt });
     palette!.dispatchEvent(event);
 
-    expect(store["application/x-soc-template"]).toBe("sail");
-    expect(store["text/plain"]).toBe("sail");
+    expect(store["application/x-soc-template"]).toBe("move-right");
+    expect(store["text/plain"]).toBe("move-right");
     expect(dt.effectAllowed).toBe("copy");
   });
 });

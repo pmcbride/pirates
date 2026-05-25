@@ -30,36 +30,50 @@ const makeCommand = (
 });
 
 // Command block labels/descriptions are intentionally NOT theme-driven for
-// now — they're code-level concepts (Sail, Fire, Repeat, If) that should read
-// the same in any theme. If a future theme wants to recolor "Fire" -> "Splash"
-// we can promote these strings into the Theme interface.
+// now — they're code-level concepts (Up/Down/Left/Right, Fire, Repeat, If)
+// that should read the same in any theme. If a future theme wants to recolor
+// "Fire" -> "Splash" we can promote these strings into the Theme interface.
+//
+// As of the absolute-direction model the four arrow blocks replace the
+// older `sail` + `turn-left`/`turn-right` triad — no mental rotation
+// required, since each arrow moves one tile in the matching compass
+// direction regardless of which way the ship was facing.
 export const commandLibrary: Record<string, CommandBlock> = {
-  sail: {
-    id: "sail",
+  "move-up": {
+    id: "move-up",
     type: "action",
-    label: "Sail",
-    shortLabel: "Sail",
+    label: "Up",
+    shortLabel: "Up",
     accent: "blue",
-    description: "Move one wave forward.",
-    defaultAction: "sail",
+    description: "Move one tile up.",
+    defaultAction: "move-up",
   },
-  "turn-left": {
-    id: "turn-left",
+  "move-down": {
+    id: "move-down",
     type: "action",
-    label: "Turn Left",
+    label: "Down",
+    shortLabel: "Down",
+    accent: "blue",
+    description: "Move one tile down.",
+    defaultAction: "move-down",
+  },
+  "move-left": {
+    id: "move-left",
+    type: "action",
+    label: "Left",
     shortLabel: "Left",
-    accent: "teal",
-    description: "Swing the bow to port.",
-    defaultAction: "turn-left",
+    accent: "blue",
+    description: "Move one tile left.",
+    defaultAction: "move-left",
   },
-  "turn-right": {
-    id: "turn-right",
+  "move-right": {
+    id: "move-right",
     type: "action",
-    label: "Turn Right",
+    label: "Right",
     shortLabel: "Right",
-    accent: "teal",
-    description: "Swing the bow to starboard.",
-    defaultAction: "turn-right",
+    accent: "blue",
+    description: "Move one tile right.",
+    defaultAction: "move-right",
   },
   dodge: {
     id: "dodge",
@@ -105,8 +119,8 @@ export const commandLibrary: Record<string, CommandBlock> = {
     accent: "sunset",
     description: "Repeat one or two moves two or three times.",
     defaultCount: 2,
-    defaultAction: "sail",
-    actionOptions: ["sail", "fire", "collect", "talk"],
+    defaultAction: "move-right",
+    actionOptions: ["move-right", "move-left", "move-up", "move-down", "fire", "collect", "talk"],
     bodyMaxLength: 2,
   },
   if: {
@@ -214,7 +228,7 @@ export const missionNodes: MissionNode[] = [
       berries: 120,
       bounty: 1_000_000,
       stars: 2,
-      unlockCommandIds: ["turn-left", "turn-right"],
+      unlockCommandIds: ["move-up", "move-down"],
     },
     unlockMissionIds: ["barrel-bay"],
   },
@@ -281,13 +295,17 @@ export const missionNodes: MissionNode[] = [
 export const sandboxNodeId = "sandbox-isle";
 export const sandboxMissionId = "sandbox-isle";
 export const defaultSandboxPalette: string[] = [
-  "sail",
-  "turn-left",
-  "turn-right",
+  "move-up",
+  "move-down",
+  "move-left",
+  "move-right",
   "collect",
 ];
 
 export const missions: Record<string, MissionDefinition> = {
+  // Sequencing only. Ship starts at (0,1) facing east. Chest at (3,1),
+  // goal at (5,1). Pure straight line — five Rights and a Collect in the
+  // middle.
   "tutorial-cove": {
     id: "tutorial-cove",
     nodeId: "tutorial-cove",
@@ -298,7 +316,7 @@ export const missions: Record<string, MissionDefinition> = {
       facing: "east",
     },
     goal: { x: 5, y: 1 },
-    palette: ["sail", "collect"],
+    palette: ["move-right", "collect"],
     requiredTileIds: ["cove-chest"],
     reward: {
       berries: 60,
@@ -315,14 +333,18 @@ export const missions: Record<string, MissionDefinition> = {
       },
     ],
     suggestedQueue: [
-      makeCommand("cove-1", "sail", { action: "sail" }),
-      makeCommand("cove-2", "sail", { action: "sail" }),
-      makeCommand("cove-3", "sail", { action: "sail" }),
+      makeCommand("cove-1", "move-right", { action: "move-right" }),
+      makeCommand("cove-2", "move-right", { action: "move-right" }),
+      makeCommand("cove-3", "move-right", { action: "move-right" }),
       makeCommand("cove-4", "collect", { action: "collect" }),
-      makeCommand("cove-5", "sail", { action: "sail" }),
-      makeCommand("cove-6", "sail", { action: "sail" }),
+      makeCommand("cove-5", "move-right", { action: "move-right" }),
+      makeCommand("cove-6", "move-right", { action: "move-right" }),
     ],
   },
+  // Sequencing + Fire. Enemy at (1,1) blocks the lane. Fire splashes one
+  // tile in the direction the ship last moved — but on turn 1 the ship is
+  // still on its mission.start.facing (east), so the first Fire splashes
+  // the Marine sitting one tile to the east before any movement.
   "spark-shoals": {
     id: "spark-shoals",
     nodeId: "spark-shoals",
@@ -333,7 +355,7 @@ export const missions: Record<string, MissionDefinition> = {
       facing: "east",
     },
     goal: { x: 6, y: 1 },
-    palette: ["fire", "sail", "collect"],
+    palette: ["fire", "move-right", "collect"],
     requiredTileIds: ["spark-chest"],
     reward: {
       berries: 100,
@@ -358,15 +380,17 @@ export const missions: Record<string, MissionDefinition> = {
     ],
     suggestedQueue: [
       makeCommand("spark-1", "fire", { action: "fire" }),
-      makeCommand("spark-2", "sail", { action: "sail" }),
-      makeCommand("spark-3", "sail", { action: "sail" }),
-      makeCommand("spark-4", "sail", { action: "sail" }),
-      makeCommand("spark-5", "sail", { action: "sail" }),
+      makeCommand("spark-2", "move-right", { action: "move-right" }),
+      makeCommand("spark-3", "move-right", { action: "move-right" }),
+      makeCommand("spark-4", "move-right", { action: "move-right" }),
+      makeCommand("spark-5", "move-right", { action: "move-right" }),
       makeCommand("spark-6", "collect", { action: "collect" }),
-      makeCommand("spark-7", "sail", { action: "sail" }),
-      makeCommand("spark-8", "sail", { action: "sail" }),
+      makeCommand("spark-7", "move-right", { action: "move-right" }),
+      makeCommand("spark-8", "move-right", { action: "move-right" }),
     ],
   },
+  // Two Marines guard the lane at (2,1) and (4,1). Move one tile to set
+  // forward direction, Fire, move, move, Fire, move, move, move to dock.
   "windrise-cove": {
     id: "windrise-cove",
     nodeId: "windrise-cove",
@@ -377,7 +401,7 @@ export const missions: Record<string, MissionDefinition> = {
       facing: "east",
     },
     goal: { x: 6, y: 1 },
-    palette: ["fire", "sail"],
+    palette: ["fire", "move-right"],
     requiredTileIds: [],
     reward: {
       berries: 110,
@@ -400,16 +424,20 @@ export const missions: Record<string, MissionDefinition> = {
       },
     ],
     suggestedQueue: [
-      makeCommand("windrise-1", "sail", { action: "sail" }),
+      makeCommand("windrise-1", "move-right", { action: "move-right" }),
       makeCommand("windrise-2", "fire", { action: "fire" }),
-      makeCommand("windrise-3", "sail", { action: "sail" }),
-      makeCommand("windrise-4", "sail", { action: "sail" }),
+      makeCommand("windrise-3", "move-right", { action: "move-right" }),
+      makeCommand("windrise-4", "move-right", { action: "move-right" }),
       makeCommand("windrise-5", "fire", { action: "fire" }),
-      makeCommand("windrise-6", "sail", { action: "sail" }),
-      makeCommand("windrise-7", "sail", { action: "sail" }),
-      makeCommand("windrise-8", "sail", { action: "sail" }),
+      makeCommand("windrise-6", "move-right", { action: "move-right" }),
+      makeCommand("windrise-7", "move-right", { action: "move-right" }),
+      makeCommand("windrise-8", "move-right", { action: "move-right" }),
     ],
   },
+  // Sequencing + Collect + Fire + Dodge. Start (0,1). Chest (1,1), enemy
+  // (3,1), reef (4,1). Goal (5,0). Right → Collect → Right → Fire → Right
+  // (now (3,1)) → Dodge slips up to (3,0) (perpendicular to east-facing) →
+  // Right → Right to dock at (5,0).
   "barrel-bay": {
     id: "barrel-bay",
     nodeId: "barrel-bay",
@@ -420,7 +448,7 @@ export const missions: Record<string, MissionDefinition> = {
       facing: "east",
     },
     goal: { x: 5, y: 0 },
-    palette: ["sail", "collect", "fire", "dodge"],
+    palette: ["move-right", "collect", "fire", "dodge"],
     requiredTileIds: ["barrel-chest"],
     reward: {
       berries: 130,
@@ -449,16 +477,21 @@ export const missions: Record<string, MissionDefinition> = {
       },
     ],
     suggestedQueue: [
-      makeCommand("barrel-1", "sail", { action: "sail" }),
+      makeCommand("barrel-1", "move-right", { action: "move-right" }),
       makeCommand("barrel-2", "collect", { action: "collect" }),
-      makeCommand("barrel-3", "sail", { action: "sail" }),
+      makeCommand("barrel-3", "move-right", { action: "move-right" }),
       makeCommand("barrel-4", "fire", { action: "fire" }),
-      makeCommand("barrel-5", "sail", { action: "sail" }),
+      makeCommand("barrel-5", "move-right", { action: "move-right" }),
       makeCommand("barrel-6", "dodge", { action: "dodge" }),
-      makeCommand("barrel-7", "sail", { action: "sail" }),
-      makeCommand("barrel-8", "sail", { action: "sail" }),
+      makeCommand("barrel-7", "move-right", { action: "move-right" }),
+      makeCommand("barrel-8", "move-right", { action: "move-right" }),
     ],
   },
+  // Practice mission for the two new direction blocks (Up/Down). The chest
+  // sits up the bay at (2,0), off the straight east lane. Start (0,1),
+  // goal (4,0). Path: Right, Right, Up, Collect, Right, Down... no wait
+  // goal is at (4,0). Path: Right (1,1), Right (2,1), Up (2,0), Collect,
+  // Right (3,0), Right (4,0) dock.
   "harbor-bend": {
     id: "harbor-bend",
     nodeId: "harbor-bend",
@@ -469,13 +502,13 @@ export const missions: Record<string, MissionDefinition> = {
       facing: "east",
     },
     goal: { x: 4, y: 0 },
-    palette: ["sail", "turn-left", "turn-right", "collect"],
+    palette: ["move-right", "move-up", "move-down", "collect"],
     requiredTileIds: ["bend-chest"],
     reward: {
       berries: 120,
       bounty: 1_000_000,
       stars: 2,
-      unlockCommandIds: ["turn-left", "turn-right"],
+      unlockCommandIds: ["move-up", "move-down"],
     },
     tiles: [
       {
@@ -486,16 +519,19 @@ export const missions: Record<string, MissionDefinition> = {
       },
     ],
     suggestedQueue: [
-      makeCommand("bend-1", "sail", { action: "sail" }),
-      makeCommand("bend-2", "sail", { action: "sail" }),
-      makeCommand("bend-3", "turn-left", { action: "turn-left" }),
-      makeCommand("bend-4", "sail", { action: "sail" }),
-      makeCommand("bend-5", "collect", { action: "collect" }),
-      makeCommand("bend-6", "turn-right", { action: "turn-right" }),
-      makeCommand("bend-7", "sail", { action: "sail" }),
-      makeCommand("bend-8", "sail", { action: "sail" }),
+      makeCommand("bend-1", "move-right", { action: "move-right" }),
+      makeCommand("bend-2", "move-right", { action: "move-right" }),
+      makeCommand("bend-3", "move-up", { action: "move-up" }),
+      makeCommand("bend-4", "collect", { action: "collect" }),
+      makeCommand("bend-5", "move-right", { action: "move-right" }),
+      makeCommand("bend-6", "move-right", { action: "move-right" }),
     ],
   },
+  // Loops! Start (0,2), chest (4,2), goal (7,2). Repeat Right x3 + Right
+  // (lands on 4,2) + Collect + Repeat Right x3 = 7 rights total. Note that
+  // Repeat with a single-action `action` field still works for old saves;
+  // here we use the body-less legacy form for parity with the existing
+  // shape.
   "current-crescent": {
     id: "current-crescent",
     nodeId: "current-crescent",
@@ -506,7 +542,7 @@ export const missions: Record<string, MissionDefinition> = {
       facing: "east",
     },
     goal: { x: 7, y: 2 },
-    palette: ["sail", "collect", "repeat"],
+    palette: ["move-right", "collect", "repeat"],
     requiredTileIds: ["current-chest"],
     reward: {
       berries: 140,
@@ -537,16 +573,19 @@ export const missions: Record<string, MissionDefinition> = {
     suggestedQueue: [
       makeCommand("current-1", "repeat", {
         count: 3,
-        action: "sail",
+        action: "move-right",
       }),
-      makeCommand("current-2", "sail", { action: "sail" }),
+      makeCommand("current-2", "move-right", { action: "move-right" }),
       makeCommand("current-3", "collect", { action: "collect" }),
       makeCommand("current-4", "repeat", {
         count: 3,
-        action: "sail",
+        action: "move-right",
       }),
     ],
   },
+  // If-then. Enemy at (1,1). Default facing is east, so `If enemy ahead`
+  // matches on turn 1 and Fire splashes the Marine. Then 6 Rights, a
+  // Collect at (5,1), two more Rights to dock at (7,1).
   "coral-lookout": {
     id: "coral-lookout",
     nodeId: "coral-lookout",
@@ -557,7 +596,7 @@ export const missions: Record<string, MissionDefinition> = {
       facing: "east",
     },
     goal: { x: 7, y: 1 },
-    palette: ["if", "fire", "sail", "collect"],
+    palette: ["if", "fire", "move-right", "collect"],
     requiredTileIds: ["coral-chest"],
     reward: {
       berries: 180,
@@ -585,16 +624,27 @@ export const missions: Record<string, MissionDefinition> = {
         condition: "enemyAhead",
         thenAction: "fire",
       }),
-      makeCommand("coral-2", "sail", { action: "sail" }),
-      makeCommand("coral-3", "sail", { action: "sail" }),
-      makeCommand("coral-4", "sail", { action: "sail" }),
-      makeCommand("coral-5", "sail", { action: "sail" }),
-      makeCommand("coral-6", "sail", { action: "sail" }),
+      makeCommand("coral-2", "move-right", { action: "move-right" }),
+      makeCommand("coral-3", "move-right", { action: "move-right" }),
+      makeCommand("coral-4", "move-right", { action: "move-right" }),
+      makeCommand("coral-5", "move-right", { action: "move-right" }),
+      makeCommand("coral-6", "move-right", { action: "move-right" }),
       makeCommand("coral-7", "collect", { action: "collect" }),
-      makeCommand("coral-8", "sail", { action: "sail" }),
-      makeCommand("coral-9", "sail", { action: "sail" }),
+      makeCommand("coral-8", "move-right", { action: "move-right" }),
+      makeCommand("coral-9", "move-right", { action: "move-right" }),
     ],
   },
+  // The final voyage. Start (0,3), reef (2,3), boss enemy (7,2), guide
+  // crew (8,2), goal (9,2). Path:
+  //   Right (1,3, facing east)
+  //   If obstacle ahead -> Dodge (reef at (2,3) ahead, slip up to (1,2))
+  //   Repeat 2x [Right, Right] -> (5,2)
+  //   Right (6,2)
+  //   If enemy ahead -> Fire (boss at (7,2), splashed)
+  //   Right (7,2)
+  //   Right (8,2)
+  //   Talk (recruit guide)
+  //   Right (9,2 dock)
   "treasure-isle": {
     id: "treasure-isle",
     nodeId: "treasure-isle",
@@ -605,7 +655,7 @@ export const missions: Record<string, MissionDefinition> = {
       facing: "east",
     },
     goal: { x: 9, y: 2 },
-    palette: ["sail", "dodge", "fire", "talk", "repeat", "if"],
+    palette: ["move-right", "move-up", "move-down", "dodge", "fire", "talk", "repeat", "if"],
     requiredTileIds: ["isle-guide"],
     reward: {
       berries: 240,
@@ -635,28 +685,28 @@ export const missions: Record<string, MissionDefinition> = {
       },
     ],
     suggestedQueue: [
-      makeCommand("isle-1", "sail", { action: "sail" }),
+      makeCommand("isle-1", "move-right", { action: "move-right" }),
       makeCommand("isle-2", "if", {
         condition: "obstacleAhead",
         thenAction: "dodge",
       }),
       makeCommand("isle-3", "repeat", {
         count: 2,
-        action: "sail",
+        action: "move-right",
         body: [
-          makeCommand("isle-3a", "sail", { action: "sail" }),
-          makeCommand("isle-3b", "sail", { action: "sail" }),
+          makeCommand("isle-3a", "move-right", { action: "move-right" }),
+          makeCommand("isle-3b", "move-right", { action: "move-right" }),
         ],
       }),
-      makeCommand("isle-4", "sail", { action: "sail" }),
+      makeCommand("isle-4", "move-right", { action: "move-right" }),
       makeCommand("isle-5", "if", {
         condition: "enemyAhead",
         thenAction: "fire",
       }),
-      makeCommand("isle-6", "sail", { action: "sail" }),
-      makeCommand("isle-7", "sail", { action: "sail" }),
+      makeCommand("isle-6", "move-right", { action: "move-right" }),
+      makeCommand("isle-7", "move-right", { action: "move-right" }),
       makeCommand("isle-8", "talk", { action: "talk" }),
-      makeCommand("isle-9", "sail", { action: "sail" }),
+      makeCommand("isle-9", "move-right", { action: "move-right" }),
     ],
   },
   "sandbox-isle": {
@@ -712,9 +762,9 @@ export const missions: Record<string, MissionDefinition> = {
       },
     ],
     suggestedQueue: [
-      makeCommand("sandbox-1", "sail", { action: "sail" }),
-      makeCommand("sandbox-2", "sail", { action: "sail" }),
-      makeCommand("sandbox-3", "sail", { action: "sail" }),
+      makeCommand("sandbox-1", "move-right", { action: "move-right" }),
+      makeCommand("sandbox-2", "move-right", { action: "move-right" }),
+      makeCommand("sandbox-3", "move-right", { action: "move-right" }),
     ],
   },
 };

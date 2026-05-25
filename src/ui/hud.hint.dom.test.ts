@@ -24,7 +24,7 @@ const missionStateWithHint = (
     activeHint: focusTemplateId
       ? {
           reason: "The ship bumped a reef.",
-          suggestion: "Try a Turn before the next Sail.",
+          suggestion: "Try a different arrow before the next move.",
           focusTemplateId,
           highlightPositions: [],
           retryFromStep: 0,
@@ -33,35 +33,35 @@ const missionStateWithHint = (
   };
 };
 
-const queuedSail = (instanceId: string): PlannedCommand => ({
+const queuedRight = (instanceId: string): PlannedCommand => ({
   instanceId,
-  templateId: "sail",
+  templateId: "move-right",
   type: "action",
-  action: "sail",
+  action: "move-right",
 });
 
-const queuedTurnLeft = (instanceId: string): PlannedCommand => ({
+const queuedUp = (instanceId: string): PlannedCommand => ({
   instanceId,
-  templateId: "turn-left",
+  templateId: "move-up",
   type: "action",
-  action: "turn-left",
+  action: "move-up",
 });
 
 describe("findHintTargetInstanceId", () => {
   it("returns null when no focusTemplateId is provided", () => {
-    const queue = [queuedSail("a"), queuedTurnLeft("b")];
+    const queue = [queuedRight("a"), queuedUp("b")];
     expect(findHintTargetInstanceId(queue, undefined)).toBeNull();
   });
 
   it("returns null when no queued command matches the focusTemplateId", () => {
-    const queue = [queuedSail("a"), queuedTurnLeft("b")];
+    const queue = [queuedRight("a"), queuedUp("b")];
     expect(findHintTargetInstanceId(queue, "fire")).toBeNull();
   });
 
   it("returns the first queued command whose templateId matches", () => {
-    const queue = [queuedSail("a"), queuedTurnLeft("b"), queuedSail("c")];
-    expect(findHintTargetInstanceId(queue, "sail")).toBe("a");
-    expect(findHintTargetInstanceId(queue, "turn-left")).toBe("b");
+    const queue = [queuedRight("a"), queuedUp("b"), queuedRight("c")];
+    expect(findHintTargetInstanceId(queue, "move-right")).toBe("a");
+    expect(findHintTargetInstanceId(queue, "move-up")).toBe("b");
   });
 });
 
@@ -80,8 +80,8 @@ describe("Hud — hint speech bubble anchoring", () => {
   });
 
   it("marks the matching queue card with `.is-hint-target` when a hint focuses it", () => {
-    const queue = [queuedSail("q1"), queuedTurnLeft("q2"), queuedSail("q3")];
-    const state = missionStateWithHint(queue, "turn-left");
+    const queue = [queuedRight("q1"), queuedUp("q2"), queuedRight("q3")];
+    const state = missionStateWithHint(queue, "move-up");
 
     hud.render(state);
 
@@ -99,7 +99,7 @@ describe("Hud — hint speech bubble anchoring", () => {
   });
 
   it("falls back gracefully when the engine produced no focusTemplateId", () => {
-    const queue = [queuedSail("q1")];
+    const queue = [queuedRight("q1")];
     const state = missionStateWithHint(queue, undefined);
     // Force a hint to exist but with no focus id.
     const stateWithUnfocusedHint: AppState = {
@@ -127,7 +127,7 @@ describe("Hud — hint speech bubble anchoring", () => {
   });
 
   it("falls back gracefully when no queue card matches the focusTemplateId", () => {
-    const queue = [queuedSail("q1")];
+    const queue = [queuedRight("q1")];
     // Engine pointed at `fire` but no `fire` block is in the queue.
     const state = missionStateWithHint(queue, "fire");
 
@@ -142,8 +142,8 @@ describe("Hud — hint speech bubble anchoring", () => {
   });
 
   it("clears the hint-target class when the hint is dismissed", () => {
-    const queue = [queuedSail("q1")];
-    const withHint = missionStateWithHint(queue, "sail");
+    const queue = [queuedRight("q1")];
+    const withHint = missionStateWithHint(queue, "move-right");
     hud.render(withHint);
 
     const card = root.querySelector<HTMLElement>(
@@ -159,21 +159,21 @@ describe("Hud — hint speech bubble anchoring", () => {
   });
 
   it("moves the hint-target class when the focusTemplateId changes", () => {
-    const queue = [queuedSail("q1"), queuedTurnLeft("q2")];
-    hud.render(missionStateWithHint(queue, "sail"));
+    const queue = [queuedRight("q1"), queuedUp("q2")];
+    hud.render(missionStateWithHint(queue, "move-right"));
 
-    const sailCard = root.querySelector<HTMLElement>(
+    const rightCard = root.querySelector<HTMLElement>(
       '.queue-card[data-instance-id="q1"]',
     );
-    const turnCard = root.querySelector<HTMLElement>(
+    const upCard = root.querySelector<HTMLElement>(
       '.queue-card[data-instance-id="q2"]',
     );
-    expect(sailCard?.classList.contains("is-hint-target")).toBe(true);
-    expect(turnCard?.classList.contains("is-hint-target")).toBe(false);
+    expect(rightCard?.classList.contains("is-hint-target")).toBe(true);
+    expect(upCard?.classList.contains("is-hint-target")).toBe(false);
 
-    hud.render(missionStateWithHint(queue, "turn-left"));
+    hud.render(missionStateWithHint(queue, "move-up"));
 
-    expect(sailCard?.classList.contains("is-hint-target")).toBe(false);
-    expect(turnCard?.classList.contains("is-hint-target")).toBe(true);
+    expect(rightCard?.classList.contains("is-hint-target")).toBe(false);
+    expect(upCard?.classList.contains("is-hint-target")).toBe(true);
   });
 });

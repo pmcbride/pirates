@@ -100,15 +100,25 @@ World map ─► Mission planning ─► Plan execution ─► Resolution
 
 | Block       | Type      | Args                              | Lesson |
 |-------------|-----------|-----------------------------------|--------|
-| Sail        | action    | —                                 | sequence atom |
-| Turn Left   | action    | —                                 | sequence atom |
-| Turn Right  | action    | —                                 | sequence atom |
+| Up          | action    | —                                 | sequence atom (absolute direction) |
+| Down        | action    | —                                 | sequence atom (absolute direction) |
+| Left        | action    | —                                 | sequence atom (absolute direction) |
+| Right       | action    | —                                 | sequence atom (absolute direction) |
 | Dodge       | action    | —                                 | sequence + reflex |
 | Fire        | action    | —                                 | sequence + targeting |
 | Collect     | action    | —                                 | sequence + interaction |
 | Talk        | action    | —                                 | sequence + interaction |
 | Repeat      | loop      | count (2–3), action               | loops |
 | If          | condition | condition, then-action            | conditionals |
+
+The four direction blocks (**Up / Down / Left / Right**) each move the ship one
+tile in the matching compass direction — **absolute, not relative**. The ship's
+facing is auto-set to whichever direction it last moved, so the sprite still
+"points forward" and `Fire` / `Dodge` / tile-here actions still have a well-defined
+notion of "ahead" — but the player never has to mentally rotate to plan a route.
+The older `Sail` + `Turn Left` / `Turn Right` blocks were retired with the
+absolute-direction model (PR #16) — they required 5-year-olds to mentally compose
+two transformations per move.
 
 **Block argument editing** is single-tap cycling, never typed input. `count` cycles
 2 ↔ 3. Conditions cycle through `enemyAhead / obstacleAhead / treasureHere / crewHere`.

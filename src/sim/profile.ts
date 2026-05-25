@@ -29,7 +29,7 @@ export const defaultProfile = (): PlayerProfile => ({
   stars: 0,
   crewRoster: [],
   fruitPowers: [],
-  commandUnlocks: ["sail", "collect"],
+  commandUnlocks: ["move-up", "move-down", "move-left", "move-right", "collect"],
   bestStars: {},
   captainLog: [],
   attemptCounts: {},

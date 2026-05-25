@@ -562,7 +562,9 @@ export class MissionScene extends Phaser.Scene {
 
     const tasks: Promise<void>[] = [];
 
-    // Always tween angle if it changed (turn-left/turn-right or facing differs).
+    // Always tween angle if facing changed. With the absolute-direction model
+    // facing is auto-set to the last-moved direction, so this fires whenever
+    // the player switches between Up/Down/Left/Right blocks.
     if (prevShip.facing !== step.ship.facing) {
       this.fireSfxFor("turn");
       tasks.push(this.tweenShipAngle(step.ship.facing, durations.turn));

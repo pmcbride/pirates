@@ -16,26 +16,27 @@ import type {
   RunStep,
 } from "./types";
 
-const leftTurnMap = {
-  north: "west",
-  west: "south",
-  south: "east",
-  east: "north",
-} as const;
-
-const rightTurnMap = {
-  north: "east",
-  east: "south",
-  south: "west",
-  west: "north",
-} as const;
-
 const deltaByFacing = {
   north: { x: 0, y: -1 },
   east: { x: 1, y: 0 },
   south: { x: 0, y: 1 },
   west: { x: -1, y: 0 },
 } as const;
+
+// Absolute-direction move actions. Each move ignores ship.facing and walks
+// one tile in the chosen compass direction. The ship's `facing` field is
+// updated to match so downstream cosmetic logic (sprite rotation) and the
+// facing-aware actions (fire, dodge, talk/collect-at-tile) still have a
+// sensible "forward" — but `facing` is no longer an input the player edits.
+const moveActionToFacing: Record<
+  "move-up" | "move-down" | "move-left" | "move-right",
+  "north" | "south" | "west" | "east"
+> = {
+  "move-up": "north",
+  "move-down": "south",
+  "move-left": "west",
+  "move-right": "east",
+};
 
 const clonePosition = (position: Position): Position => ({ ...position });
 
@@ -317,6 +318,10 @@ export const runMission = (
   const steps: RunStep[] = [];
   let stepIndex = 0;
   let failedHint: HintResult | null = null;
+  // Has any move action executed yet during this run? Dodge needs to know so
+  // it can fail gracefully when it's the very first action (no "last move"
+  // to slip perpendicular to).
+  let hasMoved = false;
 
   const pushStep = (
     commandId: string,
@@ -439,26 +444,43 @@ export const runMission = (
     action: ActionCommandId,
   ): MissionRunResult | null => {
     switch (action) {
-      case "sail": {
-        const next = positionAhead(state.ship, 1);
+      case "move-up":
+      case "move-down":
+      case "move-left":
+      case "move-right": {
+        // Absolute-direction move. The ship walks one tile in the chosen
+        // compass direction regardless of current facing; facing is then
+        // updated cosmetically to match the direction we just moved.
+        const facing = moveActionToFacing[action];
+        const delta = deltaByFacing[facing];
+        const next: Position = {
+          x: state.ship.position.x + delta.x,
+          y: state.ship.position.y + delta.y,
+        };
+
         if (!isInsideBoard(mission, next)) {
           return failRun(
             commandId,
             "The sea edge is too close",
-            "Turn the ship before sailing beyond the map.",
-            "turn-right",
+            "Pick a direction that stays on the map.",
+            "move-right",
             [state.ship.position],
           );
         }
 
+        // Always update facing so subsequent fire / dodge / picture-direction
+        // logic uses the latest move as "forward."
+        state.ship.facing = facing;
         state.ship.position = next;
+        hasMoved = true;
+
         const collision = activeTileAt(state.tiles, next, ["enemy", "obstacle"]);
 
         if (collision?.kind === "enemy") {
           return failRun(
             commandId,
             `A ${theme.enemyKind.singular} was still in the lane`,
-            `Splash the ${theme.enemyKind.singular} with Fire before sailing into it.`,
+            `Splash the ${theme.enemyKind.singular} with Fire before moving into it.`,
             "fire",
             [collision.position],
           );
@@ -474,31 +496,31 @@ export const runMission = (
           );
         }
 
-        pushStep(commandId, title, "The ship glides one tile forward.", "running", [
-          { kind: "move", text: "Sailed ahead.", positions: [clonePosition(next)] },
-        ]);
-        return maybeFinishAtGoal(commandId, title);
-      }
-      case "turn-left":
-      case "turn-right": {
-        state.ship.facing =
-          action === "turn-left"
-            ? leftTurnMap[state.ship.facing]
-            : rightTurnMap[state.ship.facing];
-
-        pushStep(commandId, title, "The bow turns to a new heading.", "running", [
-          { kind: "turn", text: "Turned the ship." },
+        pushStep(commandId, title, "The ship glides one tile.", "running", [
+          { kind: "move", text: "Moved one tile.", positions: [clonePosition(next)] },
         ]);
         return maybeFinishAtGoal(commandId, title);
       }
       case "dodge": {
+        if (!hasMoved) {
+          // Dodge slips perpendicular to the *last* move direction. With no
+          // prior move there's nothing to slip against — guide the player
+          // to add a direction arrow first.
+          return failRun(
+            commandId,
+            "No safe lane to dodge into",
+            "Try moving in a different direction or clearing the lane before dodging.",
+            "move-right",
+            [state.ship.position],
+          );
+        }
         const dodgeTarget = findDodgeTarget(mission, state);
         if (!dodgeTarget) {
           return failRun(
             commandId,
             "No safe lane to dodge into",
-            "Try turning the ship or clearing the lane before dodging.",
-            "turn-right",
+            "Try moving in a different direction or clearing the lane before dodging.",
+            "move-right",
             [state.ship.position],
           );
         }
@@ -569,7 +591,7 @@ export const runMission = (
       const result = applyAction(
         command.instanceId,
         command.templateId.replace("-", " "),
-        command.action ?? "sail",
+        command.action ?? "move-right",
       );
       if (result) {
         return result;
@@ -583,7 +605,7 @@ export const runMission = (
         command.body && command.body.length > 0
           ? command.body
           : null;
-      const fallbackAction = command.action ?? "sail";
+      const fallbackAction = command.action ?? "move-right";
 
       let loopFailure: MissionRunResult | null = null;
       for (let index = 0; index < count; index += 1) {
@@ -684,8 +706,8 @@ export const runMission = (
     return failRun(
       queuedCommands.at(-1)?.instanceId ?? "finish",
       "The lighthouse is still ahead",
-      "Add more Sail blocks or a Repeat Sail to reach the goal.",
-      "sail",
+      "Add more direction arrows (or a Repeat) to reach the goal.",
+      "move-right",
       [clonePosition(mission.goal)],
     );
   }

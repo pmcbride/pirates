@@ -553,6 +553,60 @@ canvas {
   line-height: 1;
 }
 
+/* ── Inline Twemoji SVG icons ──────────────────────────────────
+   One uniform size for every command-block glyph. The svg files
+   each have their own viewBox so width drives height too. */
+.icon-svg {
+  width: 1.4em;
+  height: 1.4em;
+  vertical-align: -0.25em;
+  display: inline-block;
+  flex: 0 0 auto;
+}
+
+.stamp-icon .icon-svg,
+.picker-icon .icon-svg {
+  width: 2rem;
+  height: 2rem;
+  vertical-align: middle;
+}
+
+.chip-button .icon-svg {
+  width: 1.2em;
+  height: 1.2em;
+  vertical-align: -0.2em;
+}
+
+/* ── Keyboard focus rings ──────────────────────────────────────
+   Touch-first does NOT mean keyboard-hostile. A 5-year-old at a
+   sibling's laptop with no touchscreen should still be able to
+   play, and that requires very visible focus rings (the default
+   browser ring disappears against the parchment cards).
+   Show the ring only on keyboard-driven focus (`:focus-visible`)
+   so the touch experience is unchanged. */
+:focus-visible {
+  outline: 3px solid var(--sun);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+.palette-card:focus-visible,
+.queue-card:focus-visible {
+  outline: 4px solid var(--sun);
+  outline-offset: 4px;
+  box-shadow:
+    var(--shadow-sticker),
+    0 0 0 4px var(--sun),
+    0 0 24px 6px rgba(255, 178, 74, 0.5);
+}
+
+.queue-card {
+  /* Tabbable cards need a hand cursor and focus affordance even when
+     the inner buttons are the actual action targets. The card itself
+     accepts keyboard reorder / delete shortcuts via the Hud listener. */
+  cursor: default;
+}
+
 .palette-card strong {
   font-family: var(--display-font);
   font-size: 1.05rem;

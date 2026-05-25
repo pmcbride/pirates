@@ -16,6 +16,7 @@ import { gameStore } from "../sim/store";
 import type { AppState, HintResult, PlannedCommand, PlayerProfile } from "../sim/types";
 import { playSfx, setMuted } from "./audio";
 import { haptic } from "./haptic";
+import { iconSvgMap, type IconKey } from "./icons";
 import { reconcileKeys } from "./reconcile";
 
 const labelMap = {
@@ -32,21 +33,25 @@ const labelMap = {
   crewHere: "Crew Here",
 } as const;
 
-const iconMap = {
-  sail: "⛵",
-  "turn-left": "↺",
-  "turn-right": "↻",
-  dodge: "💨",
-  fire: "💥",
-  collect: "💰",
-  talk: "💬",
-  repeat: "🔁",
-  if: "❓",
-  enemyAhead: "⚔️",
-  obstacleAhead: "🪨",
-  treasureHere: "💎",
-  crewHere: "🧑‍🎤",
-} as const;
+/**
+ * Visual icon set for the command-block library. Values are inline Twemoji
+ * SVG markup (see `./icons/index.ts`), not Unicode emoji — so every device
+ * (Mac, Windows, Android, ChromeOS) renders the *same* glyph instead of the
+ * host OS's emoji font. Keep keys in sync with `IconKey` in `./icons`.
+ */
+const iconMap: Record<IconKey, string> = iconSvgMap;
+
+/**
+ * Tiny ink-style glyphs for the queue card's move/remove toolbar. These
+ * used to be Unicode arrow / multiplication-sign characters (`◀`, `▶`, `✕`)
+ * but those code points fall under `\p{Extended_Pictographic}` on modern
+ * Unicode tables, so the host OS would render them with its emoji font —
+ * defeating the whole reason we bundle Twemoji. Tiny inline SVGs keep the
+ * queue card's chrome identical on every device.
+ */
+const CHEVRON_LEFT_SVG = `<svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M15.3 4.7L7 13l8.3 8.3 1.4-1.4L9.8 13l6.9-6.9z"/></svg>`;
+const CHEVRON_RIGHT_SVG = `<svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8.7 4.7L17 13l-8.3 8.3-1.4-1.4L14.2 13 7.3 6.1z"/></svg>`;
+const CLOSE_SVG = `<svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.3 5.7L12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3z"/></svg>`;
 
 const accentMap = {
   blue: "accent-blue",
@@ -66,7 +71,7 @@ const escapeHtml = (value: string): string =>
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
 
-const iconFor = (key: keyof typeof iconMap): string => iconMap[key] ?? "•";
+const iconFor = (key: keyof typeof iconMap): string => iconMap[key] ?? "";
 
 // Helpers — resolve mission/sea/crew/fruit display strings against a theme.
 const missionLabel = (theme: Theme, missionId: string): string =>
@@ -109,7 +114,7 @@ const queueCardInnerMarkup = (command: PlannedCommand, isRunning: boolean): stri
             return `
               <span class="loop-body-chip">
                 <button ${disabled} data-action="cycle-loop-body" data-instance-id="${command.instanceId}" data-inner-id="${inner.instanceId}" class="chip-button">${iconFor(innerAction)} ${labelMap[innerAction as keyof typeof labelMap]}</button>
-                <button ${disabled} aria-label="Remove inner action" data-action="remove-loop-body" data-instance-id="${command.instanceId}" data-inner-id="${inner.instanceId}" class="chip-mini">✕</button>
+                <button ${disabled} aria-label="Remove inner action" data-action="remove-loop-body" data-instance-id="${command.instanceId}" data-inner-id="${inner.instanceId}" class="chip-mini">${CLOSE_SVG}</button>
               </span>
             `;
           })
@@ -129,9 +134,9 @@ const queueCardInnerMarkup = (command: PlannedCommand, isRunning: boolean): stri
         <button ${canAddBody ? "" : "disabled"} data-action="add-loop-body" data-instance-id="${command.instanceId}" class="chip-button chip-add" aria-label="Add inner action">+</button>
       </div>
       <div class="queue-tools">
-        <button ${disabled} aria-label="Move left" data-action="move-left" data-instance-id="${command.instanceId}">◀</button>
-        <button ${disabled} aria-label="Move right" data-action="move-right" data-instance-id="${command.instanceId}">▶</button>
-        <button ${disabled} aria-label="Remove block" data-action="remove-command" data-instance-id="${command.instanceId}">✕</button>
+        <button ${disabled} aria-label="Move left" data-action="move-left" data-instance-id="${command.instanceId}">${CHEVRON_LEFT_SVG}</button>
+        <button ${disabled} aria-label="Move right" data-action="move-right" data-instance-id="${command.instanceId}">${CHEVRON_RIGHT_SVG}</button>
+        <button ${disabled} aria-label="Remove block" data-action="remove-command" data-instance-id="${command.instanceId}">${CLOSE_SVG}</button>
       </div>
     `;
   }
@@ -148,9 +153,9 @@ const queueCardInnerMarkup = (command: PlannedCommand, isRunning: boolean): stri
         <button ${disabled} data-action="open-if-action-picker" data-instance-id="${command.instanceId}" class="chip-button">${iconFor(thenAction)} ${labelMap[thenAction as keyof typeof labelMap]}</button>
       </div>
       <div class="queue-tools">
-        <button ${disabled} aria-label="Move left" data-action="move-left" data-instance-id="${command.instanceId}">◀</button>
-        <button ${disabled} aria-label="Move right" data-action="move-right" data-instance-id="${command.instanceId}">▶</button>
-        <button ${disabled} aria-label="Remove block" data-action="remove-command" data-instance-id="${command.instanceId}">✕</button>
+        <button ${disabled} aria-label="Move left" data-action="move-left" data-instance-id="${command.instanceId}">${CHEVRON_LEFT_SVG}</button>
+        <button ${disabled} aria-label="Move right" data-action="move-right" data-instance-id="${command.instanceId}">${CHEVRON_RIGHT_SVG}</button>
+        <button ${disabled} aria-label="Remove block" data-action="remove-command" data-instance-id="${command.instanceId}">${CLOSE_SVG}</button>
       </div>
     `;
   }
@@ -165,9 +170,9 @@ const queueCardInnerMarkup = (command: PlannedCommand, isRunning: boolean): stri
       </div>
     </div>
     <div class="queue-tools">
-      <button ${disabled} aria-label="Move left" data-action="move-left" data-instance-id="${command.instanceId}">◀</button>
-      <button ${disabled} aria-label="Move right" data-action="move-right" data-instance-id="${command.instanceId}">▶</button>
-      <button ${disabled} aria-label="Remove block" data-action="remove-command" data-instance-id="${command.instanceId}">✕</button>
+      <button ${disabled} aria-label="Move left" data-action="move-left" data-instance-id="${command.instanceId}">${CHEVRON_LEFT_SVG}</button>
+      <button ${disabled} aria-label="Move right" data-action="move-right" data-instance-id="${command.instanceId}">${CHEVRON_RIGHT_SVG}</button>
+      <button ${disabled} aria-label="Remove block" data-action="remove-command" data-instance-id="${command.instanceId}">${CLOSE_SVG}</button>
     </div>
   `;
 };
@@ -475,8 +480,17 @@ export class Hud {
   /** Last AppState we rendered — needed to reposition the hint bubble on resize. */
   private lastState: AppState | null = null;
 
+  /**
+   * After a `gameStore.moveCommand` we want the moved card to keep focus —
+   * otherwise hitting Arrow-Right repeatedly would lose its keyboard target
+   * the first time the card re-renders. Set on keydown, consumed by the
+   * next `reconcileQueueList` call.
+   */
+  private pendingFocusInstanceId: string | null = null;
+
   constructor(private root: HTMLElement) {
     this.root.addEventListener("click", this.handleClick);
+    this.root.addEventListener("keydown", this.handleKeydown);
     this.root.addEventListener("dragstart", this.handleDragStart);
     this.root.addEventListener("dragover", this.handleDragOver);
     this.root.addEventListener("drop", this.handleDrop);
@@ -671,6 +685,61 @@ export class Hud {
           gameStore.cycleLoopBodyAction(instanceId, innerId);
         }
         break;
+      }
+    }
+  };
+
+  /**
+   * Minimum-viable keyboard control. The game is touch-first by design, but
+   * a kid on a sibling's laptop with no touchscreen still needs to be able
+   * to play — that means at least:
+   *
+   *   • Tab cycles through palette stamps and queue cards (native, since the
+   *     palette uses `<button>` and queue cards now carry `tabindex="0"`).
+   *   • Enter / Space on a palette stamp drops it into the queue (Enter is
+   *     native for buttons; Space is too. The store call lives in
+   *     `handleClick`, which the browser also fires on keyboard activation
+   *     of a button — so we don't double-handle it here.)
+   *   • Arrow Left / Right on a focused queue card reorders that card.
+   *   • Delete / Backspace on a focused queue card removes it.
+   *   • Enter on the Run button (and any other `<button>`) triggers run —
+   *     same native click synthesis as above.
+   *
+   * Focus rings are styled via `:focus-visible` in `styles.css` so they
+   * appear only for keyboard-driven focus, not on touch / mouse press.
+   */
+  private handleKeydown = (event: KeyboardEvent): void => {
+    const target = event.target as HTMLElement | null;
+    if (!target) return;
+
+    // Queue-card scoped keys — reorder + delete.
+    const card = target.closest<HTMLElement>(".queue-card[data-instance-id]");
+    if (card) {
+      const instanceId = card.dataset.instanceId;
+      // Only act when the *card itself* (not an inner button) is the focused
+      // element. Otherwise arrow keys on inner buttons would steal focus.
+      const cardIsFocused = document.activeElement === card;
+      if (!instanceId || !cardIsFocused) return;
+
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        this.pendingFocusInstanceId = instanceId;
+        haptic("tap");
+        gameStore.moveCommand(instanceId, -1);
+        return;
+      }
+      if (event.key === "ArrowRight") {
+        event.preventDefault();
+        this.pendingFocusInstanceId = instanceId;
+        haptic("tap");
+        gameStore.moveCommand(instanceId, 1);
+        return;
+      }
+      if (event.key === "Delete" || event.key === "Backspace") {
+        event.preventDefault();
+        haptic("tap");
+        gameStore.removeCommand(instanceId);
+        return;
       }
     }
   };
@@ -1296,6 +1365,19 @@ export class Hud {
         }
       }
     }
+
+    // Restore focus to a card that was reordered via keyboard. Because we
+    // preserve `<article>` identity per `instanceId`, the same DOM node still
+    // exists — we just need to re-focus it after the browser may have moved
+    // focus during the reorder. Skip when nothing's pending so we don't fight
+    // user focus on every render.
+    if (this.pendingFocusInstanceId) {
+      const entry = m.queueNodes.get(this.pendingFocusInstanceId);
+      if (entry && document.activeElement !== entry.node) {
+        entry.node.focus();
+      }
+      this.pendingFocusInstanceId = null;
+    }
   }
 
   /**
@@ -1432,6 +1514,11 @@ const createQueueCardElement = (command: PlannedCommand, isRunning: boolean): HT
   const article = document.createElement("article");
   article.className = `queue-card ${accent}`;
   article.dataset.instanceId = command.instanceId;
+  // Make the card itself a tab-stop so keyboard users can focus it and
+  // use the arrow / Delete shortcuts defined in `Hud.handleKeydown`.
+  article.tabIndex = 0;
+  article.setAttribute("role", "group");
+  article.setAttribute("aria-label", `${template.label} command — use arrow keys to reorder, Delete to remove`);
   article.innerHTML = queueCardInnerMarkup(command, isRunning);
   return article;
 };

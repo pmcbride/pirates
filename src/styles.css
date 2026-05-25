@@ -423,6 +423,34 @@ canvas {
      the bubble floats above the failing queue card. `--hint-tail-offset` is
      also set inline so the dotted tail lines up with the card's center. */
   --hint-tail-offset: 36px;
+  /* Entrance animation — pops in from a slight scale-down so the bubble feels
+     like it's being placed on the canvas rather than appearing instantly. */
+  animation: hint-bubble-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  transform-origin: bottom left;
+}
+
+@keyframes hint-bubble-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hint-banner {
+    /* The global reduced-motion rule already shortens the duration, but we
+       additionally drop the scale change so the entrance is opacity-only. */
+    animation: hint-bubble-fade-in 1ms linear;
+  }
+
+  @keyframes hint-bubble-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
 }
 
 .hint-banner.is-anchored {
@@ -759,6 +787,26 @@ canvas {
 .queue-card.is-dragging {
   opacity: 0.45;
   transform: rotate(-2deg);
+}
+
+/* Drop-in animation — when a stamp is appended to the queue (drag from
+   palette or keyboard add), the new chip bounces from 80% to 100% so the
+   player notices their action landed. JS adds `is-just-dropped` for ~200ms
+   then removes it; an animation-end listener is also fine. Honors reduced
+   motion (the global @media block above flattens animation-duration). */
+.queue-card.is-just-dropped {
+  animation: queue-chip-drop 180ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes queue-chip-drop {
+  0% {
+    opacity: 0.4;
+    transform: scale(0.8);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 /* Drop indicator — a vertical bar on the side the dragged card would land. */

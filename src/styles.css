@@ -350,25 +350,59 @@ canvas {
   top: 13rem;
   width: min(82vw, 460px);
   padding: 1.1rem 1.2rem 1.2rem;
+  /* When anchored, JS sets `left`/`top` inline and toggles `.is-anchored` so
+     the bubble floats above the failing queue card. `--hint-tail-offset` is
+     also set inline so the dotted tail lines up with the card's center. */
+  --hint-tail-offset: 36px;
+}
+
+.hint-banner.is-anchored {
+  /* JS owns the position when anchored — width can shrink so the tail can
+     hug shorter cards. */
+  width: min(82vw, 360px);
 }
 
 .hint-banner::after {
   content: "";
   position: absolute;
   bottom: -16px;
-  left: 36px;
+  left: var(--hint-tail-offset);
   width: 24px;
   height: 24px;
   background: var(--parchment-deep);
   border-left: var(--border-ink);
   border-bottom: var(--border-ink);
   transform: rotate(-45deg);
+  /* Dotted-tail accent — a row of dots leading from the bubble down to the
+     pointer so it reads as a speech bubble pointing at the card. */
+  box-shadow:
+    -6px 6px 0 -10px var(--ink),
+    -12px 12px 0 -10px var(--ink),
+    -18px 18px 0 -10px var(--ink);
 }
 
 .hint-banner strong {
   font-family: var(--display-font);
   font-size: 1.3rem;
   color: var(--ink);
+}
+
+/* Subtle highlight on the queue card the hint is asking the player to fix.
+   Matches the `.is-active` playback halo but uses the coral hint accent
+   instead of the sun so the two states never get confused. */
+.queue-card.is-hint-target {
+  outline: 3px dashed var(--coral, #ff7a59);
+  outline-offset: 3px;
+  animation: hint-target-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes hint-target-pulse {
+  0%, 100% {
+    outline-color: var(--coral, #ff7a59);
+  }
+  50% {
+    outline-color: var(--sun, #ffb24a);
+  }
 }
 
 .hint-banner p:last-child,

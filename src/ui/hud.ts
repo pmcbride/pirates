@@ -50,15 +50,15 @@ const labelMap = {
 const iconMap: Record<IconKey, string> = iconSvgMap;
 
 /**
- * Tiny ink-style glyphs for the queue card's move/remove toolbar. These
- * used to be Unicode arrow / multiplication-sign characters (`◀`, `▶`, `✕`)
- * but those code points fall under `\p{Extended_Pictographic}` on modern
- * Unicode tables, so the host OS would render them with its emoji font —
- * defeating the whole reason we bundle Twemoji. Tiny inline SVGs keep the
- * queue card's chrome identical on every device.
+ * Tiny ink-style close glyph for the queue card's removal affordance. Used
+ * to be a Unicode `✕` but that falls under `\p{Extended_Pictographic}` on
+ * modern Unicode tables, so the host OS would render it with its emoji
+ * font — defeating the whole reason we bundle Twemoji. Tiny inline SVG
+ * keeps the queue card's chrome identical on every device.
+ *
+ * The ◀/▶ chevrons that used to live here were removed when the queue
+ * gained drag-and-drop reordering — arrows confused early readers.
  */
-const CHEVRON_LEFT_SVG = `<svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M15.3 4.7L7 13l8.3 8.3 1.4-1.4L9.8 13l6.9-6.9z"/></svg>`;
-const CHEVRON_RIGHT_SVG = `<svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8.7 4.7L17 13l-8.3 8.3-1.4-1.4L14.2 13 7.3 6.1z"/></svg>`;
 const CLOSE_SVG = `<svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.3 5.7L12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3z"/></svg>`;
 
 const accentMap = {
@@ -121,10 +121,28 @@ const missionObjective = (theme: Theme, missionId: string): string =>
  * Render the *inner* markup of a queue card (the contents of the <article>
  * wrapper). The wrapper itself is created once per `instanceId` and kept
  * across renders — see `createQueueCardElement`.
+ *
+ * Reference-game inspired (Dragon Coding Games for Kids): chips are
+ * icon-centered and ≤ 96px wide so 6–8 fit across a 720px viewport without
+ * horizontal scroll. Reordering is via drag-and-drop on the card itself
+ * (`draggable="true"` lives on the wrapper). Removal is a small `×` that
+ * appears on hover / focus.
  */
 const queueCardInnerMarkup = (command: PlannedCommand, isRunning: boolean): string => {
   const template = commandLibrary[command.templateId];
   const disabled = isRunning ? "disabled" : "";
+
+  // Common: a small `×` removal affordance shown on hover/focus only.
+  const removeBtn = `
+    <button
+      ${disabled}
+      class="queue-remove"
+      aria-label="Remove block"
+      data-action="remove-command"
+      data-instance-id="${command.instanceId}"
+      title="Remove"
+    >${CLOSE_SVG}</button>
+  `;
 
   if (command.type === "loop") {
     const body = command.body ?? [];
@@ -138,67 +156,54 @@ const queueCardInnerMarkup = (command: PlannedCommand, isRunning: boolean): stri
             const innerAction = (inner.action ?? "sail") as keyof typeof iconMap;
             return `
               <span class="loop-body-chip">
-                <button ${disabled} data-action="cycle-loop-body" data-instance-id="${command.instanceId}" data-inner-id="${inner.instanceId}" class="chip-button">${iconFor(innerAction)} ${labelMap[innerAction as keyof typeof labelMap]}</button>
+                <button ${disabled} aria-label="${escapeHtml(labelMap[innerAction as keyof typeof labelMap] ?? innerAction)}" data-action="cycle-loop-body" data-instance-id="${command.instanceId}" data-inner-id="${inner.instanceId}" class="chip-button chip-icon-only">${iconFor(innerAction)}</button>
                 <button ${disabled} aria-label="Remove inner action" data-action="remove-loop-body" data-instance-id="${command.instanceId}" data-inner-id="${inner.instanceId}" class="chip-mini">${CLOSE_SVG}</button>
               </span>
             `;
           })
           .join("")
       : `
-        <button ${disabled} data-action="loop-action" data-instance-id="${command.instanceId}" class="chip-button">${iconFor((command.action ?? "sail") as keyof typeof iconMap)} ${labelMap[(command.action ?? "sail") as keyof typeof labelMap]}</button>
+        <button ${disabled} aria-label="${escapeHtml(labelMap[(command.action ?? "sail") as keyof typeof labelMap] ?? "Sail")}" data-action="loop-action" data-instance-id="${command.instanceId}" class="chip-button chip-icon-only">${iconFor((command.action ?? "sail") as keyof typeof iconMap)}</button>
       `;
 
     return `
-      <div class="queue-main">
+      <div class="queue-main queue-loop">
         <span class="stamp-icon">${iconFor("repeat")}</span>
-        <div class="queue-kicker">Repeat</div>
-        <button ${disabled} data-action="loop-count" data-instance-id="${command.instanceId}" class="chip-button">×${command.count ?? 2}</button>
+        <button ${disabled} data-action="loop-count" data-instance-id="${command.instanceId}" class="chip-badge" aria-label="Repeat count">×${command.count ?? 2}</button>
       </div>
       <div class="loop-body-row">
         ${bodyChips}
         <button ${canAddBody ? "" : "disabled"} data-action="add-loop-body" data-instance-id="${command.instanceId}" class="chip-button chip-add" aria-label="Add inner action">+</button>
       </div>
-      <div class="queue-tools">
-        <button ${disabled} aria-label="Move left" data-action="move-left" data-instance-id="${command.instanceId}">${CHEVRON_LEFT_SVG}</button>
-        <button ${disabled} aria-label="Move right" data-action="move-right" data-instance-id="${command.instanceId}">${CHEVRON_RIGHT_SVG}</button>
-        <button ${disabled} aria-label="Remove block" data-action="remove-command" data-instance-id="${command.instanceId}">${CLOSE_SVG}</button>
-      </div>
+      ${removeBtn}
     `;
   }
 
   if (command.type === "condition") {
     const condition = (command.condition ?? "enemyAhead") as keyof typeof iconMap;
     const thenAction = (command.thenAction ?? "fire") as keyof typeof iconMap;
+    const conditionLabel = labelMap[condition as keyof typeof labelMap] ?? condition;
+    const thenLabel = labelMap[thenAction as keyof typeof labelMap] ?? thenAction;
     return `
-      <div class="queue-main">
+      <div class="queue-main queue-condition">
         <span class="stamp-icon">${iconFor("if")}</span>
-        <div class="queue-kicker">If</div>
-        <button ${disabled} data-action="open-if-condition-picker" data-instance-id="${command.instanceId}" class="chip-button">${iconFor(condition)} ${labelMap[condition as keyof typeof labelMap]}</button>
-        <span class="queue-word">then</span>
-        <button ${disabled} data-action="open-if-action-picker" data-instance-id="${command.instanceId}" class="chip-button">${iconFor(thenAction)} ${labelMap[thenAction as keyof typeof labelMap]}</button>
+        <div class="cond-mini">
+          <button ${disabled} aria-label="If ${escapeHtml(conditionLabel)}" data-action="open-if-condition-picker" data-instance-id="${command.instanceId}" class="chip-button chip-icon-only">${iconFor(condition)}</button>
+          <span class="cond-arrow" aria-hidden="true">→</span>
+          <button ${disabled} aria-label="Then ${escapeHtml(thenLabel)}" data-action="open-if-action-picker" data-instance-id="${command.instanceId}" class="chip-button chip-icon-only">${iconFor(thenAction)}</button>
+        </div>
       </div>
-      <div class="queue-tools">
-        <button ${disabled} aria-label="Move left" data-action="move-left" data-instance-id="${command.instanceId}">${CHEVRON_LEFT_SVG}</button>
-        <button ${disabled} aria-label="Move right" data-action="move-right" data-instance-id="${command.instanceId}">${CHEVRON_RIGHT_SVG}</button>
-        <button ${disabled} aria-label="Remove block" data-action="remove-command" data-instance-id="${command.instanceId}">${CLOSE_SVG}</button>
-      </div>
+      ${removeBtn}
     `;
   }
 
   const action = (command.action ?? template.defaultAction ?? "sail") as keyof typeof iconMap;
+  const actionLabel = labelMap[action as keyof typeof labelMap] ?? action;
   return `
-    <div class="queue-main">
-      <span class="stamp-icon" style="font-size:1.8rem">${iconFor(action)}</span>
-      <div>
-        <div class="queue-kicker">${escapeHtml(template.label)}</div>
-        <strong>${labelMap[action as keyof typeof labelMap]}</strong>
-      </div>
+    <div class="queue-main queue-action" aria-label="${escapeHtml(actionLabel)}">
+      <span class="stamp-icon">${iconFor(action)}</span>
     </div>
-    <div class="queue-tools">
-      <button ${disabled} aria-label="Move left" data-action="move-left" data-instance-id="${command.instanceId}">${CHEVRON_LEFT_SVG}</button>
-      <button ${disabled} aria-label="Move right" data-action="move-right" data-instance-id="${command.instanceId}">${CHEVRON_RIGHT_SVG}</button>
-      <button ${disabled} aria-label="Remove block" data-action="remove-command" data-instance-id="${command.instanceId}">${CLOSE_SVG}</button>
-    </div>
+    ${removeBtn}
   `;
 };
 
@@ -612,14 +617,35 @@ export class Hud {
     newError: "",
   };
 
-  constructor(private root: HTMLElement) {
+  /**
+   * The command dock (queue + palette) lives in its own DOM region outside
+   * the HUD overlay so the playfield grid can reserve fixed bottom space for
+   * it. When the caller doesn't pass a dock host we fall back to mounting
+   * the dock inside the HUD root — that keeps JSDOM tests working with the
+   * single-argument constructor.
+   */
+  private dockRoot: HTMLElement;
+
+  constructor(private root: HTMLElement, dockRoot?: HTMLElement) {
+    this.dockRoot = dockRoot ?? root;
     this.root.addEventListener("click", this.handleClick);
     this.root.addEventListener("keydown", this.handleKeydown);
     this.root.addEventListener("submit", this.handleSubmit);
     this.root.addEventListener("input", this.handleInput);
     this.root.addEventListener("dragstart", this.handleDragStart);
     this.root.addEventListener("dragover", this.handleDragOver);
+    this.root.addEventListener("dragleave", this.handleDragLeave);
+    this.root.addEventListener("dragend", this.handleDragEnd);
     this.root.addEventListener("drop", this.handleDrop);
+    if (this.dockRoot !== this.root) {
+      this.dockRoot.addEventListener("click", this.handleClick);
+      this.dockRoot.addEventListener("keydown", this.handleKeydown);
+      this.dockRoot.addEventListener("dragstart", this.handleDragStart);
+      this.dockRoot.addEventListener("dragover", this.handleDragOver);
+      this.dockRoot.addEventListener("dragleave", this.handleDragLeave);
+      this.dockRoot.addEventListener("dragend", this.handleDragEnd);
+      this.dockRoot.addEventListener("drop", this.handleDrop);
+    }
     if (typeof window !== "undefined") {
       window.addEventListener("resize", this.handleResize);
     }
@@ -785,18 +811,6 @@ export class Hud {
         if (instanceId) {
           haptic("tap");
           gameStore.removeCommand(instanceId);
-        }
-        break;
-      case "move-left":
-        if (instanceId) {
-          haptic("tap");
-          gameStore.moveCommand(instanceId, -1);
-        }
-        break;
-      case "move-right":
-        if (instanceId) {
-          haptic("tap");
-          gameStore.moveCommand(instanceId, 1);
         }
         break;
       case "loop-count":
@@ -1051,31 +1065,170 @@ export class Hud {
     this.captainsPanel.newDraft = target.value;
   };
 
+  /**
+   * Two drag sources, two MIME-ish payload keys:
+   *   - `application/x-soc-template` — palette card → queue (existing).
+   *   - `application/x-soc-instance` — queue card → queue reorder (new).
+   *
+   * `dataTransfer.types` is the safe channel for sniffing the payload
+   * shape during dragover, so we can show a drop indicator without
+   * actually being able to read `getData()` (browsers gate the value
+   * until drop for security).
+   *
+   * We also write the same id to `text/plain` for backward-compat with
+   * the original `handleDrop` and to satisfy browsers that require some
+   * standard MIME be set.
+   */
   private handleDragStart = (event: DragEvent): void => {
     const target = event.target as HTMLElement | null;
-    const source = target?.closest<HTMLElement>("[data-template-id]");
-    const templateId = source?.dataset.templateId;
-    if (!templateId || !event.dataTransfer) {
+    if (!event.dataTransfer) return;
+
+    // Queue card source — reorder.
+    const queueSource = target?.closest<HTMLElement>(
+      ".queue-card[data-instance-id]",
+    );
+    if (queueSource) {
+      const instanceId = queueSource.dataset.instanceId;
+      if (!instanceId) return;
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("application/x-soc-instance", instanceId);
+      event.dataTransfer.setData("text/plain", instanceId);
+      queueSource.classList.add("is-dragging");
       return;
     }
+
+    // Palette card source — add.
+    const paletteSource = target?.closest<HTMLElement>("[data-template-id]");
+    const templateId = paletteSource?.dataset.templateId;
+    if (!templateId) return;
     event.dataTransfer.effectAllowed = "copy";
+    event.dataTransfer.setData("application/x-soc-template", templateId);
     event.dataTransfer.setData("text/plain", templateId);
   };
 
+  /**
+   * Highlight the drop slot between queue cards while a drag is over the
+   * queue list. The indicator is a CSS pseudo on the card the cursor is
+   * approaching from the left; we set `data-drop-side="before"` /
+   * `"after"` on the hovered card so styles.css can render a vertical
+   * line on the correct side.
+   */
   private handleDragOver = (event: DragEvent): void => {
     const target = event.target as HTMLElement | null;
-    if (target?.closest("[data-dropzone='queue']")) {
-      event.preventDefault();
+    const zone = target?.closest<HTMLElement>("[data-dropzone='queue']");
+    if (!zone) return;
+    event.preventDefault();
+    if (event.dataTransfer) {
+      const isReorder = event.dataTransfer.types.includes(
+        "application/x-soc-instance",
+      );
+      event.dataTransfer.dropEffect = isReorder ? "move" : "copy";
+    }
+
+    // Clear any previous slot markers in this zone.
+    zone.querySelectorAll<HTMLElement>("[data-drop-side]").forEach((node) => {
+      node.removeAttribute("data-drop-side");
+    });
+
+    // Find the card we're hovering and decide before-vs-after based on
+    // cursor X relative to the card's horizontal midpoint.
+    const card = target?.closest<HTMLElement>(
+      ".queue-card[data-instance-id]",
+    );
+    if (card) {
+      const rect = card.getBoundingClientRect();
+      const side = event.clientX < rect.left + rect.width / 2 ? "before" : "after";
+      card.setAttribute("data-drop-side", side);
+    } else {
+      // Hovering an empty area — flag the zone so styles can hint an end-drop.
+      zone.setAttribute("data-drop-side", "end");
+    }
+  };
+
+  private handleDragLeave = (event: DragEvent): void => {
+    const target = event.target as HTMLElement | null;
+    const zone = target?.closest<HTMLElement>("[data-dropzone='queue']");
+    if (!zone) return;
+    // If we've left the zone entirely (related target not inside it), clear.
+    const related = event.relatedTarget as HTMLElement | null;
+    if (related && zone.contains(related)) return;
+    zone.querySelectorAll<HTMLElement>("[data-drop-side]").forEach((node) => {
+      node.removeAttribute("data-drop-side");
+    });
+    zone.removeAttribute("data-drop-side");
+  };
+
+  private handleDragEnd = (event: DragEvent): void => {
+    const target = event.target as HTMLElement | null;
+    const source = target?.closest<HTMLElement>(".queue-card.is-dragging");
+    source?.classList.remove("is-dragging");
+    // Clear any leftover drop indicators on every queue zone we know about.
+    const roots = [this.root, this.dockRoot];
+    for (const root of roots) {
+      root.querySelectorAll<HTMLElement>("[data-drop-side]").forEach((node) => {
+        node.removeAttribute("data-drop-side");
+      });
     }
   };
 
   private handleDrop = (event: DragEvent): void => {
     const target = event.target as HTMLElement | null;
-    if (!target?.closest("[data-dropzone='queue']") || !event.dataTransfer) {
+    const zone = target?.closest<HTMLElement>("[data-dropzone='queue']");
+    if (!zone || !event.dataTransfer) {
       return;
     }
     event.preventDefault();
-    const templateId = event.dataTransfer.getData("text/plain");
+
+    // Clean up drop indicators no matter which path we take.
+    zone.querySelectorAll<HTMLElement>("[data-drop-side]").forEach((node) => {
+      node.removeAttribute("data-drop-side");
+    });
+    zone.removeAttribute("data-drop-side");
+
+    // 1. Reorder — drag from a queue card to a slot in the queue.
+    const reorderInstanceId = event.dataTransfer.getData(
+      "application/x-soc-instance",
+    );
+    if (reorderInstanceId) {
+      const targetCard = target?.closest<HTMLElement>(
+        ".queue-card[data-instance-id]",
+      );
+      const queue = gameStore.getState().queuedCommands;
+      const sourceIndex = queue.findIndex(
+        (c) => c.instanceId === reorderInstanceId,
+      );
+      if (sourceIndex === -1) return;
+
+      let targetIndex: number;
+      if (targetCard && targetCard.dataset.instanceId !== reorderInstanceId) {
+        const overId = targetCard.dataset.instanceId ?? "";
+        const overIndex = queue.findIndex((c) => c.instanceId === overId);
+        if (overIndex === -1) return;
+        const rect = targetCard.getBoundingClientRect();
+        const after = event.clientX >= rect.left + rect.width / 2;
+        // Compute desired index in the *post-removal* sequence.
+        let desiredIndex = after ? overIndex + 1 : overIndex;
+        if (sourceIndex < desiredIndex) desiredIndex -= 1;
+        targetIndex = desiredIndex;
+      } else if (!targetCard) {
+        // Dropped onto empty zone area — go to end.
+        targetIndex = queue.length - 1;
+      } else {
+        return; // dropped on self
+      }
+
+      if (targetIndex !== sourceIndex) {
+        playSfx("stamp-drop");
+        haptic("tap");
+        gameStore.moveCommandToIndex(reorderInstanceId, targetIndex);
+      }
+      return;
+    }
+
+    // 2. Add from palette — original drag-from-palette flow.
+    const templateId =
+      event.dataTransfer.getData("application/x-soc-template") ||
+      event.dataTransfer.getData("text/plain");
     if (templateId) {
       playSfx("stamp-drop");
       haptic("tap");
@@ -1642,6 +1795,12 @@ export class Hud {
         entry.node.innerHTML = queueCardInnerMarkup(command, isRunning);
         entry.fingerprint = fp;
       }
+      // Drag-to-reorder is gated by playback state — a 5yo dragging a card
+      // mid-run would be very confusing.
+      const article = entry.node as HTMLElement;
+      if (article.draggable !== !isRunning) {
+        article.draggable = !isRunning;
+      }
     }
 
     // Active class — surgical toggle, never rebuilds.
@@ -1833,13 +1992,22 @@ const createQueueCardElement = (command: PlannedCommand, isRunning: boolean): HT
   const template = commandLibrary[command.templateId];
   const accent = accentMap[template.accent as keyof typeof accentMap] ?? "accent-blue";
   const article = document.createElement("article");
-  article.className = `queue-card ${accent}`;
+  article.className = `queue-card queue-card-${command.type} ${accent}`;
   article.dataset.instanceId = command.instanceId;
   // Make the card itself a tab-stop so keyboard users can focus it and
   // use the arrow / Delete shortcuts defined in `Hud.handleKeydown`.
   article.tabIndex = 0;
   article.setAttribute("role", "group");
-  article.setAttribute("aria-label", `${template.label} command — use arrow keys to reorder, Delete to remove`);
+  article.setAttribute(
+    "aria-label",
+    `${template.label} command — drag to reorder, arrow keys also work, Delete to remove`,
+  );
+  // Drag-to-reorder: the card itself is the drag source. Disabled while
+  // the queue is running (playback owns the queue) — handled by the
+  // `is-running` class flipping the CSS `-webkit-user-drag` and the
+  // dragstart handler bailing out if isRunning is true (via inner controls
+  // being disabled). The `draggable` attribute drives native HTML5 DnD.
+  article.draggable = !isRunning;
   article.innerHTML = queueCardInnerMarkup(command, isRunning);
   return article;
 };

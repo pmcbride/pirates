@@ -431,6 +431,13 @@ export class GameStore {
     }));
   }
 
+  /**
+   * Nudge a queued command one slot left (-1) or right (+1). Used by the
+   * keyboard handler (ArrowLeft/Right on a focused queue card). No-op at the
+   * edges or when the instance isn't found.
+   *
+   * For absolute repositioning (drag-and-drop), use `moveCommandToIndex`.
+   */
   moveCommand(instanceId: string, direction: -1 | 1): void {
     this.update((state) => {
       const index = state.queuedCommands.findIndex(
@@ -438,6 +445,41 @@ export class GameStore {
       );
       const nextIndex = index + direction;
       if (index === -1 || nextIndex < 0 || nextIndex >= state.queuedCommands.length) {
+        return state;
+      }
+
+      const queuedCommands = [...state.queuedCommands];
+      const [command] = queuedCommands.splice(index, 1);
+      queuedCommands.splice(nextIndex, 0, command);
+
+      return {
+        ...state,
+        queuedCommands,
+        ...this.resetPlanningAfterEdit(state),
+      };
+    });
+  }
+
+  /**
+   * Move a queued command to an absolute target index in the queue. Used by
+   * drag-and-drop reorder. The target is the desired final 0-based position
+   * *after* the move (i.e. computed in the post-removal sequence). The index
+   * is clamped to `[0, length-1]` and a no-op move (target === current) is
+   * skipped so we don't fire spurious re-renders.
+   */
+  moveCommandToIndex(instanceId: string, targetIndex: number): void {
+    this.update((state) => {
+      const index = state.queuedCommands.findIndex(
+        (command) => command.instanceId === instanceId,
+      );
+      if (index === -1) {
+        return state;
+      }
+      const nextIndex = Math.max(
+        0,
+        Math.min(targetIndex, state.queuedCommands.length - 1),
+      );
+      if (nextIndex === index) {
         return state;
       }
 

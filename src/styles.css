@@ -75,10 +75,40 @@ button:disabled {
   opacity: 0.55;
 }
 
+/* ── App shell layout ──────────────────────────────────────────
+   Two-row grid: the playfield (canvas + HUD overlay) gets the
+   remaining height, and the dock row pins the command queue +
+   palette to a fixed slice at the bottom — no overlap. Mirrors
+   the reference game's board-dominant proportions: board ~70%,
+   queue + palette ~25–30%. Tuned per-viewport in the responsive
+   block at the bottom of this file.
+   ────────────────────────────────────────────────────────────── */
+
 .app-shell {
   position: relative;
   width: 100vw;
   height: 100vh;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  grid-template-columns: 1fr;
+}
+
+.playfield-region {
+  position: relative;
+  grid-row: 1;
+  grid-column: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.dock-root {
+  grid-row: 2;
+  grid-column: 1;
+  position: relative;
+  pointer-events: auto;
+  /* Keep the dock above sit-on-top transient layers. The picker backdrop
+     (z-index: 50) still needs to cover the dock for outside-tap dismiss. */
+  z-index: 4;
 }
 
 .game-root,
@@ -90,6 +120,7 @@ canvas {
 .hud-root {
   position: absolute;
   inset: 0;
+  pointer-events: none;
 }
 
 .hud-layer {
@@ -153,7 +184,6 @@ canvas {
 
 .ghost-button,
 .dock-actions button,
-.queue-tools button,
 .drawer-toggle,
 .chip-button,
 .rail-actions button {
@@ -168,7 +198,6 @@ canvas {
 }
 
 .dock-actions button:hover:not(:disabled),
-.queue-tools button:hover:not(:disabled),
 .rail-actions button:hover:not(:disabled) {
   background: var(--sky);
 }
@@ -288,9 +317,7 @@ canvas {
 }
 
 .map-reward-row,
-.mission-pill-row,
-.dock-actions,
-.queue-tools {
+.mission-pill-row {
   display: flex;
   gap: 0.7rem;
   flex-wrap: wrap;
@@ -412,77 +439,194 @@ canvas {
   color: var(--ink-soft);
 }
 
-/* ── Command dock ──────────────────────────────────────────── */
+/* ── Command dock ──────────────────────────────────────────────
+   Mounted in `.dock-root` (grid row 2) — no `position: absolute`.
+   That guarantees the canvas + dock share screen height without
+   overlapping. The dock is a 3-row grid: head + queue strip +
+   palette strip. The head's verbose copy collapses on tablet so
+   the queue/palette can dominate. */
 
 .command-dock {
-  position: absolute;
-  left: 1rem;
-  right: 1rem;
-  bottom: 1rem;
-  padding: 1.15rem;
+  position: relative;
+  margin: 0.5rem 0.75rem max(0.5rem, env(safe-area-inset-bottom));
+  padding: 0.75rem 0.9rem;
   display: grid;
-  gap: 1rem;
+  gap: 0.55rem;
+  /* Surface card already supplies parchment background + ink border. */
 }
 
 .dock-head {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  gap: 1rem;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.dock-head > div:first-child {
+  /* Collapse the verbose intro copy on the dock head — the reference game
+     shows zero chrome above the queue. We keep the H3 for screen readers
+     and slim it visually. */
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.dock-head .eyebrow {
+  margin: 0;
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
 }
 
 .dock-head h3 {
   margin: 0;
   font-family: var(--display-font);
-  font-size: 1.5rem;
+  font-size: 1.1rem;
+  line-height: 1;
 }
 
 .dock-head p:last-child {
-  margin: 0.4rem 0 0;
+  /* The tutorial line lives here. Compact on tablet so the queue strip
+     still gets its 96px of height. */
+  margin: 0;
   max-width: 40ch;
   color: var(--ink-soft);
+  font-size: 0.78rem;
+  font-weight: 700;
 }
 
-/* ── Queue (programmed plan) ───────────────────────────────── */
+.dock-actions {
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* Slimmer dock action buttons — they shouldn't compete with the queue/palette
+   for visual weight. The hex-style Run button stays prominent via .primary-cta. */
+.dock-actions button {
+  min-height: 44px;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.92rem;
+}
+
+.dock-actions .primary-cta {
+  min-height: 56px;
+  padding: 0.6rem 1.2rem;
+  font-size: 1.1rem;
+}
+
+/* ── Queue (programmed plan) ───────────────────────────────────
+   Compact icon-only chips inspired by Dragon Coding Games for Kids.
+   The queue is a thin horizontal strip — each chip is ≤ 96px wide so
+   6–8 fit on a 720px viewport without horizontal scroll. */
 
 .queue-list {
   display: flex;
-  gap: 0.8rem;
+  gap: 0.5rem;
   overflow-x: auto;
-  padding: 0.4rem 0.2rem;
-  min-height: 152px;
+  padding: 0.3rem 0.15rem;
+  min-height: 88px;
+  align-items: center;
+  /* Visual hint that this is a drop zone for the dragged palette card
+     or for reordering an existing queue card. */
+  scroll-snap-type: x proximity;
 }
 
 .empty-queue {
-  min-height: 132px;
-  min-width: 280px;
+  min-height: 76px;
+  min-width: 240px;
   border: 3px dashed var(--ink-soft);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   display: grid;
   place-items: center;
-  padding: 1rem;
+  padding: 0.7rem 1rem;
   color: var(--ink-soft);
-  background: rgba(255, 241, 207, 0.6);
+  background: rgba(255, 241, 207, 0.5);
   font-weight: 800;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+/* End-of-strip drop slot hint (when dragging into empty area). */
+.queue-list[data-drop-side="end"]::after {
+  content: "";
+  display: block;
+  width: 4px;
+  align-self: stretch;
+  margin: 0.2rem;
+  background: var(--sun);
+  border-radius: 2px;
+  box-shadow: 0 0 0 2px rgba(255, 178, 74, 0.4);
+  flex: 0 0 auto;
 }
 
 /* ── Command stamps (palette + queue cards) ────────────────── */
 
 .queue-card,
 .palette-card {
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   border: var(--border-ink);
   color: var(--ink);
   box-shadow: var(--shadow-sticker);
 }
 
 .queue-card {
-  min-width: 240px;
-  padding: 0.95rem;
+  position: relative;
+  /* Compact icon-chip sizing — fits the reference game's strip layout. */
+  width: 76px;
+  min-width: 76px;
+  max-width: 96px;
+  height: 76px;
+  padding: 0.35rem 0.4rem;
   background: var(--parchment);
   display: grid;
-  gap: 0.7rem;
+  place-items: center;
+  gap: 0.2rem;
   transition: transform 0.18s ease, box-shadow 0.18s ease;
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  cursor: grab;
+}
+
+/* Loop chips are slightly wider — they carry both the repeat icon, the ×N
+   badge, and an inner body chip. Still icon-centered, just gets two rows. */
+.queue-card.queue-card-loop,
+.queue-card.queue-card-condition {
+  width: 96px;
+  max-width: 96px;
+  height: 92px;
+}
+
+.queue-card:active {
+  cursor: grabbing;
+}
+
+.queue-card.is-dragging {
+  opacity: 0.45;
+  transform: rotate(-2deg);
+}
+
+/* Drop indicator — a vertical bar on the side the dragged card would land. */
+.queue-card[data-drop-side="before"]::before,
+.queue-card[data-drop-side="after"]::after {
+  content: "";
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 4px;
+  background: var(--sun);
+  border-radius: 2px;
+  box-shadow: 0 0 0 2px rgba(255, 178, 74, 0.4);
+}
+
+.queue-card[data-drop-side="before"]::before {
+  left: -7px;
+}
+
+.queue-card[data-drop-side="after"]::after {
+  right: -7px;
 }
 
 .queue-card.is-active {
@@ -516,8 +660,49 @@ canvas {
 .queue-main {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.25rem;
+  width: 100%;
+  height: 100%;
+}
+
+.queue-main.queue-action .stamp-icon .icon-svg {
+  width: 2.3rem;
+  height: 2.3rem;
+}
+
+.queue-main.queue-loop {
+  flex-direction: row;
+  gap: 0.2rem;
+  height: auto;
+}
+
+.queue-main.queue-loop .stamp-icon .icon-svg {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.queue-main.queue-condition {
+  flex-direction: column;
+  gap: 0.15rem;
+  height: auto;
+}
+
+.queue-main.queue-condition .stamp-icon .icon-svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.cond-mini {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.cond-arrow {
+  font-weight: 800;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
 }
 
 .queue-kicker {
@@ -532,25 +717,107 @@ canvas {
   font-weight: 800;
 }
 
+/* Small × removal affordance — appears only on hover/focus so the chip stays
+   visually clean by default. Sits in the top-right corner of the card. */
+.queue-remove {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  background: var(--parchment);
+  color: var(--ink);
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  box-shadow: 0 2px 0 rgba(43, 29, 14, 0.25);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  pointer-events: none;
+}
+
+.queue-remove .icon-svg {
+  width: 12px;
+  height: 12px;
+  vertical-align: 0;
+}
+
+.queue-card:hover .queue-remove,
+.queue-card:focus-within .queue-remove,
+.queue-card:focus-visible .queue-remove {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.queue-remove:hover {
+  background: var(--coral);
+  color: #fff;
+}
+
+/* Small chip badge for the ×N repeat count. */
+.chip-badge {
+  min-height: 28px;
+  padding: 0.1rem 0.5rem;
+  background: var(--sun);
+  color: var(--ink);
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  font-family: var(--display-font);
+  font-size: 0.95rem;
+  font-weight: 800;
+  box-shadow: 0 2px 0 rgba(43, 29, 14, 0.25);
+}
+
+/* Inline chip with just an icon — used for loop body / condition slots. */
+.chip-icon-only {
+  min-height: 32px;
+  min-width: 32px;
+  padding: 0.15rem 0.35rem;
+  display: inline-grid;
+  place-items: center;
+}
+
+.chip-icon-only .icon-svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
 .palette-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(116px, 1fr));
-  gap: 0.7rem;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(64px, 80px);
+  gap: 0.45rem;
+  overflow-x: auto;
+  padding: 0.2rem;
+  align-items: stretch;
+  scroll-snap-type: x proximity;
 }
 
 .palette-card {
   text-align: center;
-  padding: 0.8rem 0.6rem;
+  padding: 0.4rem 0.3rem;
   display: grid;
-  gap: 0.3rem;
+  place-items: center;
+  gap: 0.1rem;
   background: var(--parchment);
-  min-height: 96px;
+  min-height: 64px;
+  height: 72px;
+  width: 100%;
   transition: transform 0.08s ease;
+  scroll-snap-align: start;
 }
 
 .palette-card .stamp-icon {
-  font-size: 2rem;
+  font-size: 1.6rem;
   line-height: 1;
+}
+
+.palette-card .stamp-icon .icon-svg {
+  width: 1.9rem;
+  height: 1.9rem;
 }
 
 /* ── Inline Twemoji SVG icons ──────────────────────────────────
@@ -608,8 +875,18 @@ canvas {
 }
 
 .palette-card strong {
-  font-family: var(--display-font);
-  font-size: 1.05rem;
+  /* Hide the verbose label under the icon — palette chips are icon-only now
+     to match the reference game's bottom strip. Visually-hidden so screen
+     readers still get the label. */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .palette-card span:not(.stamp-icon) {
@@ -638,35 +915,58 @@ canvas {
 .accent-sunset { background: #ffd1a8; }
 .accent-storm { background: #cfddf0; }
 
-/* ── Loop body row (Repeat block inner sequence) ───────────── */
+/* ── Loop body row (Repeat block inner sequence) ───────────────
+   Lives inside the compact loop queue chip. Single short row of icon-
+   only sub-chips with a tiny `+` to add and an even tinier `×` on each
+   sub-chip's hover/focus to remove. */
 
 .loop-body-row {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.2rem;
+  flex-wrap: nowrap;
 }
 
 .loop-body-chip {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 0.2rem;
 }
 
 .chip-mini {
-  min-height: 36px;
-  min-width: 36px;
-  padding: 0 0.45rem;
+  min-height: 18px;
+  min-width: 18px;
+  padding: 0 2px;
   background: var(--parchment);
   color: var(--ink);
-  border: var(--border-ink);
+  border: 1.5px solid var(--ink);
   border-radius: 999px;
-  box-shadow: 0 2px 0 rgba(43, 29, 14, 0.25);
+  box-shadow: 0 1px 0 rgba(43, 29, 14, 0.2);
   font-weight: 800;
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.chip-mini .icon-svg {
+  width: 10px;
+  height: 10px;
+  vertical-align: 0;
+}
+
+.loop-body-chip:hover .chip-mini,
+.queue-card:focus-within .chip-mini {
+  opacity: 1;
 }
 
 .chip-add {
-  min-width: 56px;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0 0.3rem;
+  font-size: 0.95rem;
 }
 
 /* ── Condition picker popover (2x2) ────────────────────────── */
@@ -936,14 +1236,9 @@ canvas {
     top: 11rem;
   }
 
-  .dock-head,
   .top-strip {
     flex-direction: column;
     align-items: flex-start;
-  }
-
-  .command-dock {
-    padding-bottom: max(1rem, env(safe-area-inset-bottom));
   }
 }
 
@@ -951,7 +1246,6 @@ canvas {
   .poster-copy,
   .map-docket,
   .objective-chip,
-  .command-dock,
   .hint-banner,
   .drawer-host {
     width: calc(100vw - 2rem);
@@ -979,12 +1273,10 @@ canvas {
     right: auto;
     left: 1rem;
     top: auto;
-    bottom: 35.5rem;
+    bottom: auto;
+    /* Sit just below the status strip — the dock owns the bottom now. */
+    top: 15rem;
     grid-auto-flow: column;
-  }
-
-  .command-dock {
-    bottom: 0.75rem;
   }
 }
 

@@ -57,7 +57,25 @@ export class MissionScene extends Phaser.Scene {
 
   private goalPulseTween?: Phaser.Tweens.Tween;
 
+  private goalBaseScale = 1;
+
   private shipBobTween?: Phaser.Tweens.Tween;
+
+  private shipBaseY = 0;
+
+  private waveOffset = { value: 0 };
+
+  /** Tracks transient FX nodes (wake droplets, sparkles, splash rings) so
+   * `renderBoard` can wipe them between missions without leaking GameObjects. */
+  private effectsLayer?: Phaser.GameObjects.Container;
+
+  /** Count of wake particles currently alive — tests + cleanup helpers read
+   * this to confirm the effects layer is reset between mission renders. */
+  private wakeParticleCount = 0;
+
+  /** Total sparkle bursts spawned this lifetime of the scene. Tests assert
+   * `popTreasure` adds at least one burst to the board. */
+  private sparkleBurstCount = 0;
 
   private tileSprites = new Map<string, TileSprite>();
 
@@ -73,6 +91,7 @@ export class MissionScene extends Phaser.Scene {
 
   create(): void {
     this.boardLayer = this.add.container(0, 0);
+    this.effectsLayer = this.add.container(0, 0);
     this.predictLayer = this.add.container(0, 0).setVisible(false);
     this.statusText = this.add
       .text(this.scale.width / 2, 220, "", {
@@ -124,8 +143,16 @@ export class MissionScene extends Phaser.Scene {
       }
 
       if (state.missionPhase === "running" && state.lastRun) {
+        this.stopShipBob();
+        this.stopGoalPulse();
         const playbackToken = ++this.activePlaybackToken;
         this.playRun(mission, state.lastRun.steps, playbackToken);
+      } else if (state.missionPhase === "planning" || state.missionPhase === "predicting") {
+        // Idle phases — gentle bob + goal pulse so the ship feels alive at sea
+        // and the destination keeps inviting the player. Both honor reduced
+        // motion (no infinite tweens spawned when the player opted out).
+        this.startShipBob();
+        this.startGoalPulse();
       }
     });
   }
@@ -222,8 +249,11 @@ export class MissionScene extends Phaser.Scene {
     this.tweens.killAll();
     this.goalPulseTween = undefined;
     this.shipBobTween = undefined;
+    this.waveOffset.value = 0;
 
     this.boardLayer?.removeAll(true);
+    this.effectsLayer?.removeAll(true);
+    this.wakeParticleCount = 0;
     this.tileSprites.clear();
     this.shipSprite = undefined;
     this.goalSprite = undefined;
@@ -236,6 +266,48 @@ export class MissionScene extends Phaser.Scene {
     water.fillGradientStyle(uiColors.sky, uiColors.sun, uiColors.sea, uiColors.seaDeep, 1);
     water.fillRect(0, 0, this.scale.width, this.scale.height);
     this.boardLayer?.add(water);
+
+    // Animated wave shimmer behind the board — soft horizontal foam bands that
+    // scroll slowly so the playfield reads as actual ocean. Drawn into its own
+    // Graphics so the per-frame redraw doesn't churn the rest of the board.
+    const boardWidth = mission.width * tileSize;
+    const boardHeight = mission.height * tileSize;
+    const waves = this.add.graphics();
+    waves.setAlpha(0.55);
+    this.boardLayer?.add(waves);
+    const drawWaves = () => {
+      waves.clear();
+      const bands = 6;
+      for (let i = 0; i < bands; i += 1) {
+        const t = i / bands;
+        const y = offsetY + boardHeight * t;
+        const amplitude = 6 + 4 * Math.sin(this.waveOffset.value * 0.8 + i);
+        const phase = this.waveOffset.value + i * 1.3;
+        waves.fillStyle(i % 2 === 0 ? uiColors.foam : uiColors.white, 0.18);
+        // Two-segment sinusoidal band approximated with overlapping ellipses —
+        // cheap, scales with screen, no per-frame string parsing.
+        const segments = 14;
+        for (let s = 0; s <= segments; s += 1) {
+          const sx = offsetX - 40 + (boardWidth + 80) * (s / segments);
+          const sy = y + Math.sin(phase + s * 0.9) * amplitude;
+          waves.fillEllipse(sx, sy, 70, 10);
+        }
+      }
+    };
+    drawWaves();
+    const reducedMotion = gameStore.getState().profile.settings.reducedMotion;
+    if (!reducedMotion) {
+      // Tween isn't stored — it's killed implicitly by `tweens.killAll()` in
+      // the next `renderBoard`, and its target (`this.waveOffset`) persists.
+      this.tweens.add({
+        targets: this.waveOffset,
+        value: Math.PI * 2,
+        duration: 6400,
+        ease: "Linear",
+        repeat: -1,
+        onUpdate: drawWaves,
+      });
+    }
 
     const grid = this.add.graphics();
     for (let y = 0; y < mission.height; y += 1) {
@@ -488,6 +560,7 @@ export class MissionScene extends Phaser.Scene {
         },
       });
       this.floatBerryGain(sprite.image.x, sprite.image.y);
+      this.spawnSparkleBurst(sprite.image.x, sprite.image.y);
     });
   }
 
@@ -517,7 +590,13 @@ export class MissionScene extends Phaser.Scene {
     if (!this.goalSprite || this.goalPulseTween) {
       return;
     }
+    if (gameStore.getState().profile.settings.reducedMotion) {
+      // Reduced-motion mode never spawns infinite cosmetic tweens — the goal
+      // sprite is still legible without the pulse.
+      return;
+    }
     const baseScale = this.goalSprite.scale;
+    this.goalBaseScale = baseScale;
     this.goalPulseTween = this.tweens.add({
       targets: this.goalSprite,
       scale: baseScale * 1.15,
@@ -528,19 +607,195 @@ export class MissionScene extends Phaser.Scene {
     });
   }
 
+  private stopGoalPulse(): void {
+    if (this.goalPulseTween) {
+      this.goalPulseTween.stop();
+      this.goalPulseTween = undefined;
+    }
+    if (this.goalSprite && this.goalBaseScale > 0) {
+      this.goalSprite.setScale(this.goalBaseScale);
+    }
+  }
+
   private startShipBob(): void {
     if (!this.shipSprite || this.shipBobTween) {
       return;
     }
+    if (gameStore.getState().profile.settings.reducedMotion) {
+      return;
+    }
     const baseY = this.shipSprite.y;
+    this.shipBaseY = baseY;
     this.shipBobTween = this.tweens.add({
       targets: this.shipSprite,
-      y: baseY - 6,
-      duration: 600,
+      y: baseY - 3,
+      duration: 800,
       ease: "Sine.easeInOut",
       yoyo: true,
       repeat: -1,
     });
+  }
+
+  private stopShipBob(): void {
+    if (this.shipBobTween) {
+      this.shipBobTween.stop();
+      this.shipBobTween = undefined;
+    }
+    // Restore base Y so any subsequent move-tween starts from the snapped cell
+    // center, not a bob offset.
+    if (this.shipSprite) {
+      this.shipSprite.setY(this.shipBaseY);
+    }
+  }
+
+  /**
+   * Drop a fading water-foam ellipse behind the ship's prior tile to suggest
+   * a wake trail. Used by every `move-*` action. Counts toward
+   * `wakeParticleCount`; the count resets on `renderBoard`.
+   */
+  private spawnWakeTrail(mission: MissionDefinition, from: Position): void {
+    if (!this.effectsLayer) {
+      return;
+    }
+    const reduced = gameStore.getState().profile.settings.reducedMotion;
+    const count = reduced ? 1 : 3;
+    const { x: cx, y: cy } = this.worldXY(mission, from);
+    const { tileSize } = this.boardMetrics(mission);
+    for (let i = 0; i < count; i += 1) {
+      const drop = this.add.graphics();
+      const jitterX = (Math.random() - 0.5) * tileSize * 0.4;
+      const jitterY = (Math.random() - 0.5) * tileSize * 0.4;
+      drop.fillStyle(uiColors.foam, 0.85);
+      drop.fillEllipse(0, 0, 18, 10);
+      drop.fillStyle(uiColors.white, 0.6);
+      drop.fillEllipse(0, -2, 10, 5);
+      drop.setPosition(cx + jitterX, cy + jitterY);
+      this.effectsLayer.add(drop);
+      this.wakeParticleCount += 1;
+      this.tweens.add({
+        targets: drop,
+        alpha: 0,
+        scale: 1.6,
+        duration: reduced ? 220 : 800,
+        ease: "Sine.easeOut",
+        delay: i * 90,
+        onComplete: () => {
+          drop.destroy();
+          this.wakeParticleCount = Math.max(0, this.wakeParticleCount - 1);
+        },
+      });
+    }
+  }
+
+  /**
+   * Quick fading splash beneath the ship's prior tile when it moves off it.
+   * Distinct from wake: a single round burst rather than a trail.
+   */
+  private spawnMoveSplash(mission: MissionDefinition, at: Position): void {
+    if (!this.effectsLayer) {
+      return;
+    }
+    const reduced = gameStore.getState().profile.settings.reducedMotion;
+    const { x: cx, y: cy } = this.worldXY(mission, at);
+    // Draw the circle at (0,0) and position the Graphics object at (cx,cy) so
+    // scale tweens grow from the splash center, not toward (0,0).
+    const ring = this.add.graphics();
+    ring.lineStyle(3, uiColors.white, 0.7);
+    ring.strokeCircle(0, 0, 14);
+    ring.setPosition(cx, cy);
+    this.effectsLayer.add(ring);
+    this.tweens.add({
+      targets: ring,
+      alpha: 0,
+      scale: reduced ? 1.4 : 2.2,
+      duration: reduced ? 220 : 520,
+      ease: "Sine.easeOut",
+      onComplete: () => ring.destroy(),
+    });
+  }
+
+  /**
+   * Sparkle burst — 6 tiny ✨ glyphs radiating outward from a tile, fading
+   * over 500ms. Layered on top of the existing `popTreasure` scale animation.
+   */
+  private spawnSparkleBurst(x: number, y: number): void {
+    if (!this.effectsLayer) {
+      return;
+    }
+    const reduced = gameStore.getState().profile.settings.reducedMotion;
+    this.sparkleBurstCount += 1;
+    const sparkleCount = reduced ? 0 : 6;
+    if (sparkleCount === 0) {
+      return;
+    }
+    for (let i = 0; i < sparkleCount; i += 1) {
+      const angle = (Math.PI * 2 * i) / sparkleCount;
+      const distance = 36;
+      const sparkle = this.add
+        .text(x, y, "✨", {
+          fontFamily: "Nunito, sans-serif",
+          fontSize: "20px",
+        })
+        .setOrigin(0.5)
+        .setDepth(55);
+      this.effectsLayer.add(sparkle);
+      this.tweens.add({
+        targets: sparkle,
+        x: x + Math.cos(angle) * distance,
+        y: y + Math.sin(angle) * distance,
+        alpha: 0,
+        scale: 1.4,
+        duration: 500,
+        ease: "Sine.easeOut",
+        onComplete: () => sparkle.destroy(),
+      });
+    }
+  }
+
+  /**
+   * Expanding white ring + two splash droplets when fire hits an enemy.
+   * The ring grows from 0→80px radius with alpha 1→0; the droplets hop
+   * above the tile then fade.
+   */
+  private spawnEnemySplash(mission: MissionDefinition, at: Position): void {
+    if (!this.effectsLayer) {
+      return;
+    }
+    const reduced = gameStore.getState().profile.settings.reducedMotion;
+    const { x: cx, y: cy } = this.worldXY(mission, at);
+    const ring = this.add.graphics();
+    ring.lineStyle(4, uiColors.white, 1);
+    ring.strokeCircle(0, 0, 4);
+    ring.setPosition(cx, cy);
+    this.effectsLayer.add(ring);
+    this.tweens.add({
+      targets: ring,
+      scale: reduced ? 4 : 20,
+      alpha: 0,
+      duration: reduced ? 240 : 520,
+      ease: "Sine.easeOut",
+      onComplete: () => ring.destroy(),
+    });
+    if (reduced) {
+      return;
+    }
+    for (let i = 0; i < 2; i += 1) {
+      const direction = i === 0 ? -1 : 1;
+      const drop = this.add.graphics();
+      drop.fillStyle(uiColors.foam, 0.95);
+      drop.fillCircle(0, 0, 5);
+      drop.setPosition(cx, cy);
+      this.effectsLayer.add(drop);
+      this.tweens.add({
+        targets: drop,
+        x: cx + direction * 26,
+        y: cy - 32,
+        alpha: 0,
+        duration: 460,
+        ease: "Sine.easeOut",
+        onComplete: () => drop.destroy(),
+      });
+    }
   }
 
   private async playStep(
@@ -572,6 +827,8 @@ export class MissionScene extends Phaser.Scene {
 
     if (primary?.kind === "move") {
       this.fireSfxFor("sail");
+      this.spawnWakeTrail(mission, prevShip.position);
+      this.spawnMoveSplash(mission, prevShip.position);
       tasks.push(this.tweenShipTo(mission, step.ship.position, durations.move));
     } else if (primary?.kind === "dodge") {
       this.fireSfxFor("dodge");
@@ -594,6 +851,11 @@ export class MissionScene extends Phaser.Scene {
       }
       const removedEnemyId = this.findRemovedTileId(prev, step, "enemy");
       if (removedEnemyId) {
+        // Locate the enemy tile we're about to fade and burst a splash ring on it.
+        const enemyTile = (prev?.tiles ?? []).find((t) => t.id === removedEnemyId);
+        if (enemyTile) {
+          this.spawnEnemySplash(mission, enemyTile.position);
+        }
         tasks.push(this.fadeTileOut(removedEnemyId, durations.tile));
       }
     } else if (primary?.kind === "collect") {
@@ -634,6 +896,8 @@ export class MissionScene extends Phaser.Scene {
         prevShip.position.y !== step.ship.position.y
       ) {
         this.fireSfxFor("sail");
+        this.spawnWakeTrail(mission, prevShip.position);
+        this.spawnMoveSplash(mission, prevShip.position);
         tasks.push(this.tweenShipTo(mission, step.ship.position, durations.move));
       }
     }
@@ -744,6 +1008,8 @@ export class MissionScene extends Phaser.Scene {
     this.unsubscribe?.();
     this.unsubscribe = undefined;
     this.predictLayer?.removeAll(true);
+    this.effectsLayer?.removeAll(true);
+    this.wakeParticleCount = 0;
     this.renderedPhase = null;
   }
 }

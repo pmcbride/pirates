@@ -1826,15 +1826,31 @@ export class Hud {
         const command = commands.find((c) => c.instanceId === op.key);
         if (!command) continue;
         let entry = m.queueNodes.get(op.key);
+        let isNewlyCreated = false;
         if (!entry) {
           const node = createQueueCardElement(command, isRunning);
           entry = { node, fingerprint: commandFingerprint(command, isRunning) };
           m.queueNodes.set(op.key, entry);
+          isNewlyCreated = true;
         }
         const before = op.beforeKey
           ? (m.queueNodes.get(op.beforeKey)?.node ?? null)
           : null;
         list.insertBefore(entry.node, before);
+        if (isNewlyCreated) {
+          // Trigger the drop-in animation. Drop the class once the animation
+          // finishes (or after a fallback timeout) so it can re-fire if the
+          // same instance is ever re-inserted (which today never happens —
+          // instance IDs are stable — but we want to be safe).
+          const node = entry.node;
+          node.classList.add("is-just-dropped");
+          const clear = () => {
+            node.classList.remove("is-just-dropped");
+            node.removeEventListener("animationend", clear);
+          };
+          node.addEventListener("animationend", clear);
+          window.setTimeout(clear, 400);
+        }
       }
     }
 

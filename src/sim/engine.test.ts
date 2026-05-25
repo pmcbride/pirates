@@ -340,6 +340,100 @@ describe("mission runner", () => {
     expect(result.finalState.ship.position).toEqual(mission.start.position);
   });
 
+  it("clears the harbor-bend turn-rehab mission with its sample queue", () => {
+    const profile = {
+      ...defaultProfile(),
+      commandUnlocks: ["sail", "collect", "turn-left", "turn-right"],
+    };
+    const mission = missions["harbor-bend"];
+
+    // The palette must include both turn blocks — that's the lesson.
+    expect(mission.palette).toContain("turn-left");
+    expect(mission.palette).toContain("turn-right");
+    expect(
+      mission.suggestedQueue.some((command) => command.action === "turn-left"),
+    ).toBe(true);
+    expect(
+      mission.suggestedQueue.some((command) => command.action === "turn-right"),
+    ).toBe(true);
+
+    const result = runMission(
+      mission,
+      cloneQueuedCommands(mission.suggestedQueue),
+      profile,
+      originalTheme,
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.reward?.berries).toBe(120);
+    // Ship lands at the docking buoy at (4, 0).
+    expect(result.finalState.ship.position).toEqual({ x: 4, y: 0 });
+  });
+
+  it("emits a warning beat when fire has no target, but still succeeds", () => {
+    const profile = {
+      ...defaultProfile(),
+      commandUnlocks: ["sail", "fire", "collect"],
+    };
+    const mission = missions["tutorial-cove"];
+
+    // Slot a Fire at the very start. There's no enemy in tutorial-cove, so this
+    // is the silent-failure case the warning beat fixes.
+    const queue: PlannedCommand[] = [
+      { instanceId: "warn-fire", templateId: "fire", type: "action", action: "fire" },
+      ...cloneQueuedCommands(mission.suggestedQueue),
+    ];
+
+    const result = runMission(mission, queue, profile, originalTheme);
+
+    expect(result.success).toBe(true);
+    const warnStep = result.steps.find((step) => step.commandId === "warn-fire");
+    expect(warnStep).toBeDefined();
+    expect(warnStep?.status).toBe("warning");
+    expect(warnStep?.message).toContain("Nothing to fire");
+  });
+
+  it("emits a warning beat when collect has no target, but still succeeds", () => {
+    const profile = defaultProfile();
+    const mission = missions["tutorial-cove"];
+
+    // Add an extra Collect at the very start where there's no treasure.
+    const queue: PlannedCommand[] = [
+      { instanceId: "warn-collect", templateId: "collect", type: "action", action: "collect" },
+      ...cloneQueuedCommands(mission.suggestedQueue),
+    ];
+
+    const result = runMission(mission, queue, profile, originalTheme);
+
+    expect(result.success).toBe(true);
+    const warnStep = result.steps.find((step) => step.commandId === "warn-collect");
+    expect(warnStep).toBeDefined();
+    expect(warnStep?.status).toBe("warning");
+    expect(warnStep?.message).toContain("Nothing to collect");
+  });
+
+  it("emits a warning beat when talk finds no crew, but still succeeds", () => {
+    const profile = {
+      ...defaultProfile(),
+      commandUnlocks: ["sail", "talk", "collect"],
+    };
+    const mission = missions["tutorial-cove"];
+
+    // Slot a Talk at the very start. No crew tile anywhere in tutorial-cove.
+    const queue: PlannedCommand[] = [
+      { instanceId: "warn-talk", templateId: "talk", type: "action", action: "talk" },
+      ...cloneQueuedCommands(mission.suggestedQueue),
+    ];
+
+    const result = runMission(mission, queue, profile, originalTheme);
+
+    expect(result.success).toBe(true);
+    const warnStep = result.steps.find((step) => step.commandId === "warn-talk");
+    expect(warnStep).toBeDefined();
+    expect(warnStep?.status).toBe("warning");
+    expect(warnStep?.message).toContain("Nobody here to talk to");
+  });
+
   it("preserves engine determinism across themes (same queue, different copy)", () => {
     const profile = defaultProfile();
     const mission = missions["tutorial-cove"];

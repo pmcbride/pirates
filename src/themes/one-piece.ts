@@ -64,6 +64,19 @@ export const onePieceTheme: Theme = {
         short: "Collect, Fire, Dodge, then dock.",
       },
     },
+    "harbor-bend": {
+      label: "Loguetown Bend",
+      sea: "East Blue",
+      briefing:
+        "The chest sits up the bay, off the straight lane. Turn the Going Merry before you sail to reach it.",
+      tutorial: "Sail, Sail, Turn Left, Sail, Collect, Turn Right, Sail, Sail.",
+      preview: "Bend the route — turn the ship to grab the chest.",
+      objective: {
+        primary:
+          "Turn the ship to reach the side chest, then dock at the far buoy.",
+        short: "Turn Left, Collect, Turn Right, then dock.",
+      },
+    },
     "sandbox-isle": {
       label: "Free Play Isle",
       sea: "Open Ocean",
@@ -126,6 +139,9 @@ export const onePieceTheme: Theme = {
       "barrel-chest": "Bay Chest",
       "barrel-enemy": "Marine",
       "barrel-reef": "Reef",
+    },
+    "harbor-bend": {
+      "bend-chest": "Bay Chest",
     },
     "sandbox-isle": {
       "sandbox-chest-1": "Play Chest",

@@ -225,7 +225,16 @@ export interface RunStep {
   ship: MissionState["ship"];
   tiles: MissionTile[];
   message: string;
-  status: "running" | "success" | "failed";
+  /**
+   * Per-step status:
+   * - "running": a normal effective beat (sail glides, fire splashes a foe, collect grabs treasure).
+   * - "warning": the move ran but had no effect (fire with no enemy, collect with no treasure,
+   *   talk with no crew). The mission still succeeds, but playback dwells longer and the HUD
+   *   gives a visible "💨 nothing here" cue so young players notice the wasted move.
+   * - "success": the final beat of a winning run.
+   * - "failed": the engine stopped the run; a hint follows.
+   */
+  status: "running" | "warning" | "success" | "failed";
   events: RunEvent[];
 }
 

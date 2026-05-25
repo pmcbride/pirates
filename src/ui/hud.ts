@@ -1220,7 +1220,9 @@ export class Hud {
       if (m.activeIndex >= 0 && m.activeIndex < commands.length) {
         const prevKey = commands[m.activeIndex]?.instanceId;
         if (prevKey) {
-          m.queueNodes.get(prevKey)?.node.classList.remove("is-active");
+          const prevNode = m.queueNodes.get(prevKey)?.node;
+          prevNode?.classList.remove("is-active");
+          prevNode?.classList.remove("is-warning");
         }
       }
       if (nextActive >= 0) {
@@ -1236,6 +1238,22 @@ export class Hud {
       const key = commands[nextActive]?.instanceId;
       if (key) {
         m.queueNodes.get(key)?.node.classList.add("is-active");
+      }
+    }
+
+    // Warning beat — toggle a yellow tint on the active card so the player
+    // sees that the move just played did nothing. Tied to the *currently
+    // playing* RunStep status, not the command itself.
+    if (nextActive >= 0) {
+      const key = commands[nextActive]?.instanceId;
+      const node = key ? m.queueNodes.get(key)?.node : undefined;
+      if (node) {
+        const currentStep = state.lastRun?.steps[state.playbackIndex];
+        if (currentStep?.status === "warning") {
+          node.classList.add("is-warning");
+        } else {
+          node.classList.remove("is-warning");
+        }
       }
     }
   }

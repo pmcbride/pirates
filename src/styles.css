@@ -459,6 +459,26 @@ canvas {
     0 0 24px 6px rgba(255, 178, 74, 0.75);
 }
 
+/* Warning beat — the move ran but had no effect (fire with no enemy, collect
+ * with no treasure, talk with no crew). Yellow tint + gentle wobble so a 5-7
+ * year old player notices the wasted move instead of reading it as success. */
+.queue-card.is-warning {
+  background: #fff4c2;
+  box-shadow:
+    var(--shadow-sticker),
+    0 0 0 4px #ffd34d,
+    0 0 24px 6px rgba(255, 211, 77, 0.65);
+  animation: queue-warning-wobble 380ms ease-in-out;
+}
+
+@keyframes queue-warning-wobble {
+  0% { transform: translateY(-3px) rotate(0deg); }
+  25% { transform: translateY(-3px) rotate(-1.5deg); }
+  50% { transform: translateY(-3px) rotate(1.5deg); }
+  75% { transform: translateY(-3px) rotate(-0.8deg); }
+  100% { transform: translateY(-3px) rotate(0deg); }
+}
+
 .queue-main {
   display: flex;
   align-items: center;

@@ -1,0 +1,12 @@
+[Sea of Codes art generation log]
+timestamp: 2026-05-25T08:16:25.056Z
+model: gpt-image-1
+requested_size: 1024x1024
+requested_quality: high
+output: art/generated/ship-v1.png
+bytes: 1686694
+elapsed_ms: 36959
+meta: {"model":"gpt-image-1","size":"1024x1024","quality":"high","created":1779696984}
+
+--- PROMPT ---
+Top-down 2D game sprite of a small wooden pirate sailing ship, painted in a warm storybook cartoon style with cream sails, a tiny red Jolly Roger flag, and a curled stern. Centered on a fully transparent background. Soft 8px offset sticker drop shadow. Single ship, no crew, no water, no UI, no text. Clean ink outlines, flat shading with subtle painted texture. Designed for a children's coding game; must read clearly at 96 by 128 pixels. Warm sunset palette: coral red flag (#ff6b5c), cream sails (#fff1cf), warm tan hull (#c08458), dark ink outline (#2b1d0e).

@@ -1,0 +1,20 @@
+Source asset: "ship (10).png" from the Kenney Pirate Pack (190+).
+
+Author:   Kenney Vleugels (Kenney.nl)
+Source:   https://opengameart.org/content/pirate-pack-190
+Mirror:   https://kenney.nl/assets/pirate-pack
+Download: https://opengameart.org/sites/default/files/kenney_piratepack.zip
+License:  CC0 1.0 Universal (Public Domain Dedication)
+          https://creativecommons.org/publicdomain/zero/1.0/
+
+Attribution to Kenney is appreciated but not required by the license. The
+asset is fully free for commercial and non-commercial use, modification, and
+redistribution with no restrictions.
+
+Verified on 2026-05-25. The original archive ships a `License.txt` at its
+root; a verbatim copy lives in this repo at
+`art/stock/KENNEY_PIRATE_PACK_LICENSE.txt`.
+
+This sprite is a true top-down view of a pirate galleon with a square sail
+bearing the Jolly Roger — selected because it reads cleanly at the ~96 px
+tile sizes used in Sea of Codes' MissionScene boards.

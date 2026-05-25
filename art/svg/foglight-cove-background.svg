@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Sea of Codes — hand-coded background for the tutorial-cove mission.
+  Wide ocean panel under the 6×3 grid. Warm sunrise palette, lighthouse on
+  the right cliff, low-tide rocks on the left. Composition is uniform in
+  the middle so the foreground tile sprites read clearly on top.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 512" width="1024" height="512">
+  <defs>
+    <!-- Sky cream → peach. -->
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffe9b8"/>
+      <stop offset="100%" stop-color="#ffd28c"/>
+    </linearGradient>
+    <!-- Sea pale → deep. -->
+    <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7fd3e6"/>
+      <stop offset="100%" stop-color="#4ec3df"/>
+    </linearGradient>
+    <!-- Sun glow. -->
+    <radialGradient id="sunGlow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0%" stop-color="#ffd779"/>
+      <stop offset="60%" stop-color="#ffb24a" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#ffb24a" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="waterPaint" patternUnits="userSpaceOnUse" width="80" height="40">
+      <rect width="80" height="40" fill="transparent"/>
+      <path d="M0 20 Q 20 12 40 20 T 80 20" fill="none" stroke="#1d6f9f" stroke-width="1.2" opacity="0.18"/>
+      <path d="M0 32 Q 20 24 40 32 T 80 32" fill="none" stroke="#1d6f9f" stroke-width="1.0" opacity="0.10"/>
+    </pattern>
+  </defs>
+
+  <!-- Sky band. -->
+  <rect x="0" y="0" width="1024" height="200" fill="url(#sky)"/>
+
+  <!-- Sun + glow on the horizon. -->
+  <circle cx="380" cy="180" r="180" fill="url(#sunGlow)"/>
+  <circle cx="380" cy="180" r="44" fill="#ffd779" stroke="#2b1d0e" stroke-width="2.5"/>
+
+  <!-- Distant cloud puffs. -->
+  <g fill="#fff1cf" opacity="0.85" stroke="#2b1d0e" stroke-width="1.6">
+    <path d="M120 60 q 20 -22 44 0 q 22 -10 30 6 q 10 14 -8 18 H 110 q -16 -6 10 -24 Z"/>
+    <path d="M740 40 q 18 -20 40 0 q 20 -8 28 6 q 8 12 -8 16 H 728 q -14 -6 12 -22 Z"/>
+  </g>
+
+  <!-- Sea band. -->
+  <rect x="0" y="200" width="1024" height="312" fill="url(#sea)"/>
+  <rect x="0" y="200" width="1024" height="312" fill="url(#waterPaint)"/>
+
+  <!-- Sun shimmer on water. -->
+  <g fill="#ffd779" opacity="0.5">
+    <ellipse cx="380" cy="220" rx="50" ry="6"/>
+    <ellipse cx="380" cy="240" rx="38" ry="4"/>
+    <ellipse cx="380" cy="260" rx="28" ry="3"/>
+  </g>
+
+  <!-- Right cliff with grass + lighthouse. -->
+  <path d="M 1024 200 L 1024 512 L 820 512 L 836 460 L 824 420 L 848 380 L 836 340 L 870 300 L 864 260 L 900 220 L 940 200 Z"
+        fill="#c08458" stroke="#2b1d0e" stroke-width="3" stroke-linejoin="round"/>
+  <!-- Grass cap on the cliff. -->
+  <path d="M 940 200 L 1024 200 L 1024 232 Q 980 240 940 232 Z"
+        fill="#7ec96b" stroke="#2b1d0e" stroke-width="2.4" stroke-linejoin="round"/>
+
+  <!-- Lighthouse. -->
+  <g transform="translate(960 130)">
+    <!-- Base. -->
+    <rect x="-22" y="40" width="44" height="14" fill="#c08458" stroke="#2b1d0e" stroke-width="2.4"/>
+    <!-- Tower (stripes). -->
+    <rect x="-18" y="-40" width="36" height="80" fill="#fff1cf" stroke="#2b1d0e" stroke-width="2.6"/>
+    <rect x="-18" y="-20" width="36" height="20" fill="#ff6b5c"/>
+    <rect x="-18" y="20" width="36" height="20" fill="#ff6b5c"/>
+    <line x1="-18" y1="-20" x2="18" y2="-20" stroke="#2b1d0e" stroke-width="2"/>
+    <line x1="-18" y1="0" x2="18" y2="0" stroke="#2b1d0e" stroke-width="2"/>
+    <line x1="-18" y1="20" x2="18" y2="20" stroke="#2b1d0e" stroke-width="2"/>
+    <!-- Lamp room. -->
+    <rect x="-14" y="-58" width="28" height="18" fill="#ffd779" stroke="#2b1d0e" stroke-width="2.4"/>
+    <!-- Roof. -->
+    <path d="M -20 -58 L 0 -78 L 20 -58 Z" fill="#ff6b5c" stroke="#2b1d0e" stroke-width="2.4" stroke-linejoin="round"/>
+    <circle cx="0" cy="-80" r="2.4" fill="#2b1d0e"/>
+  </g>
+
+  <!-- Low-tide rocks on the left. -->
+  <g stroke="#2b1d0e" stroke-width="2.4" stroke-linejoin="round">
+    <ellipse cx="40" cy="380" rx="64" ry="20" fill="#a08158"/>
+    <ellipse cx="120" cy="430" rx="46" ry="14" fill="#8f7148"/>
+    <ellipse cx="60" cy="460" rx="58" ry="16" fill="#a08158"/>
+    <ellipse cx="180" cy="390" rx="34" ry="11" fill="#a08158"/>
+    <ellipse cx="220" cy="470" rx="40" ry="12" fill="#8f7148"/>
+  </g>
+
+  <!-- Sand spit edge at the bottom-left. -->
+  <path d="M 0 470 Q 120 450 240 480 L 240 512 L 0 512 Z"
+        fill="#f7d78b" stroke="#2b1d0e" stroke-width="2.4" stroke-linejoin="round"/>
+
+  <!-- Painted-texture overlay (subtle, very faint dotted noise). -->
+  <g fill="#2b1d0e" opacity="0.04">
+    <circle cx="200" cy="80" r="1.2"/><circle cx="500" cy="60" r="1.2"/>
+    <circle cx="650" cy="120" r="1.2"/><circle cx="900" cy="160" r="1.2"/>
+    <circle cx="120" cy="300" r="1.2"/><circle cx="700" cy="280" r="1.2"/>
+    <circle cx="500" cy="350" r="1.2"/><circle cx="300" cy="430" r="1.2"/>
+    <circle cx="600" cy="450" r="1.2"/><circle cx="780" cy="380" r="1.2"/>
+  </g>
+</svg>

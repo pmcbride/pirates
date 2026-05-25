@@ -1,0 +1,12 @@
+[Sea of Codes art generation log]
+timestamp: 2026-05-25T08:17:25.022Z
+model: gpt-image-1
+requested_size: 1536x1024
+requested_quality: high
+output: art/generated/foglight-cove-v1.png
+bytes: 3223913
+elapsed_ms: 54606
+meta: {"model":"gpt-image-1","size":"1536x1024","quality":"high","created":1779697044}
+
+--- PROMPT ---
+Children's-book illustration of a calm pale-blue cove at sunrise, gentle ripples on the water, low-tide rocks scattered on the left edge, a small white-and-red striped lighthouse standing on a grassy cliff on the right, soft cream and peach sky with a pale yellow sun low on the horizon. Warm painterly cartoon style matching a pirate children's coding game. Top-down isometric perspective for use as a game-board background. No characters, no ships, no UI, no text, no logos. Composition is uniform and uncrowded so foreground tile icons read clearly on top. Palette: sea blue #4ec3df, deep sea #1d6f9f, sky cream #ffe9b8, sun #ffb24a, lighthouse red #ff6b5c, parchment cream #fff1cf, ink outline #2b1d0e.

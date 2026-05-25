@@ -205,6 +205,20 @@ export const missionNodes: MissionNode[] = [
     unlockMissionIds: ["windrise-cove"],
   },
   {
+    id: "harbor-bend",
+    missionId: "harbor-bend",
+    x: 47,
+    y: 50,
+    difficulty: "breeze",
+    rewards: {
+      berries: 120,
+      bounty: 1_000_000,
+      stars: 2,
+      unlockCommandIds: ["turn-left", "turn-right"],
+    },
+    unlockMissionIds: ["barrel-bay"],
+  },
+  {
     id: "current-crescent",
     missionId: "current-crescent",
     x: 51,
@@ -216,7 +230,7 @@ export const missionNodes: MissionNode[] = [
       stars: 2,
       unlockCommandIds: ["repeat"],
     },
-    unlockMissionIds: ["barrel-bay"],
+    unlockMissionIds: ["harbor-bend"],
   },
   {
     id: "coral-lookout",
@@ -443,6 +457,43 @@ export const missions: Record<string, MissionDefinition> = {
       makeCommand("barrel-6", "dodge", { action: "dodge" }),
       makeCommand("barrel-7", "sail", { action: "sail" }),
       makeCommand("barrel-8", "sail", { action: "sail" }),
+    ],
+  },
+  "harbor-bend": {
+    id: "harbor-bend",
+    nodeId: "harbor-bend",
+    width: 5,
+    height: 3,
+    start: {
+      position: { x: 0, y: 1 },
+      facing: "east",
+    },
+    goal: { x: 4, y: 0 },
+    palette: ["sail", "turn-left", "turn-right", "collect"],
+    requiredTileIds: ["bend-chest"],
+    reward: {
+      berries: 120,
+      bounty: 1_000_000,
+      stars: 2,
+      unlockCommandIds: ["turn-left", "turn-right"],
+    },
+    tiles: [
+      {
+        id: "bend-chest",
+        kind: "treasure",
+        position: { x: 2, y: 0 },
+        active: true,
+      },
+    ],
+    suggestedQueue: [
+      makeCommand("bend-1", "sail", { action: "sail" }),
+      makeCommand("bend-2", "sail", { action: "sail" }),
+      makeCommand("bend-3", "turn-left", { action: "turn-left" }),
+      makeCommand("bend-4", "sail", { action: "sail" }),
+      makeCommand("bend-5", "collect", { action: "collect" }),
+      makeCommand("bend-6", "turn-right", { action: "turn-right" }),
+      makeCommand("bend-7", "sail", { action: "sail" }),
+      makeCommand("bend-8", "sail", { action: "sail" }),
     ],
   },
   "current-crescent": {

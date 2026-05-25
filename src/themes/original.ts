@@ -63,6 +63,19 @@ export const originalTheme: Theme = {
         short: "Collect, Fire, Dodge, then dock.",
       },
     },
+    "harbor-bend": {
+      label: "Harbor Bend",
+      sea: "Eastern Reach",
+      briefing:
+        "The chest sits up the bay, off the straight lane. Turn the bow before you sail to reach it.",
+      tutorial: "Sail, Sail, Turn Left, Sail, Collect, Turn Right, Sail, Sail.",
+      preview: "Bend the route — turn the ship to grab the chest.",
+      objective: {
+        primary:
+          "Turn the ship to reach the side chest, then dock at the far buoy.",
+        short: "Turn Left, Collect, Turn Right, then dock.",
+      },
+    },
     "sandbox-isle": {
       label: "Free Play Isle",
       sea: "Open Ocean",
@@ -125,6 +138,9 @@ export const originalTheme: Theme = {
       "barrel-chest": "Bay Chest",
       "barrel-enemy": "Skiff",
       "barrel-reef": "Reef",
+    },
+    "harbor-bend": {
+      "bend-chest": "Bay Chest",
     },
     "sandbox-isle": {
       "sandbox-chest-1": "Play Chest",

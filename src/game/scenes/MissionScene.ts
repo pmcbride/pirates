@@ -719,6 +719,16 @@ export class MissionScene extends Phaser.Scene {
           this.time.delayedCall(reduced ? 240 : 500, () => resolve()),
         );
       }
+
+      // Warning beats (no-op fire/collect/talk) dwell longer so the player
+      // actually notices the wasted move and the "💨 nothing here" status text.
+      // Reduced-motion still gets a short dwell — we never *skip* informational
+      // beats, just shorten them.
+      if (step.status === "warning") {
+        await new Promise<void>((resolve) =>
+          this.time.delayedCall(reduced ? 220 : 480, () => resolve()),
+        );
+      }
       prev = step;
     }
 

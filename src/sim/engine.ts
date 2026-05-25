@@ -522,7 +522,9 @@ export const runMission = (
             },
           ]);
         } else {
-          pushStep(commandId, title, "The cannon splashes water, but no foe was there.", "running", [
+          // No enemy — the move ran but did nothing. Emit a "warning" beat so
+          // the player sees the wasted move instead of a cheerful no-op.
+          pushStep(commandId, title, "💨 Nothing to fire at — the cannon splashes empty water.", "warning", [
             { kind: "fire", text: "No enemy ahead." },
           ]);
         }
@@ -537,7 +539,8 @@ export const runMission = (
             { kind: "collect", text: "Collected treasure.", positions: [treasure.position] },
           ]);
         } else {
-          pushStep(commandId, title, "The crew checks the deck. No treasure here yet.", "running", [
+          // No treasure here — visible warning beat instead of silent success.
+          pushStep(commandId, title, "💨 Nothing to collect — the deck stays empty.", "warning", [
             { kind: "collect", text: "No treasure on this tile." },
           ]);
         }
@@ -551,7 +554,8 @@ export const runMission = (
             { kind: "talk", text: "Crew mate recruited.", positions: [crewTile.position] },
           ]);
         } else {
-          pushStep(commandId, title, "The crew says hello to the wind. Nobody is waiting here.", "running", [
+          // Nobody to talk to — visible warning beat.
+          pushStep(commandId, title, "💨 Nobody here to talk to — the crew waves at the wind.", "warning", [
             { kind: "talk", text: "No crew mate here." },
           ]);
         }

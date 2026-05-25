@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Sea of Codes — hand-coded top-down pirate ship sprite.
+  Matches the parchment/sticker visual language: warm sunset palette,
+  3px ink-black border, 8px offset sticker drop shadow (no blur).
+  Designed to read at ≥ 64px tall; viewBox is the full token size.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 128" width="96" height="128">
+  <defs>
+    <!-- Hard sticker shadow: solid coral, 8px down/right, no blur. -->
+    <filter id="stickerShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feOffset in="SourceAlpha" dx="3" dy="4" result="off"/>
+      <feFlood flood-color="#2b1d0e" flood-opacity="0.35"/>
+      <feComposite in2="off" operator="in" result="shadow"/>
+      <feMerge>
+        <feMergeNode in="shadow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- Subtle wood grain via repeating soft stripes. -->
+    <pattern id="hullGrain" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(15)">
+      <rect width="6" height="6" fill="#c08458"/>
+      <path d="M0 3 L6 3" stroke="#a06834" stroke-width="0.6" opacity="0.55"/>
+    </pattern>
+  </defs>
+
+  <g filter="url(#stickerShadow)">
+    <!-- Hull (rounded boat shape, top-down). -->
+    <path d="M 18 80
+             Q 12 70 20 60
+             L 76 60
+             Q 84 70 78 80
+             Q 48 100 18 80 Z"
+          fill="url(#hullGrain)" stroke="#2b1d0e" stroke-width="3" stroke-linejoin="round"/>
+
+    <!-- Deck inset (lighter wood plank ring). -->
+    <path d="M 26 76
+             Q 22 70 28 64
+             L 68 64
+             Q 74 70 70 76
+             Q 48 90 26 76 Z"
+          fill="#f4d6a4" stroke="#2b1d0e" stroke-width="2" stroke-linejoin="round"/>
+
+    <!-- Deck plank lines for top-down read. -->
+    <line x1="36" y1="66" x2="36" y2="82" stroke="#2b1d0e" stroke-width="1.2" opacity="0.45"/>
+    <line x1="48" y1="66" x2="48" y2="84" stroke="#2b1d0e" stroke-width="1.2" opacity="0.45"/>
+    <line x1="60" y1="66" x2="60" y2="82" stroke="#2b1d0e" stroke-width="1.2" opacity="0.45"/>
+
+    <!-- Main sail viewed from above: trapezoid extending forward (up). -->
+    <path d="M 30 26 L 66 26 L 60 64 L 36 64 Z"
+          fill="#fff1cf" stroke="#2b1d0e" stroke-width="2.5" stroke-linejoin="round"/>
+    <line x1="48" y1="26" x2="48" y2="64" stroke="#2b1d0e" stroke-width="1.2" opacity="0.5"/>
+    <!-- Cream highlight on sail (sunset rim light). -->
+    <path d="M 32 28 L 44 28 L 40 62 L 34 62 Z" fill="#ffe9b8" opacity="0.7"/>
+
+    <!-- Mast (circle = pole from above). -->
+    <circle cx="48" cy="64" r="3" fill="#2b1d0e"/>
+
+    <!-- Jolly Roger flag at the bow (top). -->
+    <path d="M 48 14 L 70 18 L 68 26 L 48 22 Z"
+          fill="#ff6b5c" stroke="#2b1d0e" stroke-width="2" stroke-linejoin="round"/>
+    <circle cx="58" cy="20" r="2.2" fill="#fff1cf"/>
+    <!-- tiny crossbones suggestion -->
+    <path d="M 55 22.5 L 61 17.5 M 61 22.5 L 55 17.5"
+          stroke="#fff1cf" stroke-width="0.9" stroke-linecap="round"/>
+
+    <!-- Stern curl detail at the bottom. -->
+    <path d="M 30 92 Q 48 104 66 92"
+          fill="none" stroke="#2b1d0e" stroke-width="2.2" stroke-linecap="round"/>
+    <path d="M 36 96 L 60 96"
+          stroke="#2b1d0e" stroke-width="1.4" stroke-linecap="round" opacity="0.55"/>
+
+    <!-- Bow rim highlight (cream, top edge). -->
+    <path d="M 22 62 Q 48 56 74 62"
+          fill="none" stroke="#fff1cf" stroke-width="1.4" stroke-linecap="round" opacity="0.85"/>
+  </g>
+</svg>

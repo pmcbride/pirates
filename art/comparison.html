@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sea of Codes — Phase B2 asset comparison</title>
+    <style>
+      :root {
+        --sea: #4ec3df;
+        --sea-deep: #1d6f9f;
+        --sky: #ffe9b8;
+        --sun: #ffb24a;
+        --parchment: #fff1cf;
+        --parchment-deep: #f1d99a;
+        --ink: #2b1d0e;
+        --coral: #ff6b5c;
+        --mint: #7be0a3;
+        --plum: #8e7ad8;
+        --bounty: #c4391c;
+      }
+      * { box-sizing: border-box; }
+      body {
+        font-family: "Nunito", "Trebuchet MS", system-ui, sans-serif;
+        margin: 0;
+        background: linear-gradient(180deg, var(--sky) 0%, #ffd28c 60%, var(--sun) 100%);
+        color: var(--ink);
+        padding: 32px;
+        line-height: 1.45;
+      }
+      header {
+        max-width: 1280px;
+        margin: 0 auto 24px;
+        text-align: center;
+      }
+      h1 {
+        font-family: "Fredoka", Georgia, serif;
+        font-weight: 800;
+        font-size: 42px;
+        margin: 0 0 8px;
+        letter-spacing: -0.5px;
+      }
+      header p { margin: 0; opacity: 0.85; max-width: 720px; margin-inline: auto; }
+      .container { max-width: 1280px; margin: 0 auto; }
+      .asset-section {
+        background: var(--parchment);
+        border: 3px solid var(--ink);
+        border-radius: 28px;
+        box-shadow: 8px 8px 0 var(--ink);
+        padding: 28px;
+        margin-bottom: 40px;
+      }
+      .asset-section h2 {
+        font-family: "Fredoka", Georgia, serif;
+        font-size: 28px;
+        margin: 0 0 4px;
+        color: var(--bounty);
+      }
+      .asset-section h2 .tag {
+        background: var(--ink);
+        color: var(--parchment);
+        font-size: 14px;
+        padding: 4px 10px;
+        border-radius: 12px;
+        vertical-align: middle;
+        margin-left: 10px;
+      }
+      .blurb { font-size: 14px; opacity: 0.85; margin: 0 0 20px; }
+      .options {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 18px;
+      }
+      .option {
+        background: #fff;
+        border: 3px solid var(--ink);
+        border-radius: 20px;
+        padding: 14px;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 4px 4px 0 var(--ink);
+      }
+      .option.recommended { background: #fff8d6; }
+      .option-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+      }
+      .source-tag {
+        font-size: 11px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        padding: 4px 10px;
+        border-radius: 10px;
+        border: 2px solid var(--ink);
+      }
+      .source-tag.ai    { background: var(--plum);     color: #fff; }
+      .source-tag.svg   { background: var(--mint);     color: var(--ink); }
+      .source-tag.stock { background: var(--sun);      color: var(--ink); }
+      .cost-tag {
+        font-size: 12px;
+        font-weight: 700;
+        background: var(--parchment-deep);
+        padding: 3px 8px;
+        border-radius: 8px;
+      }
+      .winner-badge {
+        display: inline-block;
+        background: var(--bounty);
+        color: #fff;
+        font-weight: 800;
+        padding: 3px 10px;
+        border-radius: 10px;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+        margin-bottom: 8px;
+      }
+      .image-frame {
+        background: var(--sea);
+        border: 2px dashed var(--ink);
+        border-radius: 14px;
+        padding: 12px;
+        min-height: 220px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 12px;
+      }
+      .image-frame.bg-frame { padding: 0; min-height: 180px; overflow: hidden; }
+      .image-frame img,
+      .image-frame svg { max-width: 100%; max-height: 240px; display: block; }
+      .image-frame.bg-frame img,
+      .image-frame.bg-frame svg { width: 100%; height: auto; max-height: 240px; object-fit: cover; }
+      .ship-grid {
+        display: flex;
+        gap: 12px;
+        align-items: end;
+      }
+      .ship-grid .small { width: 64px; }
+      .ship-grid .large { width: 128px; }
+      .ship-grid figcaption {
+        font-size: 11px;
+        text-align: center;
+        opacity: 0.7;
+        margin-top: 4px;
+      }
+      .option h3 { font-size: 16px; margin: 0 0 6px; }
+      .rationale { font-size: 13px; margin: 0 0 10px; }
+      .meta {
+        font-size: 11.5px;
+        opacity: 0.8;
+        border-top: 1px dashed var(--ink);
+        padding-top: 8px;
+        margin-top: auto;
+      }
+      .meta a { color: var(--bounty); }
+      .recommend-banner {
+        margin-top: 16px;
+        background: var(--ink);
+        color: var(--parchment);
+        padding: 14px 18px;
+        border-radius: 16px;
+        font-size: 14px;
+      }
+      .recommend-banner strong { color: var(--sun); }
+      footer {
+        max-width: 1280px;
+        margin: 24px auto 0;
+        text-align: center;
+        font-size: 12px;
+        opacity: 0.7;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Sea of Codes &mdash; Phase B2 art comparison</h1>
+      <p>
+        Three sources side-by-side per asset. Pick the winner you want shipped
+        into <code>MissionScene</code>; a follow-up PR wires it into the manifest.
+      </p>
+    </header>
+
+    <div class="container">
+
+      <!-- ASSET A: SHIP SPRITE -->
+      <section class="asset-section">
+        <h2>Asset A &mdash; Player ship sprite<span class="tag">~96 × 128 token</span></h2>
+        <p class="blurb">
+          Used as the Going Merry token in MissionScene. Must read at &ge; 64 px
+          tall on the tightest board. Currently a generic textured rect in
+          <code>src/game/assets/manifest.ts</code>.
+        </p>
+        <div class="options">
+
+          <div class="option">
+            <div class="option-header">
+              <span class="source-tag ai">AI (gpt-image-1)</span>
+              <span class="cost-tag">~$0.04</span>
+            </div>
+            <h3>Storybook sticker, oblique-top</h3>
+            <p class="rationale">
+              Charming sticker style with cream sails and a tiny Jolly Roger flag.
+              Crisp ink outline, matches the parchment HUD beautifully. <em>Caveat:</em>
+              the model gave us an oblique-top view (sails tilted forward) instead of
+              strict top-down — readable on the board but not "true" overhead.
+            </p>
+            <div class="image-frame">
+              <div class="ship-grid">
+                <figure><img class="large" src="ai/ship-sprite.png" alt="AI ship sprite at 128px" /><figcaption>128 px</figcaption></figure>
+                <figure><img class="small" src="ai/ship-sprite.png" alt="AI ship sprite at 64px" /><figcaption>64 px (in-game)</figcaption></figure>
+              </div>
+            </div>
+            <div class="meta">
+              gpt-image-1 · 1024×1024 · high · 1 attempt kept (1 discarded).
+              Prompt: <code>scripts/prompts/ship-sprite-prompts.md</code>.
+            </div>
+          </div>
+
+          <div class="option recommended">
+            <div class="option-header">
+              <span class="source-tag stock">Stock (CC0)</span>
+              <span class="cost-tag">$0.00</span>
+            </div>
+            <span class="winner-badge">Recommend</span>
+            <h3>Kenney pirate pack — ship (10)</h3>
+            <p class="rationale">
+              True top-down galleon with a square sail showing the Jolly Roger
+              crossbones. Vector-clean, scales perfectly down to 32 px and stays
+              legible. Drop-in ready, zero rework. The visual language is
+              flat-cartoon-with-outline, which sits a hair colder than our
+              warm-sticker AI option, but it's the most game-honest option.
+            </p>
+            <div class="image-frame">
+              <div class="ship-grid">
+                <figure><img class="large" src="stock/ship-sprite.png" alt="Stock ship at 128px" /><figcaption>128 px</figcaption></figure>
+                <figure><img class="small" src="stock/ship-sprite.png" alt="Stock ship at 64px" /><figcaption>64 px (in-game)</figcaption></figure>
+              </div>
+            </div>
+            <div class="meta">
+              Kenney pirate pack (190+) · CC0 1.0 · attribution appreciated, not required.<br />
+              <a href="https://opengameart.org/content/pirate-pack-190" target="_blank" rel="noopener">opengameart.org/content/pirate-pack-190</a>
+            </div>
+          </div>
+
+          <div class="option">
+            <div class="option-header">
+              <span class="source-tag svg">SVG (hand-coded)</span>
+              <span class="cost-tag">$0.00</span>
+            </div>
+            <h3>Inline SVG, palette-locked</h3>
+            <p class="rationale">
+              Authored against the design tokens directly: warm tan hull,
+              cream sails, coral flag, 3 px ink border, 8 px sticker drop
+              shadow. Infinitely scalable, recolorable from CSS, but the
+              top-down composition is geometric — it reads as "diagram of a
+              ship" more than "ship". Best if we ever want themed recolors.
+            </p>
+            <div class="image-frame">
+              <div class="ship-grid">
+                <figure><img class="large" src="svg/ship-sprite.svg" alt="SVG ship at 128px" /><figcaption>128 px</figcaption></figure>
+                <figure><img class="small" src="svg/ship-sprite.svg" alt="SVG ship at 64px" /><figcaption>64 px (in-game)</figcaption></figure>
+              </div>
+            </div>
+            <div class="meta">
+              <code>art/svg/ship-sprite.svg</code> · pure SVG, no deps, scales freely.
+            </div>
+          </div>
+
+        </div>
+        <div class="recommend-banner">
+          <strong>Recommend Stock (Kenney).</strong> True top-down read, CC0, scales
+          cleanly, drop-in. Use the AI version as a hero/menu artwork (it's
+          gorgeous) and keep SVG in reserve for future recolor needs.
+        </div>
+      </section>
+
+      <!-- ASSET B: COVE BACKGROUND -->
+      <section class="asset-section">
+        <h2>Asset B &mdash; Foglight Cove board background<span class="tag">~1024 × 512 wide</span></h2>
+        <p class="blurb">
+          Sits under the 6 × 3 grid in the <code>tutorial-cove</code> mission.
+          Should evoke "calm cove at sunrise" without competing with the foreground
+          tile sprites — composition needs a quiet middle band.
+        </p>
+        <div class="options">
+
+          <div class="option recommended">
+            <div class="option-header">
+              <span class="source-tag ai">AI (gpt-image-1)</span>
+              <span class="cost-tag">~$0.04</span>
+            </div>
+            <span class="winner-badge">Recommend</span>
+            <h3>Sunrise cove, painterly</h3>
+            <p class="rationale">
+              Hits the brief exactly: pale-blue cove, low-tide rocks on the left,
+              red-striped lighthouse on a grassy cliff on the right, warm cream sky,
+              empty quiet middle ideal for tiles. Palette matches our tokens.
+              The single "wow" candidate among the three.
+            </p>
+            <div class="image-frame bg-frame">
+              <img src="ai/foglight-cove-background.png" alt="AI cove background" />
+            </div>
+            <div class="meta">
+              gpt-image-1 · 1536×1024 · high · 1 attempt kept (1 discarded).
+              Prompt: <code>scripts/prompts/foglight-cove-background-prompts.md</code>.
+            </div>
+          </div>
+
+          <div class="option">
+            <div class="option-header">
+              <span class="source-tag stock">Stock (CC0)</span>
+              <span class="cost-tag">$0.00</span>
+            </div>
+            <h3>Kenney sample composition</h3>
+            <p class="rationale">
+              The composed sample scene that ships with the Kenney pirate pack —
+              islands, water, docks, all top-down and matched to the ship sprite.
+              <em>Caveat:</em> no lighthouse, so it doesn't specifically read as
+              "Foglight Cove" — we'd need to composite a lighthouse stamp on top
+              in MissionScene. Visual style is flatter than our warm-painterly target.
+            </p>
+            <div class="image-frame bg-frame">
+              <img src="stock/foglight-cove-background.png" alt="Stock cove background" />
+            </div>
+            <div class="meta">
+              Kenney pirate pack · CC0 1.0 · 918×515.<br />
+              <a href="https://opengameart.org/content/pirate-pack-190" target="_blank" rel="noopener">opengameart.org/content/pirate-pack-190</a>
+            </div>
+          </div>
+
+          <div class="option">
+            <div class="option-header">
+              <span class="source-tag svg">SVG (hand-coded)</span>
+              <span class="cost-tag">$0.00</span>
+            </div>
+            <h3>Token-perfect storybook</h3>
+            <p class="rationale">
+              Painted against the exact design tokens: gradient sky into sea, sun
+              + shimmer, striped lighthouse on the right cliff, rocks on the left.
+              Renders crisp at any board size and is trivially recolorable per sea.
+              Looks a touch flatter than the AI option — it's "good schematic," not
+              "wow illustration."
+            </p>
+            <div class="image-frame bg-frame">
+              <img src="svg/foglight-cove-background.svg" alt="SVG cove background" />
+            </div>
+            <div class="meta">
+              <code>art/svg/foglight-cove-background.svg</code> · scales to any board, ~3 KB.
+            </div>
+          </div>
+
+        </div>
+        <div class="recommend-banner">
+          <strong>Recommend AI.</strong> The painterly cove is the only option that
+          delivers the "Foglight Cove" identity (lighthouse + sunrise + named
+          atmosphere) without extra composition work. Stock is the safe fallback
+          if AI provenance is ever a concern; SVG is the right call if we plan to
+          theme each sea programmatically.
+        </div>
+      </section>
+
+    </div>
+    <footer>
+      Generated for review · pmcbride/pirates ·
+      <a href="https://github.com/pmcbride/pirates/pulls" target="_blank" rel="noopener">user picks winner per asset → follow-up PR wires chosen assets in.</a>
+    </footer>
+  </body>
+</html>

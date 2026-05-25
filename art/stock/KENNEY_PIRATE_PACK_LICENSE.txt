@@ -1,0 +1,26 @@
+Verbatim copy of the license file that ships inside the original archive
+(`kenney_piratepack.zip` → `License.txt`). Preserved here so the upstream
+license text travels with our committed copies of the assets, even though
+the upstream `License.txt` itself is not redistributed in the repo.
+
+================================================================================
+
+	Pirate pack
+
+	by  Kenney Vleugels (Kenney.nl)
+
+			------------------------------
+
+	License (Creative Commons Zero, CC0)
+	http://creativecommons.org/publicdomain/zero/1.0/
+
+	You may use these assets in personal and commercial projects.
+	Credit (Kenney or www.kenney.nl) would be nice but is not mandatory.
+
+			------------------------------
+
+	Donate:   http://support.kenney.nl
+	Request:  http://request.kenney.nl
+
+	Follow on Twitter for updates:
+	@KenneyNL

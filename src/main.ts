@@ -8,6 +8,21 @@ if (!app) {
   throw new Error("App root not found.");
 }
 
+// Dev-only crash visibility: uncaught exceptions inside Phaser's render loop
+// kill the game silently (black canvas). Surface them on a window array and
+// the console so headless previews and playtests can read what broke.
+if (import.meta.env.DEV) {
+  const errors: string[] = ((window as never as Record<string, unknown>).__socErrors = []);
+  window.addEventListener("error", (event) => {
+    errors.push(String(event.error?.stack ?? event.message).slice(0, 800));
+    console.error("[soc] uncaught:", event.error ?? event.message);
+  });
+  window.addEventListener("unhandledrejection", (event) => {
+    errors.push(String((event.reason as Error)?.stack ?? event.reason).slice(0, 800));
+    console.error("[soc] unhandled rejection:", event.reason);
+  });
+}
+
 // Pre-mount: resolve which captain is sailing BEFORE the GameStore singleton
 // initializes (it reads the active profile from localStorage at import time).
 // On first launch this shows the welcome/name screen; with one captain it's
@@ -46,7 +61,6 @@ const bootstrap = async (): Promise<void> => {
   // Dynamic imports so the store / Phaser bundle don't initialize until the
   // active captain has been resolved.
   const [
-    { default: Phaser },
     { createGame },
     { gameStore },
     { Hud },
@@ -54,7 +68,6 @@ const bootstrap = async (): Promise<void> => {
     { getActiveTheme },
     { createAriaLiveRegion },
   ] = await Promise.all([
-    import("phaser"),
     import("./game/createGame"),
     import("./sim/store"),
     import("./ui/hud"),
@@ -63,8 +76,55 @@ const bootstrap = async (): Promise<void> => {
     import("./ui/aria-live"),
   ]);
 
+  // Boot Phaser only once the shell has real layout — WebGL renderer
+  // creation fails against a 0×0 host. Hidden/embedded windows throttle
+  // timers (and never fire rAF), so don't poll: a ResizeObserver fires once
+  // on observe and again the moment the host gets real dimensions. Race it
+  // against a short timeout so a permanently-hidden context still boots —
+  // createGame falls back to a nonzero stage size and the observer below
+  // pushes the true size when it exists.
+  if (gameRoot.clientHeight === 0) {
+    await new Promise<void>((resolve) => {
+      const bootObserver = new ResizeObserver(() => {
+        if (gameRoot.clientHeight > 0) {
+          bootObserver.disconnect();
+          resolve();
+        }
+      });
+      bootObserver.observe(gameRoot);
+      setTimeout(() => {
+        bootObserver.disconnect();
+        resolve();
+      }, 2000);
+    });
+  }
+
   const game = createGame(gameRoot);
   new Hud(hudRoot, dockRoot);
+
+  // Dev deep-link: jump straight into a mission for fast manual testing —
+  // `?mission=tutorial-cove` in the URL, or the equivalent localStorage key
+  // (handy when the URL isn't editable, e.g. embedded previews).
+  if (import.meta.env.DEV) {
+    const devMission =
+      new URLSearchParams(window.location.search).get("mission") ??
+      window.localStorage.getItem("soc-dev-open-mission");
+    if (devMission) {
+      gameStore.startAdventure();
+      gameStore.openMission(devMission);
+    }
+  }
+
+  // Phaser's RESIZE scale mode only reacts to *window* resizes. The playfield
+  // row also changes size when the dock mounts/unmounts (screen swaps), so
+  // watch the host element directly and push its box into the scale manager.
+  const resizeObserver = new ResizeObserver(() => {
+    const { clientWidth, clientHeight } = gameRoot;
+    if (clientWidth > 0 && clientHeight > 0) {
+      game.scale.resize(clientWidth, clientHeight);
+    }
+  });
+  resizeObserver.observe(gameRoot);
 
   // Screen-reader narration channel. Mounted in the app shell so it survives
   // every screen swap (the HUD layer is replaced when the screen changes).
@@ -189,7 +249,10 @@ const bootstrap = async (): Promise<void> => {
     }
   };
 
-  game.events.once(Phaser.Core.Events.READY, () => {
+  // Wait for BootScene to finish generating/loading textures before routing —
+  // routing on Phaser READY raced the boot preload (scenes started without
+  // their textures). BootScene emits this once its assets are in place.
+  game.events.once("soc-boot-complete", () => {
     gameStore.subscribe((state) => {
       routeScene(state.screen);
       narrate(state);

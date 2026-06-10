@@ -13,7 +13,13 @@ import type {
 } from "../../sim/types";
 import { playSfx } from "../../ui/audio";
 import { haptic } from "../../ui/haptic";
-import { kindTextureMap, textureKeys, uiColors } from "../assets/manifest";
+import {
+  kindTextureMap,
+  missionBackgrounds,
+  shipArtKey,
+  textureKeys,
+  uiColors,
+} from "../assets/manifest";
 
 interface TileSprite {
   image: Phaser.GameObjects.Image;
@@ -93,15 +99,46 @@ export class MissionScene extends Phaser.Scene {
     this.boardLayer = this.add.container(0, 0);
     this.effectsLayer = this.add.container(0, 0);
     this.predictLayer = this.add.container(0, 0).setVisible(false);
+    // Status / briefing text sits in a reserved strip at the bottom of the
+    // canvas (just above the dock) so it never covers the board.
     this.statusText = this.add
-      .text(this.scale.width / 2, 220, "", {
+      .text(this.scale.width / 2, this.scale.height - 38, "", {
         fontFamily: "Nunito, Trebuchet MS, sans-serif",
-        fontSize: "26px",
+        fontSize: "22px",
         color: "#2b1d0e",
         backgroundColor: "#fff1cf",
-        padding: { x: 22, y: 14 },
+        padding: { x: 18, y: 10 },
       })
-      .setOrigin(0.5);
+      .setOrigin(0.5)
+      .setDepth(5);
+
+    // Re-layout when the canvas size changes (Scale.RESIZE mode). Skip while
+    // a run is playing back — the next planning render picks up the new size.
+    const onResize = (): void => {
+      const state = gameStore.getState();
+      this.statusText?.setPosition(this.scale.width / 2, this.scale.height - 38);
+      if (
+        (state.screen !== "mission" && state.screen !== "sandbox") ||
+        state.missionPhase === "running" ||
+        !state.activeMissionId
+      ) {
+        return;
+      }
+      const mission = missions[state.activeMissionId];
+      const fresh = createMissionState(mission, state.queuedCommands);
+      this.renderBoard(mission, fresh.ship, fresh.tiles);
+    };
+    this.scale.on("resize", onResize);
+
+    // Phaser 3 never calls a method named `shutdown` — listeners registered
+    // on global emitters (scale manager, game store) leak across scene stops
+    // and fire against destroyed GameObjects. Clean up on the real event.
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.scale.off("resize", onResize);
+      this.unsubscribe?.();
+      this.unsubscribe = undefined;
+      this.activePlaybackToken += 1;
+    });
 
     this.unsubscribe = gameStore.subscribe((state) => {
       if (state.screen !== "mission" && state.screen !== "sandbox") {
@@ -142,7 +179,11 @@ export class MissionScene extends Phaser.Scene {
         this.predictLayer?.removeAll(true);
       }
 
-      if (state.missionPhase === "running" && state.lastRun) {
+      // Only START playback on the planning→running transition. Playback
+      // itself dispatches store updates (setPlaybackIndex) that re-enter this
+      // listener synchronously — restarting on every "running" notification
+      // recursed forever and wedged the page.
+      if (phaseChanged && state.missionPhase === "running" && state.lastRun) {
         this.stopShipBob();
         this.stopGoalPulse();
         const playbackToken = ++this.activePlaybackToken;
@@ -219,16 +260,24 @@ export class MissionScene extends Phaser.Scene {
   private boardMetrics(mission: MissionDefinition) {
     const width = this.scale.width;
     const height = this.scale.height;
+    // Chrome on the playfield: objective chip + stat strip at the top, side
+    // rail buttons on the right. The dock lives outside the canvas now, so
+    // the board can use most of the remaining space.
+    const topChrome = Math.min(150, height * 0.22);
+    // Reserve a strip at the bottom for the status/briefing text.
+    const bottomPad = 76;
+    const sidePad = 110;
     const tileSize = Math.min(
-      (width - 150) / mission.width,
-      (height - 540) / mission.height,
+      (width - sidePad * 2) / mission.width,
+      (height - topChrome - bottomPad) / mission.height,
     );
     const boardWidth = mission.width * tileSize;
+    const boardHeight = mission.height * tileSize;
 
     return {
       tileSize,
       offsetX: (width - boardWidth) / 2,
-      offsetY: 320,
+      offsetY: topChrome + (height - topChrome - bottomPad - boardHeight) / 2,
     };
   }
 
@@ -262,10 +311,23 @@ export class MissionScene extends Phaser.Scene {
     const theme = getActiveTheme(gameStore.getState().profile);
     const tileLabels = theme.tileLabels[mission.id] ?? {};
 
-    const water = this.add.graphics();
-    water.fillGradientStyle(uiColors.sky, uiColors.sun, uiColors.sea, uiColors.seaDeep, 1);
-    water.fillRect(0, 0, this.scale.width, this.scale.height);
-    this.boardLayer?.add(water);
+    const bgKey = missionBackgrounds[mission.id];
+    const hasPaintedBg = Boolean(bgKey) && this.textures.exists(bgKey);
+    if (hasPaintedBg) {
+      // Painted backdrop — scale to cover the canvas, centered.
+      const bg = this.add.image(this.scale.width / 2, this.scale.height / 2, bgKey);
+      const cover = Math.max(
+        this.scale.width / bg.width,
+        this.scale.height / bg.height,
+      );
+      bg.setScale(cover);
+      this.boardLayer?.add(bg);
+    } else {
+      const water = this.add.graphics();
+      water.fillGradientStyle(uiColors.sky, uiColors.sun, uiColors.sea, uiColors.seaDeep, 1);
+      water.fillRect(0, 0, this.scale.width, this.scale.height);
+      this.boardLayer?.add(water);
+    }
 
     // Animated wave shimmer behind the board — soft horizontal foam bands that
     // scroll slowly so the playfield reads as actual ocean. Drawn into its own
@@ -312,7 +374,12 @@ export class MissionScene extends Phaser.Scene {
     const grid = this.add.graphics();
     for (let y = 0; y < mission.height; y += 1) {
       for (let x = 0; x < mission.width; x += 1) {
-        grid.fillStyle((x + y) % 2 === 0 ? 0x6fd0e8 : 0x4ec3df, 1);
+        if (hasPaintedBg) {
+          // Translucent cells so the painted ocean reads through.
+          grid.fillStyle(uiColors.white, (x + y) % 2 === 0 ? 0.26 : 0.18);
+        } else {
+          grid.fillStyle((x + y) % 2 === 0 ? 0x6fd0e8 : 0x4ec3df, 1);
+        }
         grid.fillRoundedRect(
           offsetX + x * tileSize,
           offsetY + y * tileSize,
@@ -320,7 +387,7 @@ export class MissionScene extends Phaser.Scene {
           tileSize - 8,
           24,
         );
-        grid.lineStyle(3, uiColors.ink, 0.18);
+        grid.lineStyle(hasPaintedBg ? 2 : 3, uiColors.ink, hasPaintedBg ? 0.14 : 0.18);
         grid.strokeRoundedRect(
           offsetX + x * tileSize,
           offsetY + y * tileSize,
@@ -365,9 +432,19 @@ export class MissionScene extends Phaser.Scene {
       });
 
     const shipCenter = this.worldXY(mission, ship.position);
-    const shipImage = this.add
-      .image(shipCenter.x, shipCenter.y, textureKeys.ship)
-      .setDisplaySize(tileSize - 8, tileSize - 20);
+    const hasShipArt = this.textures.exists(shipArtKey);
+    const shipImage = this.add.image(
+      shipCenter.x,
+      shipCenter.y,
+      hasShipArt ? shipArtKey : textureKeys.ship,
+    );
+    if (hasShipArt) {
+      // Preserve the painted sprite's aspect ratio (portrait, bow up).
+      const targetH = tileSize * 0.94;
+      shipImage.setDisplaySize(targetH * (shipImage.width / shipImage.height), targetH);
+    } else {
+      shipImage.setDisplaySize(tileSize - 8, tileSize - 20);
+    }
     shipImage.setAngle(facingAngle(ship.facing));
     this.boardLayer?.add(shipImage);
     this.shipSprite = shipImage;

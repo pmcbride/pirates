@@ -8,6 +8,16 @@ export const textureKeys = {
   current: "current-token",
 } as const;
 
+/** Painted ship sprite (One Piece-style, faces north at 0°). Loaded from
+ * public/art/; falls back to the procedural token when absent. */
+export const shipArtKey = "ship-art";
+
+/** Painted per-mission board backgrounds. Missions without an entry fall back
+ * to the procedural sky/sea gradient. Aspect ratio of the source art is 3:2. */
+export const missionBackgrounds: Record<string, string> = {
+  "tutorial-cove": "bg-tutorial-cove",
+};
+
 export const uiColors = {
   sea: 0x4ec3df,
   seaDeep: 0x1d6f9f,

@@ -21,6 +21,20 @@ export class WorldMapScene extends Phaser.Scene {
         this.renderMap();
       }
     });
+    // Re-layout on canvas resize (Scale.RESIZE mode).
+    const onResize = (): void => {
+      if (gameStore.getState().screen === "map") {
+        this.renderMap();
+      }
+    };
+    this.scale.on("resize", onResize);
+    // Phaser 3 never calls a method named `shutdown` — clean up listeners on
+    // the real lifecycle event so they don't leak across scene stops.
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.scale.off("resize", onResize);
+      this.unsubscribe?.();
+      this.unsubscribe = undefined;
+    });
     this.renderMap();
   }
 

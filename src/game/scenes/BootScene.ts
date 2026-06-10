@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { textureKeys, uiColors } from "../assets/manifest";
+import { missionBackgrounds, shipArtKey, textureKeys, uiColors } from "../assets/manifest";
 
 const drawStamp = (
   scene: Phaser.Scene,
@@ -24,6 +24,15 @@ export class BootScene extends Phaser.Scene {
     super("boot");
   }
 
+  preload(): void {
+    // Painted art lives in public/art/. Load failures are non-fatal — scenes
+    // check texture existence and fall back to the procedural tokens.
+    this.load.image(shipArtKey, "art/ship.png");
+    for (const [, key] of Object.entries(missionBackgrounds)) {
+      this.load.image(key, `art/${key}.png`);
+    }
+  }
+
   create(): void {
     // Going Merry — a sun-yellow rounded ship token with an ink outline.
     drawStamp(this, textureKeys.ship, uiColors.sun, 108, 86, 28);
@@ -40,6 +49,9 @@ export class BootScene extends Phaser.Scene {
     // Current — sea blue.
     drawStamp(this, textureKeys.current, uiColors.sea, 96, 96, 30);
 
-    this.scene.start("title");
+    // Hand off to the shell's scene router (main.ts) — it starts whichever
+    // scene matches the store's current screen. Hardcoding `start("title")`
+    // here raced the router when a deep-link opened a mission during boot.
+    this.game.events.emit("soc-boot-complete");
   }
 }

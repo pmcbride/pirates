@@ -11,6 +11,13 @@ export class RewardScene extends Phaser.Scene {
   }
 
   create(): void {
+    // Phaser 3 never calls a method named `shutdown` — unhook the store
+    // subscription on the real lifecycle event so it doesn't leak across
+    // scene stops and render into destroyed objects.
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.unsubscribe?.();
+      this.unsubscribe = undefined;
+    });
     this.unsubscribe = gameStore.subscribe((state) => {
       if (state.screen !== "reward") {
         return;

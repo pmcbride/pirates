@@ -823,6 +823,11 @@ export class GameStore {
   }
 
   setPlaybackIndex(index: number): void {
+    // No-op on repeats — playback dispatches this every step, and redundant
+    // notifications re-enter scene/HUD listeners for no visual change.
+    if (this.state.playbackIndex === index) {
+      return;
+    }
     this.update((state) => ({
       ...state,
       playbackIndex: index,

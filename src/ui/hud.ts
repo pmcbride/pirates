@@ -1298,6 +1298,11 @@ export class Hud {
     this.currentScreen = state.screen;
     this.mission = null;
     this.root.innerHTML = "";
+    if (this.dockRoot !== this.root) {
+      // The dock lives in its own grid row below the playfield; clear it on
+      // screen swaps so non-mission screens collapse the row to zero height.
+      this.dockRoot.innerHTML = "";
+    }
 
     const theme = getActiveTheme(state.profile);
     const layer = document.createElement("div");
@@ -1516,7 +1521,11 @@ export class Hud {
     layer.appendChild(rail);
     layer.appendChild(hintHost);
     layer.appendChild(predictHost);
-    layer.appendChild(dock);
+    // The dock mounts into its own grid row below the playfield so it never
+    // overlaps the board. When no separate dock root was provided (tests),
+    // it stays inside the overlay layer.
+    const dockParent = this.dockRoot === this.root ? layer : this.dockRoot;
+    dockParent.appendChild(dock);
     layer.appendChild(drawerHost);
     layer.appendChild(pickerHost);
 

@@ -234,3 +234,26 @@ describe("GameStore.moveCommand", () => {
     expect(after).toEqual(ids);
   });
 });
+
+describe("setPlaybackIndex re-entrancy guard", () => {
+  // Regression: playback dispatches setPlaybackIndex synchronously while
+  // scene listeners are still running. Re-notifying on an unchanged index
+  // re-entered MissionScene's listener and recursed until the page wedged.
+  it("does not re-notify listeners when the index is unchanged", async () => {
+    const { GameStore } = await import("./store");
+    const store = new GameStore();
+    let notifications = 0;
+    store.subscribe(() => {
+      notifications += 1;
+    });
+    expect(notifications).toBe(1); // subscribe fires immediately
+
+    store.setPlaybackIndex(3);
+    store.setPlaybackIndex(3);
+    store.setPlaybackIndex(3);
+    expect(notifications).toBe(2); // only the first change notifies
+
+    store.setPlaybackIndex(4);
+    expect(notifications).toBe(3);
+  });
+});

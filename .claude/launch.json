@@ -4,8 +4,12 @@
     {
       "name": "sea-of-codes-dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
-      "port": 4173
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "port": 4173,
+      "autoPort": true
     }
   ]
 }

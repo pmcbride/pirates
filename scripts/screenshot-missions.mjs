@@ -9,7 +9,9 @@
 import { mkdirSync } from "node:fs";
 import puppeteer from "puppeteer-core";
 
-const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+const CHROME =
+  process.env.CHROME_PATH ??
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const URL = process.env.SOC_URL ?? "http://localhost:5173";
 const OUT_DIR = "art/screenshots";
 const SUFFIX = process.argv[2] ?? "shot";

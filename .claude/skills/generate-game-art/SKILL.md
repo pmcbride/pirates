@@ -111,11 +111,15 @@ explicit `this.load.image` in BootScene.
 ### 6. Verify in the browser
 
 ```bash
-npm i --no-save puppeteer-core   # if not present
-npm run dev &                    # note the actual port — it roams
+npm i --no-save puppeteer-core            # if not present
+npm run dev > /tmp/soc-dev.log 2>&1 &     # log to a file; read the port from it — it roams
 SOC_URL=http://localhost:<port> node scripts/screenshot-missions.mjs <suffix>
 # set CHROME_PATH if Chrome isn't at the default macOS location
 ```
+
+`<suffix>` names the screenshot batch (`art/screenshots/<mission>-<suffix>.png`).
+For the PR's before/after pair, run once from the pre-change build with
+`before` and once with your changes with `after`.
 
 The harness asserts each mission screen mounts and **fails loudly (exit 1) on
 any art-load failure**, including vite's 200/text-html SPA fallback for missing

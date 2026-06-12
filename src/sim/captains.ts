@@ -192,6 +192,29 @@ const writeList = (store: CaptainStore, records: CaptainRecord[]): void => {
   store.setItem(profilesStorageKey, serializeCaptainList(records));
 };
 
+/**
+ * Persist a new roster + active pointer, tolerating storage failure.
+ * localStorage.setItem throws on quota exhaustion and in some private-browsing
+ * modes — and profile creation sits on the first-launch critical path, where
+ * an uncaught throw would strand the player on the picker with the game never
+ * mounting. The session must always proceed; only persistence is lost.
+ */
+const persistRoster = (
+  store: CaptainStore,
+  records: CaptainRecord[],
+  activeName: string,
+): void => {
+  try {
+    writeList(store, records);
+    store.setItem(activeProfileStorageKey, activeName);
+  } catch (err) {
+    console.warn(
+      "[captains] storage write failed — captain won't persist this session",
+      err,
+    );
+  }
+};
+
 const findIndex = (records: CaptainRecord[], name: string): number =>
   records.findIndex((record) => record.name.toLowerCase() === name.toLowerCase());
 
@@ -262,10 +285,108 @@ export const createProfile = (
     name: validation.cleaned,
     profile: defaultProfile(),
   };
-  const next = [...records, record];
-  writeList(s, next);
-  s.setItem(activeProfileStorageKey, record.name);
+  persistRoster(s, [...records, record], record.name);
   return { ok: true, record };
+};
+
+// ── Preset captains (tap-to-create, no typing) ────────────────
+//
+// The first-launch gate must be passable by a pre-reader: one tap on a big
+// emoji portrait creates the profile. Names are identity, not theme strings
+// (they persist across theme switches), so they live here rather than in
+// src/themes/*. Every name must validate against NAME_PATTERN and fit
+// MAX_NAME_LENGTH *before* suffixing.
+
+export interface PresetCaptain {
+  /** Emoji portrait — rendered huge on the pick button. */
+  icon: string;
+  /** Display name; also the stored profile key (suffixed on collision). */
+  name: string;
+}
+
+export const presetCaptains: readonly PresetCaptain[] = [
+  { icon: "🦜", name: "Captain Parrot" },
+  { icon: "🐢", name: "Captain Turtle" },
+  { icon: "⚓", name: "Captain Anchor" },
+  { icon: "🌊", name: "Captain Wave" },
+  { icon: "☀️", name: "Captain Sunny" },
+  { icon: "🗺️", name: "Captain Map" },
+];
+
+/**
+ * Roman numeral for duplicate-suffixing ("Captain Wave II"). Supports any
+ * positive count a household could plausibly reach; standard subtractive
+ * notation keeps it short.
+ */
+const toRomanNumeral = (value: number): string => {
+  const table: Array<[number, string]> = [
+    [1000, "M"],
+    [900, "CM"],
+    [500, "D"],
+    [400, "CD"],
+    [100, "C"],
+    [90, "XC"],
+    [50, "L"],
+    [40, "XL"],
+    [10, "X"],
+    [9, "IX"],
+    [5, "V"],
+    [4, "IV"],
+    [1, "I"],
+  ];
+  let remaining = Math.max(1, Math.floor(value));
+  let out = "";
+  for (const [num, glyph] of table) {
+    while (remaining >= num) {
+      out += glyph;
+      remaining -= num;
+    }
+  }
+  return out;
+};
+
+/**
+ * Create a profile from a preset name — the no-typing path. Unlike
+ * `createProfile` this NEVER fails and never asks for input: a name
+ * collision auto-suffixes " II", " III", … (truncating the base so the
+ * result still fits MAX_NAME_LENGTH). The new captain is set active.
+ */
+export const createProfileWithPreset = (
+  presetName: string,
+  store?: CaptainStore,
+): CaptainRecord => {
+  const s = resolveStore(store);
+  const records = loadList(s);
+  const taken = new Set(records.map((record) => record.name.toLowerCase()));
+
+  // Empty/whitespace input would create a record that deserialization drops
+  // on the next load (isCaptainRecord rejects empty names) — fall back to the
+  // legacy default so "never fails" holds for the whole input domain.
+  const base =
+    presetName.trim().replace(/\s+/g, " ").slice(0, MAX_NAME_LENGTH).trim() ||
+    MIGRATED_LEGACY_CAPTAIN_NAME;
+
+  let candidate = base;
+  let ordinal = 2;
+  while (taken.has(candidate.toLowerCase())) {
+    const suffix = ` ${toRomanNumeral(ordinal)}`;
+    // Trim the base so base + suffix stays within MAX_NAME_LENGTH — the
+    // numeral is what disambiguates, so it always survives whole. The slice
+    // floor guards pathological ordinals whose numeral alone exceeds the
+    // budget (negative slice indices count from the END of the string);
+    // trimStart keeps the all-suffix candidate pattern-valid.
+    candidate = `${base
+      .slice(0, Math.max(0, MAX_NAME_LENGTH - suffix.length))
+      .trimEnd()}${suffix}`.trimStart();
+    ordinal += 1;
+  }
+
+  const record: CaptainRecord = {
+    name: candidate,
+    profile: defaultProfile(),
+  };
+  persistRoster(s, [...records, record], record.name);
+  return record;
 };
 
 export const deleteProfile = (

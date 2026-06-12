@@ -33,22 +33,26 @@ World map ─► Mission planning ─► Plan execution ─► Resolution
    docket previews the reward and the one new concept the mission will teach.
 2. **Mission planning.** Bottom dock holds the **command queue** (drag/tap stamps
    in) and the **block palette** (only the blocks this lesson cares about). On a
-   mission's first attempt, the suggested queue is pre-loaded so the child never
-   faces an empty canvas. On subsequent attempts, only the first stamp is
-   pre-loaded — the kid has to think the rest through (a "Reset to Suggested"
-   button is always available as a safety net, and parents can enable a settings
-   toggle to always pre-load the full plan).
-3. **Predict-then-run.** Before playback starts (every mission except the
-   tutorial), the playfield enters a tap-to-predict overlay: "Where will the
-   ship end up?" The player drops a marker on a tile and confirms with "Run
-   plan!". After playback the reward (or hint) screen reports whether the
-   prediction was right — converting passive watching into active reasoning per
-   Wing/Bers/Resnick research on early CT. A "Skip prediction" link on the
-   predict screen persists in the profile for parents who want to opt out.
+   mission's first attempt — and every retry until the mission is first
+   cleared — the suggested queue is pre-loaded so the child never faces an
+   empty canvas mid-struggle. Replays of already-cleared missions pre-load
+   only the first stamp (free-play tinkering), and parents can enable a
+   settings toggle to always pre-load the full plan.
+3. **Predict-then-run.** From the fourth mission onward (the first three keep
+   the loop friction-free while it's being learned), the playfield enters a
+   tap-to-predict overlay before playback: "Where will the ship end up?" The
+   marker starts pre-placed on the ship's tile so "Run plan!" is never dead;
+   the player may move it, then confirms. After playback the reward (or hint)
+   screen reports whether the prediction was right — converting passive
+   watching into active reasoning per Wing/Bers/Resnick research on early CT.
+   The predict card's Skip button skips one run only; the persistent opt-out
+   lives in Settings for parents.
 4. **Plan execution.** The Going Merry runs the queue beat-by-beat. Each block
    highlights as it executes. On a hit (treasure, enemy, recruit) the affected
-   tile pops and a 1-word callout fires. On a failure the ship freezes mid-beat,
-   the offending block pulses, and a **speech bubble** from a relevant Straw Hat
+   tile pops and a 1-word callout fires. On a failure the ship lunges at the
+   obstacle and bounces back while the flagged tile flashes a coral ring
+   (a readable beat, shortened — never skipped — under reduced motion), the
+   offending block pulses, and a **speech bubble** from a relevant Straw Hat
    says what went wrong and what to add.
 5. **Resolution.** Success ⇒ Reward screen (berries + stars + new toy) and a
    single line of **Captain's Log** ("Day 14 — Cleared Spark Shoals, took the
@@ -176,8 +180,11 @@ last entry shows on the reward screen.
 |               | Sizes step on 1.25 ratio: 14 / 18 / 22 / 28 / 36 / 48.              |
 | Shape         | 28px corner radius everywhere. 3px ink-black border on stamps.      |
 |               | 8px offset drop shadow (no blur) — the "sticker" look.              |
-| Iconography   | Each command is a colored stamp with a chunky pictogram +           |
-|               | a 1-word caption. No fine-line icons.                               |
+| Iconography   | Each command is a colored stamp with a chunky pictogram. Palette    |
+|               | stamps add a 1-word caption; queue cards are icon-only (the label   |
+|               | lives in aria). Command pictograms render as Twemoji SVGs for       |
+|               | cross-platform consistency; HUD chrome (drawer buttons, stat pills) |
+|               | uses system emoji. No fine-line icons.                              |
 | Motion        | Slot-in spring on stamps dropped into the queue, gentle bob on the  |
 |               | Merry while idle, pop on tile clears. Stripped in reduced-motion.   |
 | Board art     | Every mission has a painted top-down board background (AI-generated |
@@ -217,8 +224,10 @@ draft's right-side vertical stack swallowed too much screen.
 
 ### 5.3 Component spec
 
-- **Command stamp (palette + queue):** 96×96 min, colored fill, 3px ink border,
-  big pictogram (~40px), 1-word label below in 14px bold. Press → press-in shadow.
+- **Command stamp (palette):** ≥72px square, colored fill, 3px ink border, big
+  pictogram with a 1-word caption below. Press → press-in shadow. **Queue
+  card:** compact (≥64px) icon-only variant of the same stamp — the sequence
+  reads as pictures, with the label in `aria-label` for screen readers.
 - **Wanted-poster card (crew + fruit drawers):** parchment background, ink-black
   rough border, dotted divider, "WANTED" header, character portrait, bounty in
   red, one-line ability in handwritten font. Used in the reward reveal too.
@@ -234,9 +243,11 @@ chart**: parchment background, dotted route line, x-marks-the-spot icons,
 ribboned banner labels per sea ("East Blue", "Grand Line", "Raftel"). Each
 island bobs in a sea-foam ring on hover.
 
-The map docket (bottom card) shows: sea name, mission title, one-line preview,
-reward icons, and a big "Set Sail" CTA. Routes drawer becomes a "Voyage Log"
-drawer listing cleared missions with stars and Captain's Log entries.
+The map docket (bottom card) leads with the selected island's portrait glyph +
+mission name, a one-line preview, reward chips, and a big "Set Sail" CTA. The
+full island list lives in the Routes drawer ("Voyage Log" — cleared / ready /
+locked status per island); the Captain's Log keeps its own Log drawer. Berries/stars/bounty pills sit in
+the top strip, not the docket.
 
 **Responsive layout rules** (the canvas is `Scale.RESIZE` — no fixed stage):
 
@@ -257,9 +268,16 @@ drawer listing cleared missions with stars and Captain's Log entries.
 - `prefers-reduced-motion` and an in-app toggle both kill cosmetic motion and
   halve playback delay.
 - Speech bubbles use the highest-contrast text (`--ink` on `--parchment`).
-- Audio (in v1.1) is supportive, never required. All sound is paired with a
-  visible animation.
-- No text input. Ever. Argument editing is single-tap cycling.
+- Audio is supportive, never required. All sound is paired with a visible
+  animation. Web Speech narration reads objectives, hints, palette labels,
+  and reward lines aloud for pre-readers; it follows the mute toggle.
+- No text input. Ever. Argument editing is single-tap cycling. First-run
+  identity is a tap-a-pirate preset grid (typed names live behind a parent
+  disclosure and in the Settings drawer).
+- Board tiles communicate by pictogram (⛵ 🪨 💰 🧑 🌀, 🏁 goal) on colored
+  backplates — never by letters. Hints pair the speech bubble with pulsing
+  rings on the board tiles the engine flagged and a glow on the palette
+  stamp to add.
 
 ## 7. IP and theming
 

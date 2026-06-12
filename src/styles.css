@@ -353,6 +353,11 @@ button:disabled {
   bottom: 1rem;
   max-width: 720px;
   padding: 1.35rem 1.4rem 1.4rem;
+  /* The canvas sea chart lives in the band above this card — never let
+     the docket eat more than ~45% of the playfield on short windows.
+     WorldMapScene reserves the same fraction when sizing the chart. */
+  max-height: calc(45% - 1rem);
+  overflow-y: auto;
 }
 
 .map-docket p {

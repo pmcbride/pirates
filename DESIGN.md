@@ -233,6 +233,18 @@ The map docket (bottom card) shows: sea name, mission title, one-line preview,
 reward icons, and a big "Set Sail" CTA. Routes drawer becomes a "Voyage Log"
 drawer listing cleared missions with stars and Captain's Log entries.
 
+**Responsive layout rules** (the canvas is `Scale.RESIZE` — no fixed stage):
+
+- The parchment chart derives from the real canvas size with proportional
+  padding; markers and labels scale down on small canvases but islands never
+  drop below the 64px tap-target floor.
+- Island coordinates in `content.ts` are authored percentages; they are
+  normalized against their bounds and mapped into the chart's inner area,
+  inset for the DOM chrome (top strip ~150px, right rail ~150px).
+- The map docket caps at 45% of the playfield height (scrolling inside if
+  needed) and the island band stays above that line, so every island remains
+  visible and tappable down to short landscape windows (~1000×500).
+
 ## 6. Accessibility
 
 - Tap targets ≥ 64px. Primary CTAs ≥ 72px.

@@ -26,10 +26,14 @@ export class BootScene extends Phaser.Scene {
 
   preload(): void {
     // Painted art lives in public/art/. Load failures are non-fatal — scenes
-    // check texture existence and fall back to the procedural tokens.
+    // check texture existence and fall back to the procedural tokens — but
+    // log them so a 404/typo'd key is diagnosable and not just "looks plain".
+    this.load.on("loaderror", (file: Phaser.Loader.File) => {
+      console.warn(`[boot] painted art failed to load, using fallback: ${file.key} (${file.src})`);
+    });
     this.load.image(shipArtKey, "art/ship.png");
     for (const [, key] of Object.entries(missionBackgrounds)) {
-      this.load.image(key, `art/${key}.png`);
+      this.load.image(key, `art/${key}.webp`);
     }
   }
 

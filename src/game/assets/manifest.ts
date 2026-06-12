@@ -16,6 +16,14 @@ export const shipArtKey = "ship-art";
  * to the procedural sky/sea gradient. Aspect ratio of the source art is 3:2. */
 export const missionBackgrounds: Record<string, string> = {
   "tutorial-cove": "bg-tutorial-cove",
+  "spark-shoals": "bg-spark-shoals",
+  "windrise-cove": "bg-windrise-cove",
+  "barrel-bay": "bg-barrel-bay",
+  "harbor-bend": "bg-harbor-bend",
+  "current-crescent": "bg-current-crescent",
+  "coral-lookout": "bg-coral-lookout",
+  "treasure-isle": "bg-treasure-isle",
+  "sandbox-isle": "bg-sandbox-isle",
 };
 
 export const uiColors = {

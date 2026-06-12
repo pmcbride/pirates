@@ -123,6 +123,56 @@ describe("hex Play button — mission screen", () => {
   });
 });
 
+describe("hex Play button — predict phase (the dock owns the predict beat)", () => {
+  it("turns into confirm-prediction, unlocks once a tile is picked, and runs the plan", () => {
+    const root = document.createElement("div");
+    document.body.appendChild(root);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _hud = new Hud(root);
+    void _hud;
+
+    // Win the tutorial for real so spark-shoals (prediction required) unlocks.
+    // Earlier tests in this file bumped the tutorial attempt count, so the
+    // pre-loaded queue may be the one-command stub — reset to the full
+    // suggested (winning) plan first.
+    gameStore.startAdventure();
+    gameStore.openMission("tutorial-cove");
+    gameStore.resetQueue();
+    gameStore.runActiveMission(); // tutorial is prediction-exempt → straight to running
+    gameStore.finishPlayback();
+    gameStore.claimReward();
+
+    gameStore.openMission("spark-shoals");
+    expect(gameStore.getState().screen).toBe("mission");
+
+    gameStore.resetQueue();
+    gameStore.runActiveMission();
+    expect(gameStore.getState().missionPhase).toBe("predicting");
+
+    // The floating predict banner is gone — the dock head carries the beat.
+    expect(root.querySelector(".predict-banner")).toBeNull();
+    expect(
+      root.querySelector('[data-action="skip-prediction"]'),
+      "dock shows a Skip link while predicting",
+    ).not.toBeNull();
+
+    // Hex button: confirm-prediction action, locked until a tile is tapped.
+    let hex = root.querySelector<HTMLButtonElement>("button.hex-play");
+    expect(hex?.dataset.action).toBe("confirm-prediction");
+    expect(hex?.disabled).toBe(true);
+    expect(hex?.classList.contains("is-ready")).toBe(false);
+
+    gameStore.setPrediction({ x: 0, y: 0 });
+    hex = root.querySelector<HTMLButtonElement>("button.hex-play");
+    expect(hex?.disabled).toBe(false);
+    expect(hex?.classList.contains("is-ready")).toBe(true);
+
+    // Confirming runs the plan — same hex button, no separate CTA needed.
+    hex?.click();
+    expect(gameStore.getState().missionPhase).toBe("running");
+  });
+});
+
 describe("title screen — single affordance", () => {
   it("renders exactly one start-adventure button on the title screen", () => {
     // The store starts on the title screen. Mount a fresh HUD against an

@@ -31,6 +31,16 @@ import enemyAheadSvg from "./enemy-ahead.svg?raw";
 import obstacleAheadSvg from "./obstacle-ahead.svg?raw";
 import treasureHereSvg from "./treasure-here.svg?raw";
 import crewHereSvg from "./crew-here.svg?raw";
+// Hand-drawn HUD chrome icons (not Twemoji) — same ink-outline cel style as
+// the board art so the chrome and the playfield read as one set.
+import coinSvg from "./coin.svg?raw";
+import starSvg from "./star.svg?raw";
+import crewMateSvg from "./crew-mate.svg?raw";
+import fruitSvg from "./fruit.svg?raw";
+import flagSvg from "./flag.svg?raw";
+import mapSvg from "./map.svg?raw";
+import scrollSvg from "./scroll.svg?raw";
+import gearSvg from "./gear.svg?raw";
 
 /**
  * Marker class added to every inline icon SVG so a single CSS rule
@@ -65,6 +75,14 @@ export const iconSvgMap = {
   obstacleAhead: decorate(obstacleAheadSvg, "Reef ahead"),
   treasureHere: decorate(treasureHereSvg, "Treasure here"),
   crewHere: decorate(crewHereSvg, "Crew here"),
+  coin: decorate(coinSvg, "Berries"),
+  star: decorate(starSvg, "Stars"),
+  crewMate: decorate(crewMateSvg, "Crew"),
+  fruit: decorate(fruitSvg, "Devil Fruit"),
+  flag: decorate(flagSvg, "Bounty flag"),
+  map: decorate(mapSvg, "Map"),
+  scroll: decorate(scrollSvg, "Captain's log"),
+  gear: decorate(gearSvg, "Settings"),
 } as const;
 
 export type IconKey = keyof typeof iconSvgMap;

@@ -54,3 +54,17 @@ export const kindTextureMap = {
   crew: textureKeys.crew,
   current: textureKeys.current,
 } as const;
+
+/** Hand-drawn SVG tile icons (public/art/tiles/). Rasterized by the loader at
+ * 2× tile scale; missions fall back to the procedural `kindTextureMap` stamps
+ * when a file fails to load, mirroring the painted-background pattern. */
+export const tileArtKeys = {
+  enemy: "tile-art-enemy",
+  obstacle: "tile-art-obstacle",
+  treasure: "tile-art-treasure",
+  crew: "tile-art-crew",
+  current: "tile-art-current",
+} as const;
+
+/** X-marks-the-spot landing pad — the goal tile's painted icon. */
+export const goalArtKey = "tile-art-goal";

@@ -1,0 +1,13 @@
+<svg viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg">
+  <!-- X-marks-the-spot landing pad: sandy circle, rope ring, painted red X. -->
+  <ellipse cx="48" cy="86" rx="35" ry="6" fill="#2b1d0e" opacity="0.14"/>
+  <circle cx="48" cy="50" r="34" fill="#f7d78b" stroke="#2b1d0e" stroke-width="5"/>
+  <circle cx="48" cy="50" r="26.5" fill="none" stroke="#c89559" stroke-width="4.5" stroke-dasharray="7.5 6" stroke-linecap="round"/>
+  <!-- The X: ink under-stroke, red over-stroke -->
+  <path d="M34 36l28 28M62 36L34 64" stroke="#2b1d0e" stroke-width="15" stroke-linecap="round"/>
+  <path d="M34 36l28 28M62 36L34 64" stroke="#c4391c" stroke-width="9" stroke-linecap="round"/>
+  <path d="M37 38.5l9 9" stroke="#ff6b5c" stroke-width="3" stroke-linecap="round"/>
+  <!-- Arrival flag -->
+  <line x1="74" y1="12" x2="74" y2="34" stroke="#2b1d0e" stroke-width="4.5" stroke-linecap="round"/>
+  <path d="M74 12l15 5-15 5z" fill="#7ec96b" stroke="#2b1d0e" stroke-width="3" stroke-linejoin="round"/>
+</svg>

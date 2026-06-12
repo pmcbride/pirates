@@ -1429,6 +1429,20 @@ button:disabled {
   padding-bottom: 0.4rem;
 }
 
+/* Painted mugshot between the WANTED header and the name — the poster's
+   photograph. Square, ink-framed, sized so two posters + the fruit section
+   still browse comfortably inside the drawer. */
+.wanted-card .wanted-portrait {
+  width: min(100%, 220px);
+  aspect-ratio: 1;
+  justify-self: center;
+  object-fit: cover;
+  border: var(--border-ink);
+  border-radius: var(--radius-sm);
+  background: var(--parchment);
+  box-shadow: 0 3px 0 rgba(43, 29, 14, 0.2);
+}
+
 .wanted-card .wanted-name {
   font-family: var(--display-font);
   font-size: 1.6rem;

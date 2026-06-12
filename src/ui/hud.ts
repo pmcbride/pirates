@@ -224,13 +224,25 @@ const commandFingerprint = (command: PlannedCommand, isRunning: boolean): string
     isRunning ? "r" : "p",
   ].join("|");
 
+/**
+ * Crew ids with a painted wanted-poster portrait in `public/art/crew/`.
+ * Gated by id rather than letting the <img> 404: vite's SPA fallback answers
+ * missing public files with 200 text/html, which renders as a broken image
+ * tile instead of failing cleanly.
+ */
+const crewPortraitIds = new Set(["zoro", "nami"]);
+
 const wantedCrewCard = (theme: Theme, crewId: string): string => {
   const crew = theme.crew[crewId];
   if (!crew) return "";
+  const portrait = crewPortraitIds.has(crewId)
+    ? `<img class="wanted-portrait" src="art/crew/crew-${crewId}.webp" alt="" aria-hidden="true" draggable="false" />`
+    : "";
   return `
     <li>
       <div class="wanted-card">
         <div class="wanted-header">Wanted</div>
+        ${portrait}
         <p class="wanted-name">${escapeHtml(crew.name)}</p>
         <div class="wanted-role">${escapeHtml(crew.title)}</div>
         <p class="wanted-line">${escapeHtml(crew.description)}</p>

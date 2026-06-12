@@ -165,10 +165,12 @@ const bootstrap = async (): Promise<void> => {
   // human-readable sentence to the aria-live region. The element is throttled
   // internally so rapid-fire ticks don't flood the SR queue.
   //
-  // The same composed sentences also feed `speak()` (Web Speech) at the
-  // moments a PRE-READER needs them read aloud: mission open (objective),
-  // hint arrival (reason + fix), and the reward line. speak() no-ops when
-  // unsupported and is muted alongside sfx via the HUD's store subscription.
+  // `speak()` (Web Speech) additionally voices the three moments a PRE-READER
+  // needs read aloud: mission open (the themed objective), hint arrival
+  // (reason + fix — spoken only; the aria region gets the phase line), and
+  // the reward sentence (the one string shared with aria.announce). speak()
+  // no-ops when unsupported and is muted alongside sfx via the HUD's store
+  // subscription.
   let lastScreen: AppState["screen"] | null = null;
   let lastPhase: AppState["missionPhase"] | null = null;
   let lastPlaybackKey: string | null = null;
@@ -291,4 +293,17 @@ const bootstrap = async (): Promise<void> => {
   });
 };
 
-void bootstrap();
+// A bootstrap failure (e.g. storage APIs throwing before any handler exists)
+// must not be a silent blank page — the dev-only error listeners above don't
+// run in production builds, and the audience can't open a console.
+bootstrap().catch((err) => {
+  console.error("[soc] bootstrap failed", err);
+  app.innerHTML = `
+    <main class="app-shell" style="display:grid;place-items:center;">
+      <section class="surface-card" style="max-width:420px;padding:2rem;text-align:center;">
+        <h1 style="margin:0 0 0.5rem;">⚓ Rough seas!</h1>
+        <p style="margin:0;">The game couldn't start. Try reloading the page.</p>
+      </section>
+    </main>
+  `;
+});

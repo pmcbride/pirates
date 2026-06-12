@@ -131,10 +131,14 @@ const queueCardInnerMarkup = (command: PlannedCommand, isRunning: boolean): stri
   const template = commandLibrary[command.templateId];
   const disabled = isRunning ? "disabled" : "";
 
-  // Common: a small `×` removal affordance shown on hover/focus only.
-  const removeBtn = `
+  // Removal affordance — omitted entirely during playback rather than
+  // rendered disabled: on touch (always-visible mode) a row of greyed 48px
+  // circles would clutter the most-watched moment of the loop and invite
+  // dead taps.
+  const removeBtn = isRunning
+    ? ""
+    : `
     <button
-      ${disabled}
       class="queue-remove"
       aria-label="Remove block"
       data-action="remove-command"
@@ -1787,7 +1791,7 @@ export class Hud {
         </div>
         <div class="dock-actions">
           <button ${locked ? "disabled" : ""} data-action="clear-queue"><span class="dock-action-icon" aria-hidden="true">🧹</span>Clear</button>
-          <button ${locked ? "disabled" : ""} data-action="reset-queue"><span class="dock-action-icon" aria-hidden="true">⚓</span>Reset</button>
+          <button ${locked ? "disabled" : ""} data-action="reset-queue"><span class="dock-action-icon" aria-hidden="true">🔄</span>Reset</button>
         </div>
       `;
       m.fingerprints.dockHead = dockHeadFp;
@@ -2239,17 +2243,18 @@ const renderHexPlayButton = (canRun: boolean, locked: boolean): string => {
 /**
  * Celebration layer for the reward overlay: a burst of star/coin sprites
  * raining over the card with staggered delays (whole show ≤ ~1.5s). The
- * positions/delays are derived from the sprite index (golden-angle spread),
- * not Math.random — re-renders of the overlay don't reshuffle the burst,
- * and jsdom tests see stable markup. Callers skip this entirely under
- * reduced motion (sounds are kept; this layer is purely cosmetic).
+ * positions/delays are index-derived, not Math.random — re-renders of the
+ * overlay don't reshuffle the burst, and jsdom tests see stable markup.
+ * The position step (37/97) is coprime to the 4-emoji cycle so columns mix
+ * glyphs instead of always dropping the same one. Callers skip this entirely
+ * under reduced motion (sounds are kept; this layer is purely cosmetic).
  */
 const CELEBRATION_SPRITES = ["⭐", "🪙", "✨", "🎉"] as const;
 const CELEBRATION_COUNT = 24;
 
 const rewardCelebrationMarkup = (): string => {
   const sprites = Array.from({ length: CELEBRATION_COUNT }, (_, i) => {
-    const left = Math.round((i * 137.5) % 100);
+    const left = (i * 37) % 97;
     const delayMs = (i * 61) % 700;
     const emoji = CELEBRATION_SPRITES[i % CELEBRATION_SPRITES.length];
     return `<span class="celebration-sprite" style="left:${left}%;animation-delay:${delayMs}ms;">${emoji}</span>`;

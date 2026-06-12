@@ -192,6 +192,29 @@ const writeList = (store: CaptainStore, records: CaptainRecord[]): void => {
   store.setItem(profilesStorageKey, serializeCaptainList(records));
 };
 
+/**
+ * Persist a new roster + active pointer, tolerating storage failure.
+ * localStorage.setItem throws on quota exhaustion and in some private-browsing
+ * modes — and profile creation sits on the first-launch critical path, where
+ * an uncaught throw would strand the player on the picker with the game never
+ * mounting. The session must always proceed; only persistence is lost.
+ */
+const persistRoster = (
+  store: CaptainStore,
+  records: CaptainRecord[],
+  activeName: string,
+): void => {
+  try {
+    writeList(store, records);
+    store.setItem(activeProfileStorageKey, activeName);
+  } catch (err) {
+    console.warn(
+      "[captains] storage write failed — captain won't persist this session",
+      err,
+    );
+  }
+};
+
 const findIndex = (records: CaptainRecord[], name: string): number =>
   records.findIndex((record) => record.name.toLowerCase() === name.toLowerCase());
 
@@ -262,9 +285,7 @@ export const createProfile = (
     name: validation.cleaned,
     profile: defaultProfile(),
   };
-  const next = [...records, record];
-  writeList(s, next);
-  s.setItem(activeProfileStorageKey, record.name);
+  persistRoster(s, [...records, record], record.name);
   return { ok: true, record };
 };
 
@@ -338,19 +359,25 @@ export const createProfileWithPreset = (
   const records = loadList(s);
   const taken = new Set(records.map((record) => record.name.toLowerCase()));
 
-  const base = presetName
-    .trim()
-    .replace(/\s+/g, " ")
-    .slice(0, MAX_NAME_LENGTH)
-    .trim();
+  // Empty/whitespace input would create a record that deserialization drops
+  // on the next load (isCaptainRecord rejects empty names) — fall back to the
+  // legacy default so "never fails" holds for the whole input domain.
+  const base =
+    presetName.trim().replace(/\s+/g, " ").slice(0, MAX_NAME_LENGTH).trim() ||
+    MIGRATED_LEGACY_CAPTAIN_NAME;
 
   let candidate = base;
   let ordinal = 2;
   while (taken.has(candidate.toLowerCase())) {
     const suffix = ` ${toRomanNumeral(ordinal)}`;
     // Trim the base so base + suffix stays within MAX_NAME_LENGTH — the
-    // numeral is what disambiguates, so it always survives whole.
-    candidate = `${base.slice(0, MAX_NAME_LENGTH - suffix.length).trimEnd()}${suffix}`;
+    // numeral is what disambiguates, so it always survives whole. The slice
+    // floor guards pathological ordinals whose numeral alone exceeds the
+    // budget (negative slice indices count from the END of the string);
+    // trimStart keeps the all-suffix candidate pattern-valid.
+    candidate = `${base
+      .slice(0, Math.max(0, MAX_NAME_LENGTH - suffix.length))
+      .trimEnd()}${suffix}`.trimStart();
     ordinal += 1;
   }
 
@@ -358,8 +385,7 @@ export const createProfileWithPreset = (
     name: candidate,
     profile: defaultProfile(),
   };
-  writeList(s, [...records, record]);
-  s.setItem(activeProfileStorageKey, record.name);
+  persistRoster(s, [...records, record], record.name);
   return record;
 };
 

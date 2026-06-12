@@ -33,13 +33,11 @@ import type {
 /**
  * Missions that skip the predict-then-run beat. The first three voyages stay
  * friction-free so a pre-reader can build → run without an extra gate; the
- * predict beat starts at barrel-bay, after three full plan→watch loops.
+ * predict beat starts with the fourth, after three full plan→watch loops.
+ * Derived from the curriculum ordering so a mission rename or insertion can
+ * never silently shift the gate.
  */
-const PREDICTION_EXEMPT_MISSION_IDS = new Set<string>([
-  "tutorial-cove",
-  "spark-shoals",
-  "windrise-cove",
-]);
+const PREDICTION_EXEMPT_MISSION_IDS = new Set<string>(orderedMissionIds.slice(0, 3));
 
 /**
  * Pure helper: does the player need to predict before running this mission?
@@ -201,7 +199,17 @@ export class GameStore {
 
   private setState(next: AppState): void {
     this.state = next;
-    this.listeners.forEach((listener) => listener(this.state));
+    // Isolate listeners from each other: state is already committed, so one
+    // throwing subscriber (HUD render, scene draw, narration) must not starve
+    // the rest into rendering stale state — that's how one cosmetic bug turns
+    // into a canvas/HUD desync or a run wedged mid-playback.
+    this.listeners.forEach((listener) => {
+      try {
+        listener(this.state);
+      } catch (err) {
+        console.error("[store] subscriber failed during notify", err);
+      }
+    });
   }
 
   private update(mutator: (state: AppState) => AppState): void {
@@ -775,6 +783,11 @@ export class GameStore {
    * opt-out) this never touches the persisted profile settings.
    */
   skipPredictionOnce(): void {
+    // Phase guard, like setPrediction/confirmPrediction: a double-tap on the
+    // Skip button must not re-execute the run that the first tap started.
+    if (this.state.missionPhase !== "predicting") {
+      return;
+    }
     if (!this.state.activeMissionId || this.state.queuedCommands.length === 0) {
       return;
     }

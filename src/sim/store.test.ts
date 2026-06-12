@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { originalTheme } from "../themes";
-import { missions } from "./content";
+import { missionNodes, missions } from "./content";
 import { cloneQueuedCommands, runMission } from "./engine";
 import { defaultProfile, deserializeProfile } from "./profile";
 import {
@@ -245,6 +245,50 @@ describe("predict beat flow", () => {
     expect(state.lastPredictionCorrect).toBeNull();
     // ...and the persisted Settings opt-out stays untouched.
     expect(state.profile.settings.skipPrediction).toBe(false);
+  });
+
+  it("skipPredictionOnce is a no-op once playback has started (double-tap)", () => {
+    const store = storeWithFirstThreeCleared();
+    store.openMission("barrel-bay");
+    store.runActiveMission();
+    store.skipPredictionOnce();
+    expect(store.getState().missionPhase).toBe("running");
+    const firstRun = store.getState().lastRun;
+
+    // The second tap of a fast double-tap lands after the phase flipped —
+    // it must not re-execute the run (same RunResult object, same phase).
+    store.skipPredictionOnce();
+    expect(store.getState().lastRun).toBe(firstRun);
+    expect(store.getState().missionPhase).toBe("running");
+  });
+
+  it("skipPredictionOnce is a no-op from the planning phase (exempt missions)", () => {
+    const store = new GameStore();
+    store.startAdventure();
+    store.openMission("tutorial-cove");
+    expect(store.getState().missionPhase).toBe("planning");
+
+    store.skipPredictionOnce();
+
+    expect(store.getState().missionPhase).toBe("planning");
+    expect(store.getState().lastRun).toBeNull();
+  });
+});
+
+describe("content integrity", () => {
+  it("keeps every map node's reward bundle in sync with its mission definition", () => {
+    // The map docket advertises MissionNode.rewards; the engine pays out
+    // MissionDefinition.reward. They are authored twice in content.ts — this
+    // pins them together so a promise on the chart is always what the kid
+    // actually receives.
+    for (const node of missionNodes) {
+      const mission = missions[node.missionId];
+      expect(mission, `missions["${node.missionId}"] for node "${node.id}"`).toBeDefined();
+      expect(
+        node.rewards,
+        `node "${node.id}" rewards must match missions["${node.missionId}"].reward`,
+      ).toEqual(mission.reward);
+    }
   });
 });
 

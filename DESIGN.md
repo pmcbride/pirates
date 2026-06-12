@@ -49,8 +49,10 @@ World map ─► Mission planning ─► Plan execution ─► Resolution
    lives in Settings for parents.
 4. **Plan execution.** The Going Merry runs the queue beat-by-beat. Each block
    highlights as it executes. On a hit (treasure, enemy, recruit) the affected
-   tile pops and a 1-word callout fires. On a failure the ship freezes mid-beat,
-   the offending block pulses, and a **speech bubble** from a relevant Straw Hat
+   tile pops and a 1-word callout fires. On a failure the ship lunges at the
+   obstacle and bounces back while the flagged tile flashes a coral ring
+   (a readable beat, shortened — never skipped — under reduced motion), the
+   offending block pulses, and a **speech bubble** from a relevant Straw Hat
    says what went wrong and what to add.
 5. **Resolution.** Success ⇒ Reward screen (berries + stars + new toy) and a
    single line of **Captain's Log** ("Day 14 — Cleared Spark Shoals, took the
@@ -178,8 +180,11 @@ last entry shows on the reward screen.
 |               | Sizes step on 1.25 ratio: 14 / 18 / 22 / 28 / 36 / 48.              |
 | Shape         | 28px corner radius everywhere. 3px ink-black border on stamps.      |
 |               | 8px offset drop shadow (no blur) — the "sticker" look.              |
-| Iconography   | Each command is a colored stamp with a chunky pictogram +           |
-|               | a 1-word caption. No fine-line icons.                               |
+| Iconography   | Each command is a colored stamp with a chunky pictogram. Palette    |
+|               | stamps add a 1-word caption; queue cards are icon-only (the label   |
+|               | lives in aria). Command pictograms render as Twemoji SVGs for       |
+|               | cross-platform consistency; HUD chrome (drawer buttons, stat pills) |
+|               | uses system emoji. No fine-line icons.                              |
 | Motion        | Slot-in spring on stamps dropped into the queue, gentle bob on the  |
 |               | Merry while idle, pop on tile clears. Stripped in reduced-motion.   |
 | Board art     | Every mission has a painted top-down board background (AI-generated |
@@ -219,8 +224,10 @@ draft's right-side vertical stack swallowed too much screen.
 
 ### 5.3 Component spec
 
-- **Command stamp (palette + queue):** 96×96 min, colored fill, 3px ink border,
-  big pictogram (~40px), 1-word label below in 14px bold. Press → press-in shadow.
+- **Command stamp (palette):** ≥72px square, colored fill, 3px ink border, big
+  pictogram with a 1-word caption below. Press → press-in shadow. **Queue
+  card:** compact (≥64px) icon-only variant of the same stamp — the sequence
+  reads as pictures, with the label in `aria-label` for screen readers.
 - **Wanted-poster card (crew + fruit drawers):** parchment background, ink-black
   rough border, dotted divider, "WANTED" header, character portrait, bounty in
   red, one-line ability in handwritten font. Used in the reward reveal too.
@@ -236,9 +243,11 @@ chart**: parchment background, dotted route line, x-marks-the-spot icons,
 ribboned banner labels per sea ("East Blue", "Grand Line", "Raftel"). Each
 island bobs in a sea-foam ring on hover.
 
-The map docket (bottom card) shows: sea name, mission title, one-line preview,
-reward icons, and a big "Set Sail" CTA. Routes drawer becomes a "Voyage Log"
-drawer listing cleared missions with stars and Captain's Log entries.
+The map docket (bottom card) leads with the selected island's portrait glyph +
+mission name, a one-line preview, reward chips, and a big "Set Sail" CTA. The
+full island list lives in the Routes drawer ("Voyage Log" — cleared / ready /
+locked status per island); the Captain's Log keeps its own Log drawer. Berries/stars/bounty pills sit in
+the top strip, not the docket.
 
 **Responsive layout rules** (the canvas is `Scale.RESIZE` — no fixed stage):
 

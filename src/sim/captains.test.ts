@@ -356,3 +356,43 @@ describe("switch-player flow integration", () => {
     expect(records.map((r) => r.name).sort()).toEqual(["Alpha", "Bravo"]);
   });
 });
+
+describe("profile creation resilience", () => {
+  const throwingStore = (): CaptainStore => {
+    const map = new Map<string, string>();
+    return {
+      getItem: (key) => (map.has(key) ? (map.get(key) ?? null) : null),
+      setItem: () => {
+        throw new Error("QuotaExceededError (simulated)");
+      },
+      removeItem: (key) => {
+        map.delete(key);
+      },
+    };
+  };
+
+  it("createProfileWithPreset returns a usable captain when storage writes throw", () => {
+    // Quota exhaustion / locked-down private browsing on the first-launch
+    // tap must degrade to a non-persisted session, never a stuck picker.
+    const record = createProfileWithPreset("Captain Wave", throwingStore());
+    expect(record.name).toBe("Captain Wave");
+    expect(record.profile.berries).toBe(defaultProfile().berries);
+  });
+
+  it("createProfile reports ok when only persistence fails", () => {
+    const result = createProfile("Theo", throwingStore());
+    expect(result.ok).toBe(true);
+    expect(result.record?.name).toBe("Theo");
+  });
+
+  it("createProfileWithPreset falls back to the legacy default name on empty input", () => {
+    const store = makeStore();
+    const record = createProfileWithPreset("   ", store);
+    expect(record.name).toBe(MIGRATED_LEGACY_CAPTAIN_NAME);
+    // The fallback name round-trips the list serializer (an empty name
+    // would be silently dropped by deserializeCaptainList on next launch).
+    expect(listProfiles(store).map((r) => r.name)).toContain(
+      MIGRATED_LEGACY_CAPTAIN_NAME,
+    );
+  });
+});

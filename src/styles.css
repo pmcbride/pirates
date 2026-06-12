@@ -623,12 +623,6 @@ button:disabled {
   vertical-align: -0.15rem;
 }
 
-.dock-actions .primary-cta {
-  min-height: 56px;
-  padding: 0.6rem 1.2rem;
-  font-size: 1.1rem;
-}
-
 /* ── Queue (programmed plan) ───────────────────────────────────
    Compact icon-only chips inspired by Dragon Coding Games for Kids.
    The queue is a thin horizontal strip — each chip is ≤ 96px wide so
@@ -1066,7 +1060,10 @@ button:disabled {
   grid-auto-columns: minmax(72px, 88px);
   gap: 0.45rem;
   overflow-x: auto;
-  padding: 0.2rem;
+  /* Vertical headroom: overflow-x:auto clips the cross axis too, which was
+     shaving the next-up bob (-4px lift) and the hint glow ring off the
+     stamps. */
+  padding: 0.5rem 0.2rem;
   align-items: stretch;
   scroll-snap-type: x proximity;
 }
@@ -1801,7 +1798,9 @@ button:disabled {
    ≥120px square so a 5-year-old's first-ever tap can't miss. Used both in
    the pre-mount overlay and the Settings drawer's New-captain panel. */
 .captain-preset-grid {
-  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  /* 118px floor keeps two columns alive on small phones; tablet target still
+     lays out 3×2. */
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
   gap: 0.7rem;
 }
 

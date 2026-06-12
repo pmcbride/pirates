@@ -493,17 +493,19 @@ export class MissionScene extends Phaser.Scene {
     tiles
       .filter((tile) => tile.active)
       .forEach((tile) => {
-        const key = kindTextureMap[tile.kind as keyof typeof kindTextureMap];
-        if (!key) {
+        if (tile.kind === "goal") {
+          // The goal renders above as a dedicated sprite + flag pictogram —
+          // content never places goal *tiles*, but the type allows it.
           return;
         }
+        const key = kindTextureMap[tile.kind];
         const center = this.worldXY(mission, tile.position);
         const image = this.add
           .image(center.x, center.y, key)
           .setDisplaySize(tileSize - 22, tileSize - 22);
         // Pictogram, not letters — the target player can't read yet. The
         // colored backplate still carries the per-kind color coding.
-        const glyph = kindGlyphMap[tile.kind as keyof typeof kindGlyphMap] ?? "";
+        const glyph = kindGlyphMap[tile.kind];
         const text = this.add
           .text(image.x, image.y, glyph, {
             fontFamily: "Nunito, sans-serif",
@@ -998,9 +1000,9 @@ export class MissionScene extends Phaser.Scene {
   }
 
   /**
-   * Cosmetic fail lunge: nudge the ship halfway toward the tile it hit, then
-   * bounce back. Never awaited — snapToStep corrects the position at the end
-   * of the step regardless of whether the tween ran.
+   * Cosmetic fail lunge: nudge the ship halfway from `from` toward the flagged
+   * tile, then bounce back. Never awaited — snapToStep corrects the position
+   * at the end of the step regardless of whether the tween ran.
    */
   private bumpShipToward(
     mission: MissionDefinition,
@@ -1101,8 +1103,9 @@ export class MissionScene extends Phaser.Scene {
     );
     for (const [id, sprite] of this.tileSprites) {
       if (!activeIds.has(id)) {
-        // Kill frozen fade/pop tweens so syncTilesToStep sees a sprite it is
-        // allowed to destroy (it skips sprites that look mid-animation).
+        // Kill frozen fade/pop tweens so they can't resume once the page is
+        // visible again and replay against a sprite syncTilesToStep is about
+        // to destroy (its alpha/scale guard only spares fully-faded sprites).
         this.tweens.killTweensOf([sprite.image, sprite.text]);
       }
     }
@@ -1113,6 +1116,7 @@ export class MissionScene extends Phaser.Scene {
     prev: RunStep | null,
     step: RunStep,
     durations: { move: number; turn: number; dodge: number; tile: number },
+    token: number,
   ): Promise<void> {
     const prevShip = prev?.ship ?? { position: mission.start.position, facing: mission.start.facing };
 
@@ -1205,8 +1209,11 @@ export class MissionScene extends Phaser.Scene {
         this.flashFailRing(mission, position, reduced),
       );
       if (!reduced && failPositions.length > 0) {
-        // Cosmetic lunge-and-bounce toward the collision — not awaited.
-        this.bumpShipToward(mission, step.ship.position, failPositions[0]);
+        // Cosmetic lunge-and-bounce toward the collision — not awaited. Lunge
+        // from where the sprite visually sits (the previous step's tile): the
+        // engine parks the failed step's ship.position ON the collision tile,
+        // which would degenerate the bump into a full-tile jump.
+        this.bumpShipToward(mission, prevShip.position, failPositions[0]);
       }
       // Readable failure beat — shortened under reduced motion, never skipped.
       failHoldMs = reduced ? 400 : 900;
@@ -1248,6 +1255,12 @@ export class MissionScene extends Phaser.Scene {
       const deadline =
         Math.max(durations.move, durations.turn, durations.dodge, durations.tile) + 200;
       await Promise.race([Promise.all(tasks), this.beat(deadline)]);
+    }
+
+    // Wall-clock beats keep firing after a token bump (newer run, scene
+    // shutdown) — never snap a stale step onto the new run's sprites.
+    if (token !== this.activePlaybackToken) {
+      return;
     }
 
     this.snapToStep(mission, step);
@@ -1304,53 +1317,62 @@ export class MissionScene extends Phaser.Scene {
       ? { move: 120, turn: 90, dodge: 140, tile: 160 }
       : { move: 260, turn: 200, dodge: 320, tile: 300 };
 
-    let prev: RunStep | null = null;
-    for (let i = 0; i < steps.length; i += 1) {
-      if (token !== this.activePlaybackToken) {
-        return;
-      }
-      const step = steps[i];
-      this.statusText?.setText(step.message);
-      gameStore.setPlaybackIndex(i);
+    try {
+      let prev: RunStep | null = null;
+      for (let i = 0; i < steps.length; i += 1) {
+        if (token !== this.activePlaybackToken) {
+          return;
+        }
+        const step = steps[i];
+        this.statusText?.setText(step.message);
+        gameStore.setPlaybackIndex(i);
 
-      await this.playStep(mission, prev, step, durations);
+        await this.playStep(mission, prev, step, durations, token);
 
-      if (token !== this.activePlaybackToken) {
-        return;
-      }
+        if (token !== this.activePlaybackToken) {
+          return;
+        }
 
-      // Final success step gets a moment to linger so the player feels the win
-      // BEFORE the screen swaps to the reward card: sparkle burst + ship
-      // wiggle at the goal tile (cosmetic), riding a wall-clock hold
-      // (informational — shortened under reduced motion, never skipped).
-      if (i === steps.length - 1 && step.status === "success") {
-        const goalPoint = this.worldXY(mission, step.ship.position);
-        this.spawnSparkleBurst(goalPoint.x, goalPoint.y);
-        this.wiggleShip();
-        await this.beat(reduced ? 400 : 900);
-      }
+        // Final success step gets a moment to linger so the player feels the
+        // win BEFORE the screen swaps to the reward card: sparkle burst + ship
+        // wiggle at the goal tile (cosmetic), riding a wall-clock hold
+        // (informational — shortened under reduced motion, never skipped).
+        if (i === steps.length - 1 && step.status === "success") {
+          const goalPoint = this.worldXY(mission, step.ship.position);
+          this.spawnSparkleBurst(goalPoint.x, goalPoint.y);
+          this.wiggleShip();
+          await this.beat(reduced ? 400 : 900);
+        }
 
-      // Warning beats (no-op fire/collect/talk) dwell longer so the player
-      // actually notices the wasted move and the "💨 nothing here" status text.
-      // Reduced-motion still gets a short dwell — we never *skip* informational
-      // beats, just shorten them.
-      if (step.status === "warning") {
-        await this.beat(reduced ? 220 : 480);
-      }
+        // Warning beats (no-op fire/collect/talk) dwell longer so the player
+        // actually notices the wasted move and the "💨 nothing here" status
+        // text. Reduced-motion still gets a short dwell — we never *skip*
+        // informational beats, just shorten them.
+        if (step.status === "warning") {
+          await this.beat(reduced ? 220 : 480);
+        }
 
-      // Fixed inter-step breath so back-to-back commands read as separate
-      // beats instead of one continuous slide. Wall clock, like every pacing
-      // wait in this loop.
-      if (i < steps.length - 1) {
-        await this.beat(reduced ? 50 : 110);
+        // Fixed inter-step breath so back-to-back commands read as separate
+        // beats instead of one continuous slide. Wall clock, like every pacing
+        // wait in this loop.
+        if (i < steps.length - 1) {
+          await this.beat(reduced ? 50 : 110);
+        }
+        prev = step;
       }
-      prev = step;
+    } catch (err) {
+      // An animation/subscriber bug must never wedge the mission in "running"
+      // (board frozen, every control locked, reward silently dropped).
+      console.error("[mission] playback aborted by error", err);
+    } finally {
+      // Completion is structurally guaranteed for the run that still owns the
+      // playback token: success lands on the reward screen, failure lands in
+      // gentle rewind. Cancelled runs (token bumped by a newer run or scene
+      // shutdown) skip it — the canceller owns the state transition.
+      if (token === this.activePlaybackToken) {
+        gameStore.finishPlayback();
+      }
     }
-
-    if (token !== this.activePlaybackToken) {
-      return;
-    }
-    gameStore.finishPlayback();
   }
 
   shutdown(): void {

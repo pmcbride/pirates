@@ -246,14 +246,28 @@ export class WorldMapScene extends Phaser.Scene {
       }
       this.layer?.add([nodeGraphics, portraitText]);
 
+      // Everything that visually belongs to the island wiggles together on a
+      // locked tap — the lock badge is created below and pushed in, so the
+      // padlock can't shear off its island mid-shake.
+      const wiggleTargets: Phaser.GameObjects.GameObject[] = [
+        nodeGraphics,
+        portraitText,
+      ];
+
       nodeGraphics.on("pointerdown", () => {
         if (!unlocked) {
           // Locked: soft fail tone + a quick head-shake wiggle (cosmetic —
           // skipped under reduced motion; the tone still answers the tap).
           playSfx("fail");
-          if (!gameStore.getState().profile.settings.reducedMotion) {
+          // isTweening guard: the wiggle is a *relative* tween (x: "+=7"),
+          // so stacking a second one mid-shake (rapid double-tap) would
+          // compound the offset and drift the island off its anchor.
+          if (
+            !gameStore.getState().profile.settings.reducedMotion &&
+            !this.tweens.isTweening(nodeGraphics)
+          ) {
             this.tweens.add({
-              targets: [nodeGraphics, portraitText],
+              targets: wiggleTargets,
               x: "+=7",
               duration: 55,
               ease: "Sine.easeInOut",
@@ -296,6 +310,7 @@ export class WorldMapScene extends Phaser.Scene {
           })
           .setOrigin(0.5);
         this.layer?.add([badgeBg, badgeText]);
+        wiggleTargets.push(badgeBg, badgeText);
       } else if (complete) {
         const badgeBg = this.add.circle(
           x + badgeOffset,

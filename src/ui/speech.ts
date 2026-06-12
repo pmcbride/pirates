@@ -26,6 +26,21 @@ type UtteranceCtor = new (text?: string) => SpeechSynthesisUtterance;
 let muted = false;
 let primed = false;
 let unlockInstalled = false;
+let failureWarned = false;
+
+/**
+ * Warn the first time narration breaks, then go quiet. Speech is the only
+ * information channel a pre-reader has — when it dies on a device, that has
+ * to be diagnosable (BootScene sets the same precedent for painted art), but
+ * a broken engine erroring on every line must not spam the console.
+ */
+const warnOnce = (context: string, detail?: unknown): void => {
+  if (failureWarned) {
+    return;
+  }
+  failureWarned = true;
+  console.warn(`[speech] narration unavailable (${context})`, detail ?? "");
+};
 
 /** Resolve the synth lazily — never cached, so tests can swap the global. */
 const getSynth = (): SpeechSynthesis | null => {
@@ -57,13 +72,15 @@ const primeOnGesture = (): void => {
   if (!synth || !Ctor) {
     return;
   }
-  primed = true;
   try {
     const utterance = new Ctor("");
     utterance.volume = 0;
     synth.speak(utterance);
-  } catch {
-    // priming is best-effort only
+    // Mark primed only after the engine accepted the utterance — a throw
+    // leaves the flag unset so a later explicit gesture could retry.
+    primed = true;
+  } catch (err) {
+    warnOnce("gesture priming failed", err);
   }
 };
 
@@ -119,9 +136,19 @@ export const speak = (text: string): void => {
     synth.cancel();
     const utterance = new Ctor(trimmed);
     utterance.rate = SPEECH_RATE;
+    // speak() itself rarely throws — real failures (not-allowed, audio-busy,
+    // synthesis-failed) arrive async on the utterance's error event.
+    utterance.onerror = (event) => {
+      const error = (event as SpeechSynthesisErrorEvent).error;
+      // "interrupted"/"canceled" are the expected result of our own
+      // cancel-prior-on-new-speak policy, not failures.
+      if (error !== "interrupted" && error !== "canceled") {
+        warnOnce(`utterance error: ${error}`);
+      }
+    };
     synth.speak(utterance);
-  } catch {
-    // never let a speech glitch break gameplay
+  } catch (err) {
+    warnOnce("speak threw", err);
   }
 };
 
@@ -129,6 +156,7 @@ export const speak = (text: string): void => {
 export const __resetSpeechForTests = (): void => {
   muted = false;
   primed = false;
+  failureWarned = false;
   // Leave `unlockInstalled` alone — the once-listener already consumed
   // itself or is still armed; re-installing per test would stack handlers.
 };

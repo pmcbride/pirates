@@ -3,6 +3,7 @@ import { missionNodes, sandboxMissionId } from "../../sim/content";
 import { missionPortraits } from "../../sim/portraits";
 import { gameStore } from "../../sim/store";
 import { getActiveTheme } from "../../themes";
+import { playSfx } from "../../ui/audio";
 import { uiColors } from "../assets/manifest";
 
 export class WorldMapScene extends Phaser.Scene {
@@ -225,15 +226,10 @@ export class WorldMapScene extends Phaser.Scene {
       );
       nodeGraphics.setStrokeStyle(6, uiColors.ink, 1);
       nodeGraphics.setInteractive({ useHandCursor: unlocked });
-      nodeGraphics.on("pointerdown", () => {
-        if (unlocked) {
-          gameStore.selectMission(node.missionId);
-        }
-      });
 
       // Portrait glyph hints at what awaits on this island — visible even
       // when locked so the player gets pulled toward the boss/treasure ahead.
-      // Locked islands render dimmer with a tiny padlock badge; completed
+      // Locked islands render dimmer with a padlock badge; completed
       // islands get a small checkmark badge.
       const portrait = missionPortraits[node.missionId] ?? "★";
       const portraitText = this.add
@@ -250,23 +246,52 @@ export class WorldMapScene extends Phaser.Scene {
       }
       this.layer?.add([nodeGraphics, portraitText]);
 
-      // Corner badge: small lock for locked nodes, small check for completed.
+      nodeGraphics.on("pointerdown", () => {
+        if (!unlocked) {
+          // Locked: soft fail tone + a quick head-shake wiggle (cosmetic —
+          // skipped under reduced motion; the tone still answers the tap).
+          playSfx("fail");
+          if (!gameStore.getState().profile.settings.reducedMotion) {
+            this.tweens.add({
+              targets: [nodeGraphics, portraitText],
+              x: "+=7",
+              duration: 55,
+              ease: "Sine.easeInOut",
+              yoyo: true,
+              repeat: 3,
+            });
+          }
+          return;
+        }
+        if (selected) {
+          // Second tap on the already-selected island sails — the DOM
+          // Set Sail CTA stays as the redundant affordance.
+          gameStore.openMission(node.missionId);
+          return;
+        }
+        gameStore.selectMission(node.missionId);
+      });
+
+      // Corner badge: lock for locked nodes, small check for completed.
       // Rendered as a contrasting circle + glyph in the bottom-right corner
       // of the portrait so the portrait itself stays the dominant visual.
       const badgeOffset = Math.round((selected ? selectedRadius : nodeRadius) * 0.72);
       const badgeRadius = Math.max(9, Math.round(12 * ui));
       if (!unlocked && !isSandbox) {
+        // Lock badge runs ~2x the other badges — locked-vs-open is the one
+        // state a pre-reader must read at arm's length on a tablet.
+        const lockRadius = Math.max(18, Math.round(22 * ui));
         const badgeBg = this.add.circle(
           x + badgeOffset,
           y + badgeOffset,
-          badgeRadius,
+          lockRadius,
           uiColors.ink,
           0.85,
         );
         const badgeText = this.add
           .text(x + badgeOffset, y + badgeOffset, "🔒", {
             fontFamily: "Fredoka, Georgia, serif",
-            fontSize: `${Math.max(11, Math.round(14 * ui))}px`,
+            fontSize: `${Math.max(20, Math.round(26 * ui))}px`,
             color: "#fff1cf",
           })
           .setOrigin(0.5);

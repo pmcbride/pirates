@@ -54,3 +54,17 @@ export const kindTextureMap = {
   crew: textureKeys.crew,
   current: textureKeys.current,
 } as const;
+
+/** Pictogram per tile kind — pre-readers identify board tokens by glyph, not
+ * letters. Rendered as Phaser text centered on the colored token backplate
+ * (the backplate keeps carrying the color coding). */
+export const kindGlyphMap: Record<keyof typeof kindTextureMap, string> = {
+  enemy: "⛵",
+  obstacle: "🪨",
+  treasure: "💰",
+  crew: "🧑",
+  current: "🌀",
+};
+
+/** Goal-tile pictogram overlay — the finish flag every kid knows from races. */
+export const goalGlyph = "🏁";

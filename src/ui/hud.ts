@@ -10,9 +10,11 @@ import type { Theme, ThemeId } from "../themes/types";
 import {
   MAX_NAME_LENGTH,
   createProfile,
+  createProfileWithPreset,
   deleteProfile,
   getActiveProfileName,
   listProfiles,
+  presetCaptains,
   validateCaptainName,
 } from "../sim/captains";
 import {
@@ -20,12 +22,14 @@ import {
   missionNodes,
   missions,
 } from "../sim/content";
+import { missionPortraits } from "../sim/portraits";
 import { gameStore } from "../sim/store";
 import type { AppState, HintResult, PlannedCommand, PlayerProfile } from "../sim/types";
 import { playSfx, setMuted } from "./audio";
 import { haptic } from "./haptic";
 import { iconSvgMap, type IconKey } from "./icons";
 import { reconcileKeys } from "./reconcile";
+import { setSpeechMuted, speak } from "./speech";
 
 const labelMap = {
   "move-up": "Up",
@@ -105,12 +109,6 @@ const missionLabel = (theme: Theme, missionId: string): string =>
 
 const missionSea = (theme: Theme, missionId: string): string =>
   theme.missions[missionId]?.sea ?? "";
-
-const missionPreview = (theme: Theme, missionId: string): string =>
-  theme.missions[missionId]?.preview ?? "";
-
-const missionBriefing = (theme: Theme, missionId: string): string =>
-  theme.missions[missionId]?.briefing ?? "";
 
 const missionTutorial = (theme: Theme, missionId: string): string =>
   theme.missions[missionId]?.tutorial ?? "";
@@ -255,8 +253,10 @@ const wantedFruitCard = (theme: Theme, fruitId: string): string => {
 };
 
 interface CaptainsPanelState {
-  /** True while the player is typing a new captain name in-drawer. */
+  /** True while the new-captain section (preset grid) is open in-drawer. */
   showNewInput: boolean;
+  /** True when the parent expanded the typed-name disclosure inside it. */
+  showTyped: boolean;
   /** Last-entered name (preserved across re-renders so an error message
    *  doesn't wipe the input). */
   newDraft: string;
@@ -300,28 +300,65 @@ const captainsPanelMarkup = (
     })
     .join("");
 
+  // Default new-captain flow is the tap-a-pirate preset grid (no typing —
+  // same path as the first-launch overlay). The typed form stays reachable
+  // behind a small parent-facing disclosure.
+  const presetGrid = `
+    <div class="captain-grid captain-preset-grid">
+      ${presetCaptains
+        .map(
+          (preset) => `
+            <button
+              type="button"
+              class="captain-pick captain-pick-preset"
+              data-action="add-preset-captain"
+              data-preset-name="${escapeHtml(preset.name)}"
+            >
+              <span class="captain-pick-icon" aria-hidden="true">${preset.icon}</span>
+              <strong>${escapeHtml(preset.name)}</strong>
+            </button>
+          `,
+        )
+        .join("")}
+    </div>
+  `;
+
+  const typedForm = `
+    <form class="captain-new-form" data-captain-new-form>
+      <label class="captain-new-label" for="captain-new-input">New captain name</label>
+      <input
+        id="captain-new-input"
+        type="text"
+        name="captainName"
+        maxlength="${MAX_NAME_LENGTH}"
+        autocomplete="off"
+        autocapitalize="words"
+        spellcheck="false"
+        class="captain-input"
+        value="${escapeHtml(state.newDraft)}"
+        required
+      />
+      ${state.newError ? `<p class="captain-error">${escapeHtml(state.newError)}</p>` : ""}
+      <div class="captain-new-actions">
+        <button type="submit" class="primary-cta">⛵ Add captain</button>
+      </div>
+    </form>
+  `;
+
   const newCaptainSection = state.showNewInput
     ? `
-        <form class="captain-new-form" data-captain-new-form>
-          <label class="captain-new-label" for="captain-new-input">New captain name</label>
-          <input
-            id="captain-new-input"
-            type="text"
-            name="captainName"
-            maxlength="${MAX_NAME_LENGTH}"
-            autocomplete="off"
-            autocapitalize="words"
-            spellcheck="false"
-            class="captain-input"
-            value="${escapeHtml(state.newDraft)}"
-            required
-          />
-          ${state.newError ? `<p class="captain-error">${escapeHtml(state.newError)}</p>` : ""}
-          <div class="captain-new-actions">
-            <button type="submit" class="primary-cta">⛵ Add captain</button>
-            <button type="button" class="ghost-link" data-action="cancel-new-captain">Cancel</button>
-          </div>
-        </form>
+        <p class="drawer-copy">Tap a pirate to start a new voyage.</p>
+        ${presetGrid}
+        ${
+          state.showTyped
+            ? typedForm
+            : `
+              <button type="button" class="captain-type-toggle" data-action="show-typed-captain">
+                ✏️ Type a name instead
+              </button>
+            `
+        }
+        <button type="button" class="ghost-link" data-action="cancel-new-captain">Cancel</button>
       `
     : `
         <button type="button" class="drawer-toggle" data-action="show-new-captain">
@@ -601,6 +638,12 @@ interface MissionScaffold {
   activeIndex: number;
   /** instanceId of the queue card currently flagged as the hint target, or null. */
   hintTargetInstanceId: string | null;
+  /**
+   * templateId of the PALETTE stamp flagged as the hint target — the
+   * fallback when the needed block isn't in the queue at all (deleted /
+   * never added). Mutually exclusive with `hintTargetInstanceId`.
+   */
+  hintPaletteTemplateId: string | null;
 }
 
 /**
@@ -645,6 +688,7 @@ export class Hud {
   /** Transient state for the captains panel in the Settings drawer. */
   private captainsPanel: CaptainsPanelState = {
     showNewInput: false,
+    showTyped: false,
     newDraft: "",
     newError: "",
   };
@@ -683,6 +727,8 @@ export class Hud {
     }
     gameStore.subscribe((state) => {
       setMuted(state.profile.settings.muted);
+      // One mute switch silences both sfx and voice narration.
+      setSpeechMuted(state.profile.settings.muted);
       this.render(state);
     });
   }
@@ -790,8 +836,10 @@ export class Hud {
         gameStore.leaveMission();
         break;
       case "claim-reward":
-        playSfx("reward-claim");
-        haptic("success");
+        // The victory fanfare fires automatically on reward-screen entry
+        // (see `mountScreen`) — the claim tap just needs a light confirm.
+        playSfx("stamp-drop");
+        haptic("tap");
         gameStore.claimReward();
         break;
       case "toggle-drawer":
@@ -813,8 +861,11 @@ export class Hud {
         gameStore.confirmPrediction();
         break;
       case "skip-prediction":
-        gameStore.toggleSkipPrediction();
-        gameStore.runActiveMission();
+        // One-shot skip — runs the plan immediately WITHOUT flipping the
+        // persisted skipPrediction setting (a kid taps this blindly; the
+        // permanent opt-out lives only in the Settings drawer).
+        haptic("tap");
+        gameStore.skipPredictionOnce();
         break;
       case "set-theme":
         if (themeId) {
@@ -825,6 +876,8 @@ export class Hud {
         if (templateId) {
           playSfx("stamp-drop");
           haptic("tap");
+          // Instant vocabulary for pre-readers: tap Fire → hear "Fire!".
+          speak(`${commandLibrary[templateId]?.label ?? templateId}!`);
           gameStore.addCommand(templateId);
         }
         break;
@@ -915,6 +968,7 @@ export class Hud {
         if (name) {
           this.captainsPanel = {
             showNewInput: false,
+            showTyped: false,
             newDraft: "",
             newError: "",
           };
@@ -923,6 +977,31 @@ export class Hud {
         }
         break;
       }
+      case "add-preset-captain": {
+        // Tap-a-pirate creation — never fails, never asks for input.
+        const presetName = button.dataset.presetName;
+        if (!presetName) break;
+        haptic("tap");
+        const record = createProfileWithPreset(presetName);
+        this.captainsPanel = {
+          showNewInput: false,
+          showTyped: false,
+          newDraft: "",
+          newError: "",
+        };
+        // createProfileWithPreset already set the new captain active —
+        // reload the store so map/title reflect the fresh profile.
+        gameStore.switchCaptain(record.name);
+        break;
+      }
+      case "show-typed-captain":
+        this.captainsPanel = {
+          ...this.captainsPanel,
+          showNewInput: true,
+          showTyped: true,
+        };
+        this.rerenderDrawer(gameStore.getState());
+        break;
       case "delete-captain": {
         const name = button.dataset.captainName;
         if (!name) break;
@@ -947,6 +1026,7 @@ export class Hud {
         }
         this.captainsPanel = {
           showNewInput: false,
+          showTyped: false,
           newDraft: "",
           newError: "",
         };
@@ -963,6 +1043,7 @@ export class Hud {
       case "show-new-captain":
         this.captainsPanel = {
           showNewInput: true,
+          showTyped: false,
           newDraft: "",
           newError: "",
         };
@@ -971,6 +1052,7 @@ export class Hud {
       case "cancel-new-captain":
         this.captainsPanel = {
           showNewInput: false,
+          showTyped: false,
           newDraft: "",
           newError: "",
         };
@@ -1061,6 +1143,7 @@ export class Hud {
     if (!validation.ok) {
       this.captainsPanel = {
         showNewInput: true,
+        showTyped: true,
         newDraft: raw,
         newError: errorMessageFor(validation.error),
       };
@@ -1072,6 +1155,7 @@ export class Hud {
     if (!result.ok) {
       this.captainsPanel = {
         showNewInput: true,
+        showTyped: true,
         newDraft: raw,
         newError: errorMessageFor(result.error),
       };
@@ -1081,6 +1165,7 @@ export class Hud {
 
     this.captainsPanel = {
       showNewInput: false,
+      showTyped: false,
       newDraft: "",
       newError: "",
     };
@@ -1321,6 +1406,13 @@ export class Hud {
         this.mountMissionScaffold(layer, state);
         break;
       case "reward":
+        // Fire the fanfare on screen ENTRY — the kid hears the win the
+        // moment it lands, not only if they later tap the claim button.
+        // mountScreen runs once per screen change, so this never repeats
+        // while the overlay sits open. Reduced motion trims the visual
+        // celebration only; sound + haptics stay.
+        playSfx("reward-claim");
+        haptic("success");
         layer.innerHTML = this.renderRewardMarkup(state, theme);
         break;
     }
@@ -1380,23 +1472,16 @@ export class Hud {
 
       <section class="map-docket surface-card">
         <p class="eyebrow">${escapeHtml(node ? missionSea(theme, node.missionId) : "")}</p>
-        <h3>${escapeHtml(node ? missionLabel(theme, node.missionId) : "")}</h3>
-        <p>${escapeHtml(node ? missionPreview(theme, node.missionId) || missionBriefing(theme, node.missionId) : "")}</p>
+        <h3>
+          ${node ? `<span class="docket-portrait" aria-hidden="true">${missionPortraits[node.missionId] ?? ""}</span>` : ""}
+          ${escapeHtml(node ? missionLabel(theme, node.missionId) : "")}
+        </h3>
         <div class="map-reward-row">
           <span>💰 ${escapeHtml(formatCurrency(theme, node?.rewards.berries ?? 0))}</span>
           <span>🏴‍☠️ ${escapeHtml(formatBountyFor(theme, node?.rewards.bounty ?? 0))}</span>
           <span>⭐ ${node?.rewards.stars ?? 0}</span>
           ${node?.rewards.crewId ? `<span>🧑‍🎤 ${escapeHtml(theme.crew[node.rewards.crewId]?.name ?? "")}</span>` : ""}
           ${node?.rewards.fruitPowerId ? `<span>🍎 ${escapeHtml(theme.fruits[node.rewards.fruitPowerId]?.name ?? "")}</span>` : ""}
-        </div>
-        <div class="mission-pill-row">
-          ${missionNodes
-            .map((entry) => {
-              const unlocked = state.profile.unlockedMissionIds.includes(entry.missionId);
-              const current = missionId === entry.missionId;
-              return `<button ${unlocked ? "" : "disabled"} data-action="select-mission" data-mission-id="${entry.missionId}" class="route-pill ${current ? "is-current" : ""}">${escapeHtml(missionLabel(theme, entry.missionId))}</button>`;
-            })
-            .join("")}
         </div>
         <button data-action="open-selected-mission" class="primary-cta">${
           missionId === "sandbox-isle"
@@ -1429,6 +1514,19 @@ export class Hud {
       ? missionLabel(theme, state.rewardMissionId)
       : "Voyage Clear";
 
+    // Hide zero-value chips — a "+0" pill is pure noise to a pre-reader.
+    const chips = [
+      (reward?.berries ?? 0) > 0
+        ? `<span class="stat-pill">💰 ${escapeHtml(formatCurrency(theme, reward?.berries ?? 0))}</span>`
+        : "",
+      (reward?.bounty ?? 0) > 0
+        ? `<span class="stat-pill bounty" aria-label="Bounty">🏴‍☠️ +${escapeHtml(formatBountyFor(theme, reward?.bounty ?? 0))}</span>`
+        : "",
+      (reward?.stars ?? 0) > 0
+        ? `<span class="stat-pill">⭐ +${reward?.stars ?? 0}</span>`
+        : "",
+    ].join("");
+
     return `
       <section class="reward-overlay">
         <div class="reward-copy">
@@ -1443,11 +1541,7 @@ export class Hud {
                 }</p>`
               : ""
           }
-          <div class="reward-row">
-            <span class="stat-pill">💰 ${escapeHtml(formatCurrency(theme, reward?.berries ?? 0))}</span>
-            <span class="stat-pill bounty" aria-label="Bounty">🏴‍☠️ +${escapeHtml(formatBountyFor(theme, reward?.bounty ?? 0))}</span>
-            <span class="stat-pill">⭐ +${reward?.stars ?? 0}</span>
-          </div>
+          ${chips ? `<div class="reward-row">${chips}</div>` : ""}
           ${
             reward?.crewId
               ? `<ul class="drawer-list" style="margin:0;">${wantedCrewCard(theme, reward.crewId)}</ul>`
@@ -1467,6 +1561,7 @@ export class Hud {
           }
           <button data-action="claim-reward" class="primary-cta">🗺️ Back to Chart</button>
         </div>
+        ${state.profile.settings.reducedMotion ? "" : rewardCelebrationMarkup()}
       </section>
     `;
   }
@@ -1560,6 +1655,7 @@ export class Hud {
       queueNodes: new Map(),
       activeIndex: -1,
       hintTargetInstanceId: null,
+      hintPaletteTemplateId: null,
     };
   }
 
@@ -1626,11 +1722,18 @@ export class Hud {
                 : "Close — try the next one!"
             }</p>`
           : "";
+      // The fix's block icon rides inside the bubble — a pre-reader can't
+      // parse "add a Fire block", but they CAN match the pictured stamp.
+      const focusId = state.activeHint?.focusTemplateId;
+      const focusIcon =
+        focusId && focusId in iconMap
+          ? `<span class="hint-block-icon">${iconFor(focusId as keyof typeof iconMap)}</span>`
+          : "";
       m.hintHost.innerHTML = state.activeHint && !isSandbox
         ? `
           <section class="hint-banner surface-card" data-hint-bubble>
             <p class="eyebrow">💬 Gentle Rewind</p>
-            <strong>${escapeHtml(state.activeHint.reason)}</strong>
+            <strong>${focusIcon}${escapeHtml(state.activeHint.reason)}</strong>
             <p>${escapeHtml(state.activeHint.suggestion)}</p>
             ${feedback}
           </section>
@@ -1656,8 +1759,8 @@ export class Hud {
                 class="primary-cta"
                 ${state.predictedEndPosition ? "" : "disabled"}
               >▶ Run plan!</button>
-              <button data-action="skip-prediction" class="ghost-link">
-                Skip prediction
+              <button data-action="skip-prediction" class="predict-skip">
+                <span class="dock-action-icon" aria-hidden="true">⏭️</span>Skip
               </button>
             </div>
           </section>
@@ -1683,8 +1786,8 @@ export class Hud {
           <p>${escapeHtml(themedTutorial)}</p>
         </div>
         <div class="dock-actions">
-          <button ${locked ? "disabled" : ""} data-action="clear-queue">Clear</button>
-          <button ${locked ? "disabled" : ""} data-action="reset-queue">Reset</button>
+          <button ${locked ? "disabled" : ""} data-action="clear-queue"><span class="dock-action-icon" aria-hidden="true">🧹</span>Clear</button>
+          <button ${locked ? "disabled" : ""} data-action="reset-queue"><span class="dock-action-icon" aria-hidden="true">⚓</span>Reset</button>
         </div>
       `;
       m.fingerprints.dockHead = dockHeadFp;
@@ -1702,24 +1805,38 @@ export class Hud {
       m.fingerprints.playButton = playFp;
     }
 
-    // — Palette grid (depends on mission palette + locked)
-    const paletteFp = `${mission.id}|${locked ? "l" : "u"}`;
+    // — Palette grid (depends on mission palette + locked + rebuild nudge)
+    // When the queue is EMPTY during planning, the stamp matching the
+    // suggested plan's first block pulses gently — the rebuild path must be
+    // self-evident to a pre-reader who just cleared their plan. Gated off
+    // under the profile's reduced-motion setting (the CSS media query
+    // handles the OS-level preference).
+    const nextUpTemplateId =
+      !locked &&
+      state.queuedCommands.length === 0 &&
+      !state.profile.settings.reducedMotion
+        ? (mission.suggestedQueue[0]?.templateId ?? null)
+        : null;
+    const paletteFp = `${mission.id}|${locked ? "l" : "u"}|${nextUpTemplateId ?? "-"}`;
     if (paletteFp !== m.fingerprints.palette) {
       m.palette.innerHTML = mission.palette
         .map((templateId) => {
           const template = commandLibrary[templateId];
           const icon = iconFor(templateId as keyof typeof iconMap);
+          const nextUp = templateId === nextUpTemplateId ? " is-next-up" : "";
+          // Icon-first stamp: the description sentence is aria-only so the
+          // glyph can fill the card (pre-readers never read the sentence).
           return `
             <button
               ${locked ? "disabled" : ""}
-              class="palette-card ${accentMap[template.accent as keyof typeof accentMap] ?? "accent-blue"}"
+              class="palette-card ${accentMap[template.accent as keyof typeof accentMap] ?? "accent-blue"}${nextUp}"
               data-action="add-command"
               data-template-id="${templateId}"
               draggable="true"
+              aria-label="${escapeHtml(template.label)} — ${escapeHtml(template.description)}"
             >
               <span class="stamp-icon">${icon}</span>
               <strong>${escapeHtml(template.label)}</strong>
-              <span>${escapeHtml(template.description)}</span>
             </button>
           `;
         })
@@ -1953,6 +2070,11 @@ export class Hud {
     const focusTemplateId =
       state.activeHint && !isSandbox ? state.activeHint.focusTemplateId : undefined;
     const nextTargetId = findHintTargetInstanceId(state.queuedCommands, focusTemplateId);
+    // Fallback: the hint names a block that isn't in the queue at all (the
+    // common "you deleted / never added the needed block" case). Glow the
+    // PALETTE stamp instead so the bubble can point at where the fix lives.
+    const nextPaletteId = !nextTargetId && focusTemplateId ? focusTemplateId : null;
+    this.applyPaletteHintTarget(nextPaletteId);
 
     if (nextTargetId === m.hintTargetInstanceId) {
       // Same target — but the node may have been rebuilt (e.g. queue reordered).
@@ -1988,10 +2110,38 @@ export class Hud {
     }
   }
 
+  /** Find the palette stamp for a templateId (scoped to the mission palette). */
+  private paletteButtonFor(templateId: string | null): HTMLElement | null {
+    if (!templateId || !this.mission) return null;
+    return this.mission.palette.querySelector<HTMLElement>(
+      `[data-template-id="${templateId}"]`,
+    );
+  }
+
+  /**
+   * Apply / clear the `.is-hint-target` glow on a palette stamp. Re-applied
+   * every render (idempotent) because the palette region rebuilds its
+   * innerHTML whenever its fingerprint changes, wiping classes.
+   */
+  private applyPaletteHintTarget(nextPaletteId: string | null): void {
+    const m = this.mission;
+    if (!m) return;
+
+    if (nextPaletteId !== m.hintPaletteTemplateId) {
+      this.paletteButtonFor(m.hintPaletteTemplateId)?.classList.remove(
+        "is-hint-target",
+      );
+      m.hintPaletteTemplateId = nextPaletteId;
+    }
+    this.paletteButtonFor(nextPaletteId)?.classList.add("is-hint-target");
+  }
+
   /**
    * Position the hint bubble above the targeted queue card with a dotted
-   * tail pointing down at it. Falls back to the static anchor when there's
-   * no target (or no bubble in the DOM).
+   * tail pointing down at it. When the needed block is MISSING from the
+   * queue, the anchor falls back to the matching palette stamp instead —
+   * the bubble then points at the thing the player should tap. Static
+   * anchor only when neither exists (or no bubble in the DOM).
    *
    * Called both on render and on window resize so the bubble stays glued
    * to the card as the layout changes.
@@ -2004,7 +2154,9 @@ export class Hud {
     if (!bubble) return;
 
     const targetId = m.hintTargetInstanceId;
-    const targetNode = targetId ? m.queueNodes.get(targetId)?.node : null;
+    const targetNode =
+      (targetId ? m.queueNodes.get(targetId)?.node : null) ??
+      this.paletteButtonFor(m.hintPaletteTemplateId);
 
     if (!targetNode) {
       // Fall back to static-anchor mode — clear any inline overrides and the
@@ -2082,6 +2234,27 @@ const renderHexPlayButton = (canRun: boolean, locked: boolean): string => {
       </svg>
     </button>
   `;
+};
+
+/**
+ * Celebration layer for the reward overlay: a burst of star/coin sprites
+ * raining over the card with staggered delays (whole show ≤ ~1.5s). The
+ * positions/delays are derived from the sprite index (golden-angle spread),
+ * not Math.random — re-renders of the overlay don't reshuffle the burst,
+ * and jsdom tests see stable markup. Callers skip this entirely under
+ * reduced motion (sounds are kept; this layer is purely cosmetic).
+ */
+const CELEBRATION_SPRITES = ["⭐", "🪙", "✨", "🎉"] as const;
+const CELEBRATION_COUNT = 24;
+
+const rewardCelebrationMarkup = (): string => {
+  const sprites = Array.from({ length: CELEBRATION_COUNT }, (_, i) => {
+    const left = Math.round((i * 137.5) % 100);
+    const delayMs = (i * 61) % 700;
+    const emoji = CELEBRATION_SPRITES[i % CELEBRATION_SPRITES.length];
+    return `<span class="celebration-sprite" style="left:${left}%;animation-delay:${delayMs}ms;">${emoji}</span>`;
+  }).join("");
+  return `<div class="reward-celebration" aria-hidden="true">${sprites}</div>`;
 };
 
 const hintFingerprint = (hint: HintResult | null): string =>

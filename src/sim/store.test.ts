@@ -5,6 +5,7 @@ import { cloneQueuedCommands, runMission } from "./engine";
 import { defaultProfile, deserializeProfile } from "./profile";
 import {
   computePredictionCorrect,
+  GameStore,
   gameStore,
   pickInitialQueue,
   shipEndPositionForPrediction,
@@ -22,25 +23,29 @@ const profileWithAttempts = (
 });
 
 describe("shouldPredictForMission", () => {
-  it("skips prediction for the tutorial mission", () => {
-    expect(shouldPredictForMission("tutorial-cove", defaultProfile())).toBe(false);
+  it("skips prediction for the first three missions", () => {
+    const profile = defaultProfile();
+    expect(shouldPredictForMission("tutorial-cove", profile)).toBe(false);
+    expect(shouldPredictForMission("spark-shoals", profile)).toBe(false);
+    expect(shouldPredictForMission("windrise-cove", profile)).toBe(false);
   });
 
-  it("requires prediction for non-tutorial missions by default", () => {
-    expect(shouldPredictForMission("spark-shoals", defaultProfile())).toBe(true);
+  it("requires prediction from barrel-bay onward by default", () => {
+    expect(shouldPredictForMission("barrel-bay", defaultProfile())).toBe(true);
+    expect(shouldPredictForMission("treasure-isle", defaultProfile())).toBe(true);
   });
 
   it("skips prediction when the player has opted out", () => {
     const profile = defaultProfile();
     profile.settings.skipPrediction = true;
-    expect(shouldPredictForMission("spark-shoals", profile)).toBe(false);
+    expect(shouldPredictForMission("barrel-bay", profile)).toBe(false);
   });
 });
 
 describe("pickInitialQueue", () => {
   const mission = missions["spark-shoals"];
 
-  it("pre-loads the full suggested queue on the first attempt", () => {
+  it("pre-loads the full suggested queue for a never-attempted mission", () => {
     const profile = profileWithAttempts();
     const queue = pickInitialQueue(mission, profile);
     expect(queue).toHaveLength(mission.suggestedQueue.length);
@@ -49,22 +54,40 @@ describe("pickInitialQueue", () => {
     );
   });
 
-  it("collapses to a one-stamp stub on subsequent attempts", () => {
-    const profile = profileWithAttempts({}, { "spark-shoals": 1 });
+  it("keeps the full plan while the mission is attempted but not yet cleared", () => {
+    const profile = profileWithAttempts({}, { "spark-shoals": 3 });
+    const queue = pickInitialQueue(mission, profile);
+    expect(queue).toHaveLength(mission.suggestedQueue.length);
+    expect(queue.map((command) => command.templateId)).toEqual(
+      mission.suggestedQueue.map((command) => command.templateId),
+    );
+  });
+
+  it("collapses to a one-stamp stub when replaying an already-cleared mission", () => {
+    const profile = profileWithAttempts(
+      { completedMissionIds: ["spark-shoals"] },
+      { "spark-shoals": 1 },
+    );
     const queue = pickInitialQueue(mission, profile);
     expect(queue).toHaveLength(1);
     expect(queue[0].templateId).toBe(mission.suggestedQueue[0].templateId);
   });
 
-  it("respects the alwaysShowSuggested escape hatch", () => {
-    const profile = profileWithAttempts({}, { "spark-shoals": 5 });
+  it("respects the alwaysShowSuggested escape hatch on cleared missions", () => {
+    const profile = profileWithAttempts(
+      { completedMissionIds: ["spark-shoals"] },
+      { "spark-shoals": 5 },
+    );
     profile.settings.alwaysShowSuggested = true;
     const queue = pickInitialQueue(mission, profile);
     expect(queue).toHaveLength(mission.suggestedQueue.length);
   });
 
   it("returns the stub as fresh clones, not references into the mission def", () => {
-    const profile = profileWithAttempts({}, { "spark-shoals": 1 });
+    const profile = profileWithAttempts(
+      { completedMissionIds: ["spark-shoals"] },
+      { "spark-shoals": 1 },
+    );
     const queue = pickInitialQueue(mission, profile);
     expect(queue[0]).not.toBe(mission.suggestedQueue[0]);
   });
@@ -142,6 +165,86 @@ describe("prediction correctness helpers", () => {
     expect(result.success).toBe(false);
     const actual = shipEndPositionForPrediction(result);
     expect(actual).toEqual(result.finalState.ship.position);
+  });
+});
+
+describe("predict beat flow", () => {
+  // Drive a store through a full clear of `missionId` using the pre-loaded
+  // suggested plan — the exact path a pre-reader takes: open, Run, watch, claim.
+  const clearWithSuggestedPlan = (store: GameStore, missionId: string): void => {
+    store.openMission(missionId);
+    store.runActiveMission();
+    store.finishPlayback();
+    store.claimReward();
+  };
+
+  // Clear the three exempt missions so barrel-bay — the first mission with a
+  // predict beat — is unlocked.
+  const storeWithFirstThreeCleared = (): GameStore => {
+    const store = new GameStore();
+    store.startAdventure();
+    clearWithSuggestedPlan(store, "tutorial-cove");
+    clearWithSuggestedPlan(store, "spark-shoals");
+    clearWithSuggestedPlan(store, "windrise-cove");
+    return store;
+  };
+
+  it("runs the first three missions with no predict gate (friction-free chain)", () => {
+    const store = new GameStore();
+    store.startAdventure();
+
+    for (const missionId of ["tutorial-cove", "spark-shoals", "windrise-cove"]) {
+      store.openMission(missionId);
+      expect(store.getState().activeMissionId).toBe(missionId);
+      store.runActiveMission();
+      // Exempt missions go straight into playback — never the predict beat.
+      expect(store.getState().missionPhase).toBe("running");
+      expect(store.getState().lastRun?.success).toBe(true);
+      store.finishPlayback();
+      store.claimReward();
+    }
+
+    expect(store.getState().profile.unlockedMissionIds).toContain("barrel-bay");
+  });
+
+  it("pre-places the prediction marker on the start tile so confirm is never dead", () => {
+    const store = storeWithFirstThreeCleared();
+    store.openMission("barrel-bay");
+    store.runActiveMission();
+
+    const state = store.getState();
+    expect(state.missionPhase).toBe("predicting");
+    expect(state.predictedEndPosition).toEqual(
+      missions["barrel-bay"].start.position,
+    );
+    // A copy, not a live reference into the mission definition.
+    expect(state.predictedEndPosition).not.toBe(
+      missions["barrel-bay"].start.position,
+    );
+
+    // The confirm CTA works immediately, before the player moves the marker.
+    store.confirmPrediction();
+    expect(store.getState().missionPhase).toBe("running");
+    expect(store.getState().lastRun?.success).toBe(true);
+    // The untouched start-tile guess is scored like any other guess.
+    expect(store.getState().lastPredictionCorrect).toBe(false);
+  });
+
+  it("skipPredictionOnce runs the plan right away without persisting the opt-out", () => {
+    const store = storeWithFirstThreeCleared();
+    store.openMission("barrel-bay");
+    store.runActiveMission();
+    expect(store.getState().missionPhase).toBe("predicting");
+
+    store.skipPredictionOnce();
+
+    const state = store.getState();
+    expect(state.missionPhase).toBe("running");
+    expect(state.lastRun?.success).toBe(true);
+    // No guess is scored on a skipped run...
+    expect(state.lastPredictionCorrect).toBeNull();
+    // ...and the persisted Settings opt-out stays untouched.
+    expect(state.profile.settings.skipPrediction).toBe(false);
   });
 });
 

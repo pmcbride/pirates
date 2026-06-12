@@ -126,15 +126,67 @@ describe("Hud — hint speech bubble anchoring", () => {
     expect(cards.length).toBe(0);
   });
 
-  it("falls back gracefully when no queue card matches the focusTemplateId", () => {
+  it("anchors to the PALETTE stamp when the needed block is missing from the queue", () => {
+    // The common "you deleted / never added the needed block" case: the
+    // hint focuses `collect` (in tutorial-cove's palette) but the queue
+    // only holds movement blocks. The bubble must glow + point at the
+    // palette stamp so a pre-reader sees the thing to tap.
     const queue = [queuedRight("q1")];
-    // Engine pointed at `fire` but no `fire` block is in the queue.
+    const state = missionStateWithHint(queue, "collect");
+
+    expect(() => hud.render(state)).not.toThrow();
+
+    // No queue card claims the highlight…
+    expect(root.querySelectorAll(".queue-card.is-hint-target").length).toBe(0);
+
+    // …the matching palette stamp does.
+    const paletteTarget = root.querySelector<HTMLElement>(
+      '.palette-card[data-template-id="collect"]',
+    );
+    expect(paletteTarget).not.toBeNull();
+    expect(paletteTarget?.classList.contains("is-hint-target")).toBe(true);
+
+    // And the bubble anchors (tail pointed at the stamp).
+    const bubble = root.querySelector<HTMLElement>("[data-hint-bubble]");
+    expect(bubble).not.toBeNull();
+    expect(bubble?.classList.contains("is-anchored")).toBe(true);
+  });
+
+  it("shows the needed block's icon inside the bubble", () => {
+    const queue = [queuedRight("q1")];
+    hud.render(missionStateWithHint(queue, "collect"));
+
+    const bubble = root.querySelector<HTMLElement>("[data-hint-bubble]");
+    expect(bubble).not.toBeNull();
+    const icon = bubble?.querySelector(".hint-block-icon svg");
+    expect(icon, "bubble must visually name the needed block").not.toBeNull();
+  });
+
+  it("clears the palette glow when the hint is dismissed", () => {
+    const queue = [queuedRight("q1")];
+    hud.render(missionStateWithHint(queue, "collect"));
+
+    const paletteTarget = root.querySelector<HTMLElement>(
+      '.palette-card[data-template-id="collect"]',
+    );
+    expect(paletteTarget?.classList.contains("is-hint-target")).toBe(true);
+
+    hud.render(missionStateWithHint(queue, undefined));
+
+    const stillGlowing = root.querySelectorAll(".palette-card.is-hint-target");
+    expect(stillGlowing.length).toBe(0);
+  });
+
+  it("falls back to static anchoring when the block is in neither queue nor palette", () => {
+    const queue = [queuedRight("q1")];
+    // Engine pointed at `fire` — not queued, and not in tutorial-cove's
+    // palette either. Nothing can take the glow; the bubble stays static.
     const state = missionStateWithHint(queue, "fire");
 
     expect(() => hud.render(state)).not.toThrow();
 
-    const cards = root.querySelectorAll(".queue-card.is-hint-target");
-    expect(cards.length).toBe(0);
+    expect(root.querySelectorAll(".queue-card.is-hint-target").length).toBe(0);
+    expect(root.querySelectorAll(".palette-card.is-hint-target").length).toBe(0);
 
     const bubble = root.querySelector<HTMLElement>("[data-hint-bubble]");
     expect(bubble).not.toBeNull();

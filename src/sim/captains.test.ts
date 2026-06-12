@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   CaptainStore,
+  MAX_NAME_LENGTH,
   MIGRATED_LEGACY_CAPTAIN_NAME,
   activeProfileStorageKey,
   createProfile,
+  createProfileWithPreset,
   deleteProfile,
   deserializeCaptainList,
   getActiveProfile,
@@ -11,6 +13,7 @@ import {
   legacyProfileStorageKey,
   listProfiles,
   migrateLegacyV2,
+  presetCaptains,
   profilesStorageKey,
   resetActiveProfile,
   saveActiveProfile,
@@ -256,6 +259,72 @@ describe("captains store API (stateful)", () => {
     expect(luffy?.profile.berries).toBe(50);
     expect(zoro?.profile.berries).toBe(0);
     expect(zoro?.profile.completedMissionIds).toEqual([]);
+  });
+});
+
+describe("createProfileWithPreset (tap-to-create, never fails)", () => {
+  let store: CaptainStore;
+
+  beforeEach(() => {
+    store = makeStore();
+  });
+
+  it("creates the preset name verbatim on first use and marks it active", () => {
+    const record = createProfileWithPreset("Captain Wave", store);
+    expect(record.name).toBe("Captain Wave");
+    expect(getActiveProfileName(store)).toBe("Captain Wave");
+    expect(listProfiles(store)).toHaveLength(1);
+  });
+
+  it("suffixes ' II' then ' III' on duplicate collisions", () => {
+    const first = createProfileWithPreset("Captain Wave", store);
+    const second = createProfileWithPreset("Captain Wave", store);
+    const third = createProfileWithPreset("Captain Wave", store);
+    expect(first.name).toBe("Captain Wave");
+    expect(second.name).toBe("Captain Wave II");
+    expect(third.name).toBe("Captain Wave III");
+    expect(listProfiles(store)).toHaveLength(3);
+  });
+
+  it("treats collisions case-insensitively", () => {
+    createProfile("captain wave", store);
+    const record = createProfileWithPreset("Captain Wave", store);
+    expect(record.name).toBe("Captain Wave II");
+  });
+
+  it("keeps suffixed names within MAX_NAME_LENGTH by trimming the base", () => {
+    // "Captain Parrot" is 14 chars — a bare " II" would overflow the 16-char
+    // cap, so the base must give way while the numeral survives whole.
+    const first = createProfileWithPreset("Captain Parrot", store);
+    const second = createProfileWithPreset("Captain Parrot", store);
+    expect(first.name).toBe("Captain Parrot");
+    expect(second.name.length).toBeLessThanOrEqual(MAX_NAME_LENGTH);
+    expect(second.name.endsWith(" II")).toBe(true);
+    expect(second.name).not.toBe(first.name);
+  });
+
+  it("every result passes validateCaptainName against the rest of the roster", () => {
+    // Hammer one preset repeatedly — each new name must be storable as-is.
+    for (let i = 0; i < 6; i += 1) {
+      const before = listProfiles(store).map((r) => r.name);
+      const record = createProfileWithPreset("Captain Sunny", store);
+      const validation = validateCaptainName(record.name, before);
+      expect(validation.ok).toBe(true);
+      expect(validation.cleaned).toBe(record.name);
+    }
+    expect(listProfiles(store)).toHaveLength(6);
+  });
+
+  it("ships preset captains that are all individually valid names", () => {
+    expect(presetCaptains.length).toBeGreaterThanOrEqual(4);
+    for (const preset of presetCaptains) {
+      const validation = validateCaptainName(preset.name);
+      expect(validation.ok, `preset "${preset.name}" must validate`).toBe(true);
+      expect(preset.icon.length).toBeGreaterThan(0);
+    }
+    // Names must be unique within the preset list itself.
+    const lower = presetCaptains.map((p) => p.name.toLowerCase());
+    expect(new Set(lower).size).toBe(lower.length);
   });
 });
 

@@ -1,5 +1,6 @@
 import type {
   CommandBlock,
+  ConditionKind,
   CrewMate,
   FruitPower,
   MissionDefinition,
@@ -142,6 +143,17 @@ export const commandLibrary: Record<string, CommandBlock> = {
   },
 };
 
+// Kid-readable names for condition ids. Step titles and event text must never
+// show a raw id like "enemyAhead" — pre-readers can't parse camelCase ids.
+// Wording matches the HUD's condition-picker labels, lowercased for
+// mid-sentence use.
+export const conditionLabels: Record<ConditionKind, string> = {
+  enemyAhead: "foe ahead",
+  obstacleAhead: "reef ahead",
+  treasureHere: "treasure here",
+  crewHere: "crew here",
+};
+
 export const crewMates: Record<string, CrewMate> = {
   zoro: {
     id: "zoro",
@@ -214,7 +226,9 @@ export const missionNodes: MissionNode[] = [
       berries: 130,
       bounty: 2_000_000,
       stars: 2,
-      unlockCommandIds: [],
+      // Up/Down unlock here so they're in hand before harbor-bend — the next
+      // mission's palette is where those blocks first appear.
+      unlockCommandIds: ["move-up", "move-down"],
     },
     unlockMissionIds: ["windrise-cove"],
   },
@@ -228,7 +242,7 @@ export const missionNodes: MissionNode[] = [
       berries: 120,
       bounty: 1_000_000,
       stars: 2,
-      unlockCommandIds: ["move-up", "move-down"],
+      unlockCommandIds: [],
     },
     unlockMissionIds: ["barrel-bay"],
   },
@@ -454,7 +468,9 @@ export const missions: Record<string, MissionDefinition> = {
       berries: 130,
       bounty: 2_000_000,
       stars: 2,
-      unlockCommandIds: [],
+      // Up/Down unlock here so they're in hand before harbor-bend — the next
+      // mission's palette is where those blocks first appear.
+      unlockCommandIds: ["move-up", "move-down"],
     },
     tiles: [
       {
@@ -508,7 +524,7 @@ export const missions: Record<string, MissionDefinition> = {
       berries: 120,
       bounty: 1_000_000,
       stars: 2,
-      unlockCommandIds: ["move-up", "move-down"],
+      unlockCommandIds: [],
     },
     tiles: [
       {

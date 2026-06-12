@@ -33,18 +33,20 @@ World map ─► Mission planning ─► Plan execution ─► Resolution
    docket previews the reward and the one new concept the mission will teach.
 2. **Mission planning.** Bottom dock holds the **command queue** (drag/tap stamps
    in) and the **block palette** (only the blocks this lesson cares about). On a
-   mission's first attempt, the suggested queue is pre-loaded so the child never
-   faces an empty canvas. On subsequent attempts, only the first stamp is
-   pre-loaded — the kid has to think the rest through (a "Reset to Suggested"
-   button is always available as a safety net, and parents can enable a settings
-   toggle to always pre-load the full plan).
-3. **Predict-then-run.** Before playback starts (every mission except the
-   tutorial), the playfield enters a tap-to-predict overlay: "Where will the
-   ship end up?" The player drops a marker on a tile and confirms with "Run
-   plan!". After playback the reward (or hint) screen reports whether the
-   prediction was right — converting passive watching into active reasoning per
-   Wing/Bers/Resnick research on early CT. A "Skip prediction" link on the
-   predict screen persists in the profile for parents who want to opt out.
+   mission's first attempt — and every retry until the mission is first
+   cleared — the suggested queue is pre-loaded so the child never faces an
+   empty canvas mid-struggle. Replays of already-cleared missions pre-load
+   only the first stamp (free-play tinkering), and parents can enable a
+   settings toggle to always pre-load the full plan.
+3. **Predict-then-run.** From the fourth mission onward (the first three keep
+   the loop friction-free while it's being learned), the playfield enters a
+   tap-to-predict overlay before playback: "Where will the ship end up?" The
+   marker starts pre-placed on the ship's tile so "Run plan!" is never dead;
+   the player may move it, then confirms. After playback the reward (or hint)
+   screen reports whether the prediction was right — converting passive
+   watching into active reasoning per Wing/Bers/Resnick research on early CT.
+   The predict card's Skip button skips one run only; the persistent opt-out
+   lives in Settings for parents.
 4. **Plan execution.** The Going Merry runs the queue beat-by-beat. Each block
    highlights as it executes. On a hit (treasure, enemy, recruit) the affected
    tile pops and a 1-word callout fires. On a failure the ship freezes mid-beat,
@@ -257,9 +259,16 @@ drawer listing cleared missions with stars and Captain's Log entries.
 - `prefers-reduced-motion` and an in-app toggle both kill cosmetic motion and
   halve playback delay.
 - Speech bubbles use the highest-contrast text (`--ink` on `--parchment`).
-- Audio (in v1.1) is supportive, never required. All sound is paired with a
-  visible animation.
-- No text input. Ever. Argument editing is single-tap cycling.
+- Audio is supportive, never required. All sound is paired with a visible
+  animation. Web Speech narration reads objectives, hints, palette labels,
+  and reward lines aloud for pre-readers; it follows the mute toggle.
+- No text input. Ever. Argument editing is single-tap cycling. First-run
+  identity is a tap-a-pirate preset grid (typed names live behind a parent
+  disclosure and in the Settings drawer).
+- Board tiles communicate by pictogram (⛵ 🪨 💰 🧑 🌀, 🏁 goal) on colored
+  backplates — never by letters. Hints pair the speech bubble with pulsing
+  rings on the board tiles the engine flagged and a glow on the palette
+  stamp to add.
 
 ## 7. IP and theming
 

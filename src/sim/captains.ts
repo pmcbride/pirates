@@ -268,6 +268,101 @@ export const createProfile = (
   return { ok: true, record };
 };
 
+// ── Preset captains (tap-to-create, no typing) ────────────────
+//
+// The first-launch gate must be passable by a pre-reader: one tap on a big
+// emoji portrait creates the profile. Names are identity, not theme strings
+// (they persist across theme switches), so they live here rather than in
+// src/themes/*. Every name must validate against NAME_PATTERN and fit
+// MAX_NAME_LENGTH *before* suffixing.
+
+export interface PresetCaptain {
+  /** Emoji portrait — rendered huge on the pick button. */
+  icon: string;
+  /** Display name; also the stored profile key (suffixed on collision). */
+  name: string;
+}
+
+export const presetCaptains: readonly PresetCaptain[] = [
+  { icon: "🦜", name: "Captain Parrot" },
+  { icon: "🐢", name: "Captain Turtle" },
+  { icon: "⚓", name: "Captain Anchor" },
+  { icon: "🌊", name: "Captain Wave" },
+  { icon: "☀️", name: "Captain Sunny" },
+  { icon: "🗺️", name: "Captain Map" },
+];
+
+/**
+ * Roman numeral for duplicate-suffixing ("Captain Wave II"). Supports any
+ * positive count a household could plausibly reach; standard subtractive
+ * notation keeps it short.
+ */
+const toRomanNumeral = (value: number): string => {
+  const table: Array<[number, string]> = [
+    [1000, "M"],
+    [900, "CM"],
+    [500, "D"],
+    [400, "CD"],
+    [100, "C"],
+    [90, "XC"],
+    [50, "L"],
+    [40, "XL"],
+    [10, "X"],
+    [9, "IX"],
+    [5, "V"],
+    [4, "IV"],
+    [1, "I"],
+  ];
+  let remaining = Math.max(1, Math.floor(value));
+  let out = "";
+  for (const [num, glyph] of table) {
+    while (remaining >= num) {
+      out += glyph;
+      remaining -= num;
+    }
+  }
+  return out;
+};
+
+/**
+ * Create a profile from a preset name — the no-typing path. Unlike
+ * `createProfile` this NEVER fails and never asks for input: a name
+ * collision auto-suffixes " II", " III", … (truncating the base so the
+ * result still fits MAX_NAME_LENGTH). The new captain is set active.
+ */
+export const createProfileWithPreset = (
+  presetName: string,
+  store?: CaptainStore,
+): CaptainRecord => {
+  const s = resolveStore(store);
+  const records = loadList(s);
+  const taken = new Set(records.map((record) => record.name.toLowerCase()));
+
+  const base = presetName
+    .trim()
+    .replace(/\s+/g, " ")
+    .slice(0, MAX_NAME_LENGTH)
+    .trim();
+
+  let candidate = base;
+  let ordinal = 2;
+  while (taken.has(candidate.toLowerCase())) {
+    const suffix = ` ${toRomanNumeral(ordinal)}`;
+    // Trim the base so base + suffix stays within MAX_NAME_LENGTH — the
+    // numeral is what disambiguates, so it always survives whole.
+    candidate = `${base.slice(0, MAX_NAME_LENGTH - suffix.length).trimEnd()}${suffix}`;
+    ordinal += 1;
+  }
+
+  const record: CaptainRecord = {
+    name: candidate,
+    profile: defaultProfile(),
+  };
+  writeList(s, [...records, record]);
+  s.setItem(activeProfileStorageKey, record.name);
+  return record;
+};
+
 export const deleteProfile = (
   name: string,
   store?: CaptainStore,

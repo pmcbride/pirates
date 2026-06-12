@@ -41,6 +41,31 @@ const main = async () => {
   await page.setViewport({ width: 768, height: 1024 });
   page.on("pageerror", (err) => console.log("[pageerror]", String(err).slice(0, 300)));
 
+  // The game intentionally degrades a failed background load to the gradient
+  // fallback, so this harness is the only place an art 404 can surface —
+  // collect failures and fail the run instead of screenshotting the fallback.
+  const artFailures = [];
+  page.on("requestfailed", (req) => {
+    if (req.url().includes("/art/")) {
+      artFailures.push(`${req.url()} — ${req.failure()?.errorText}`);
+    }
+  });
+  page.on("response", (res) => {
+    if (!res.url().includes("/art/")) return;
+    const type = res.headers()["content-type"] ?? "";
+    // Vite's dev server answers missing public/ files with the SPA fallback
+    // (200 text/html), so a plain status check misses 404s in dev.
+    if (res.status() >= 400 || type.includes("text/html")) {
+      artFailures.push(`${res.url()} — HTTP ${res.status()} (${type || "no content-type"})`);
+    }
+  });
+  page.on("console", (msg) => {
+    // BootScene warns when a painted texture fails to decode/load.
+    if (msg.text().includes("painted art failed to load")) {
+      artFailures.push(msg.text());
+    }
+  });
+
   // Seed a captain with every mission unlocked so the `?mission=` deep-link
   // can open boards beyond the fresh-profile unlock frontier. The profile
   // loader merges this over defaults, so a partial profile is fine.
@@ -52,15 +77,35 @@ const main = async () => {
     localStorage.setItem("sea-of-codes/active-profile/v3", "Tester");
   `);
 
-  for (const id of MISSIONS) {
-    await page.goto(`${URL}/?mission=${id}`, { waitUntil: "domcontentloaded" });
-    await sleep(4000); // boot + texture load + scene fade-in
-    const path = `${OUT_DIR}/${id}-${SUFFIX}.png`;
-    await page.screenshot({ path });
-    console.log("saved", path);
+  try {
+    for (const id of MISSIONS) {
+      await page.goto(`${URL}/?mission=${id}`, { waitUntil: "domcontentloaded" });
+      // The deep-link silently no-ops for unknown/locked ids (openMission
+      // guard) — assert the mission screen actually mounted rather than
+      // screenshotting whatever screen we landed on.
+      await page
+        .waitForFunction(`!!document.querySelector('[data-action="run-mission"]')`, {
+          timeout: 15000,
+        })
+        .catch(() => {
+          throw new Error(
+            `mission "${id}" never opened — bad id, locked profile seed, or non-DEV build`,
+          );
+        });
+      await sleep(1500); // texture swap + scene fade-in settle
+      const path = `${OUT_DIR}/${id}-${SUFFIX}.png`;
+      await page.screenshot({ path });
+      console.log("saved", path);
+    }
+  } finally {
+    await browser.close();
   }
 
-  await browser.close();
+  if (artFailures.length > 0) {
+    console.error("art requests failed (screenshots show the gradient fallback):");
+    for (const f of artFailures) console.error("  " + f);
+    process.exit(1);
+  }
 };
 
 main().catch((e) => {

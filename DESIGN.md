@@ -180,6 +180,11 @@ last entry shows on the reward screen.
 |               | a 1-word caption. No fine-line icons.                               |
 | Motion        | Slot-in spring on stamps dropped into the queue, gentle bob on the  |
 |               | Merry while idle, pop on tile clears. Stripped in reduced-motion.   |
+| Board art     | Every mission has a painted top-down board background (AI-generated |
+|               | via `scripts/generate-art.ts`, shōnen ink-outline style, 3:2 WebP in |
+|               | `public/art/bg-<mission-id>.webp`) — open-ocean center for tile     |
+|               | contrast, land only at the edges. Missions without a loaded texture |
+|               | fall back to the procedural sky/sea gradient.                       |
 
 ### 5.2 Layout (mission view, portrait tablet)
 

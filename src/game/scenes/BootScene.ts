@@ -29,7 +29,7 @@ export class BootScene extends Phaser.Scene {
     // check texture existence and fall back to the procedural tokens.
     this.load.image(shipArtKey, "art/ship.png");
     for (const [, key] of Object.entries(missionBackgrounds)) {
-      this.load.image(key, `art/${key}.png`);
+      this.load.image(key, `art/${key}.webp`);
     }
   }
 

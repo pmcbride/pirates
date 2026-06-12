@@ -1330,6 +1330,49 @@ button:disabled {
   min-height: auto;
 }
 
+/* ── Crew portrait badges (status strip / wanted cards / docket) ── */
+
+/* Overlapping avatar row in the mission status strip — the recruited crew
+   watching the plan come together. Faces are SVG badges that carry their
+   own ink-ringed circle, so no extra border here. */
+.stat-pill.crew-strip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.3rem 0.75rem 0.3rem 0.6rem;
+}
+
+.crew-face {
+  display: block;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+}
+
+.crew-strip .crew-face + .crew-face {
+  margin-left: -12px;
+}
+
+/* Inline face inside the map docket's reward chip. */
+.crew-reward-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.crew-face-inline {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+}
+
+/* Portrait on the wanted-poster card (drawer + reward reveal). */
+.wanted-face {
+  display: block;
+  width: 104px;
+  height: 104px;
+  margin: 0.25rem auto 0;
+}
+
 /* ── Wanted-poster card (crew/fruit/reveal) ────────────────── */
 
 .wanted-card {

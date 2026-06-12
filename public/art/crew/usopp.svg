@@ -1,0 +1,20 @@
+<svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <!-- Sniper — long nose, olive bandana, black curls. -->
+  <circle cx="64" cy="64" r="58" fill="#e7e0f5" stroke="#2b1d0e" stroke-width="5"/>
+  <!-- curly hair puffs behind the face -->
+  <circle cx="38" cy="72" r="11" fill="#2b1d0e"/>
+  <circle cx="90" cy="72" r="11" fill="#2b1d0e"/>
+  <circle cx="42" cy="88" r="9" fill="#2b1d0e"/>
+  <circle cx="86" cy="88" r="9" fill="#2b1d0e"/>
+  <!-- face -->
+  <circle cx="64" cy="76" r="27" fill="#d8a878" stroke="#2b1d0e" stroke-width="4"/>
+  <!-- olive bandana -->
+  <path d="M37 64 Q40 44 64 44 Q88 44 91 64 Q78 56 64 56 Q50 56 37 64 Z" fill="#a8a55f" stroke="#2b1d0e" stroke-width="4" stroke-linejoin="round"/>
+  <!-- eyes -->
+  <circle cx="53" cy="71" r="3.2" fill="#2b1d0e"/>
+  <circle cx="75" cy="71" r="3.2" fill="#2b1d0e"/>
+  <!-- proud grin (the nose overlaps its middle, like the real Usopp) -->
+  <path d="M52 90 Q64 99 76 90" stroke="#2b1d0e" stroke-width="3.2" stroke-linecap="round" fill="none"/>
+  <!-- the legendary long nose -->
+  <rect x="60.5" y="73" width="7" height="23" rx="3.5" fill="#d8a878" stroke="#2b1d0e" stroke-width="3.4"/>
+</svg>

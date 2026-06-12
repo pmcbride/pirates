@@ -1,0 +1,20 @@
+<svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <!-- Navigator — bright orange bob, warm smile, tangerine clip. -->
+  <circle cx="64" cy="64" r="58" fill="#ffe9c0" stroke="#2b1d0e" stroke-width="5"/>
+  <!-- hair behind the face -->
+  <circle cx="64" cy="60" r="30" fill="#ff9a3c" stroke="#2b1d0e" stroke-width="4"/>
+  <ellipse cx="40" cy="82" rx="7" ry="13" fill="#ff9a3c" stroke="#2b1d0e" stroke-width="3.4"/>
+  <ellipse cx="88" cy="82" rx="7" ry="13" fill="#ff9a3c" stroke="#2b1d0e" stroke-width="3.4"/>
+  <!-- face -->
+  <circle cx="64" cy="78" r="26" fill="#ffdcb0" stroke="#2b1d0e" stroke-width="4"/>
+  <!-- shallow side-swept fringe high on the forehead -->
+  <path d="M40 66 Q40 52 64 52 Q88 52 88 66 Q76 58 64 59 Q52 58 40 66 Z" fill="#ff9a3c" stroke="#2b1d0e" stroke-width="3.4" stroke-linejoin="round"/>
+  <!-- tangerine hair clip -->
+  <circle cx="46" cy="58" r="4.4" fill="#ff8c2e" stroke="#2b1d0e" stroke-width="2"/>
+  <circle cx="46" cy="54.5" r="1.6" fill="#5fae6e"/>
+  <!-- eyes -->
+  <circle cx="55" cy="77" r="3.3" fill="#2b1d0e"/>
+  <circle cx="73" cy="77" r="3.3" fill="#2b1d0e"/>
+  <!-- happy smile -->
+  <path d="M54 88 Q64 96 74 88" stroke="#2b1d0e" stroke-width="3.2" stroke-linecap="round" fill="none"/>
+</svg>

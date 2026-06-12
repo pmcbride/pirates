@@ -12,6 +12,11 @@ export const textureKeys = {
  * public/art/; falls back to the procedural token when absent. */
 export const shipArtKey = "ship-art";
 
+/** Texture key for a crew portrait badge (rasterized from the SVG in
+ * public/art/crew/). Scenes must check `textures.exists` before use —
+ * a failed load degrades to simply not drawing that badge. */
+export const crewArtKey = (crewId: string): string => `crew-art-${crewId}`;
+
 /** Painted per-mission board backgrounds. Missions without an entry fall back
  * to the procedural sky/sea gradient. Aspect ratio of the source art is 3:2. */
 export const missionBackgrounds: Record<string, string> = {

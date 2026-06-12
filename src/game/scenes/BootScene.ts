@@ -1,5 +1,6 @@
 import Phaser from "phaser";
-import { missionBackgrounds, shipArtKey, textureKeys, uiColors } from "../assets/manifest";
+import { crewPortraitPaths } from "../../sim/portraits";
+import { crewArtKey, missionBackgrounds, shipArtKey, textureKeys, uiColors } from "../assets/manifest";
 
 const drawStamp = (
   scene: Phaser.Scene,
@@ -34,6 +35,12 @@ export class BootScene extends Phaser.Scene {
     this.load.image(shipArtKey, "art/ship.png");
     for (const [, key] of Object.entries(missionBackgrounds)) {
       this.load.image(key, `art/${key}.webp`);
+    }
+    // Crew portrait badges — rasterized at 2× their largest on-screen size
+    // so they stay crisp on retina tablets. Missing files degrade to the
+    // badge simply not rendering (scenes check texture existence).
+    for (const [crewId, path] of Object.entries(crewPortraitPaths)) {
+      this.load.svg(crewArtKey(crewId), path, { width: 96, height: 96 });
     }
   }
 

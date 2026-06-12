@@ -65,7 +65,7 @@ export const onePieceTheme: Theme = {
       },
     },
     "harbor-bend": {
-      label: "Loguetown Bend",
+      label: "Baratie Harbor",
       sea: "East Blue",
       briefing:
         "The chest sits up the bay, off the straight lane. Tap Up to reach it before docking.",
@@ -166,6 +166,11 @@ export const onePieceTheme: Theme = {
     },
   },
   crew: {
+    luffy: {
+      name: "Luffy",
+      title: "Captain",
+      description: "Leads every voyage from the bow with a big grin.",
+    },
     zoro: {
       name: "Zoro",
       title: "Swordsman",
@@ -176,6 +181,21 @@ export const onePieceTheme: Theme = {
       name: "Nami",
       title: "Navigator",
       description: "Finds one extra berry every time a voyage is cleared.",
+    },
+    usopp: {
+      name: "Usopp",
+      title: "Sniper",
+      description: "Keeps lookout from the bow and tells very brave tales.",
+    },
+    sanji: {
+      name: "Sanji",
+      title: "Cook",
+      description: "Cooks the crew a victory feast after every voyage.",
+    },
+    chopper: {
+      name: "Chopper",
+      title: "Doctor",
+      description: "Keeps the whole crew patched up and smiling.",
     },
   },
   fruits: {

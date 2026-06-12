@@ -109,6 +109,7 @@ There is no lint script yet — TypeScript strict + the test suite are the safet
 | Add a Devil Fruit power | `fruitPowers` + `engine.ts` (e.g. `fireRange()` reads it) |
 | Restyle the HUD | `src/styles.css` + markup in `src/ui/hud.ts` |
 | Change board visuals | `src/game/scenes/MissionScene.ts` + `assets/manifest.ts` |
+| Generate painted art (backgrounds, sprites) | use the `generate-game-art` skill (`.claude/skills/generate-game-art/`) |
 | Add a stat (bounty, log) | `PlayerProfile` in `types.ts` → engine → store → HUD |
 
 ## Definition of done for a PR

@@ -251,13 +251,21 @@ const wantedCrewCard = (theme: Theme, crewId: string): string => {
   `;
 };
 
+/** Fruit ids with painted art in `public/art/fruits/` — same SPA-fallback
+ *  gating rationale as `crewPortraitIds`. */
+const fruitArtIds = new Set(["gumgum"]);
+
 const wantedFruitCard = (theme: Theme, fruitId: string): string => {
   const fruit = theme.fruits[fruitId];
   if (!fruit) return "";
+  const portrait = fruitArtIds.has(fruitId)
+    ? `<img class="wanted-portrait" src="art/fruits/fruit-${fruitId}.webp" alt="" aria-hidden="true" draggable="false" />`
+    : "";
   return `
     <li>
       <div class="wanted-card">
         <div class="wanted-header">Devil Fruit</div>
+        ${portrait}
         <p class="wanted-name">${escapeHtml(fruit.name)}</p>
         <div class="wanted-role">${escapeHtml(fruit.title)}</div>
         <p class="wanted-line">${escapeHtml(fruit.description)}</p>

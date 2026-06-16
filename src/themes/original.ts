@@ -165,6 +165,11 @@ export const originalTheme: Theme = {
     },
   },
   crew: {
+    luffy: {
+      name: "Captain Coral",
+      title: "Captain",
+      description: "Leads every voyage from the bow with a big grin.",
+    },
     zoro: {
       name: "Saber",
       title: "Swordsman",
@@ -175,6 +180,21 @@ export const originalTheme: Theme = {
       name: "Compass",
       title: "Navigator",
       description: "Finds one extra coin every time a voyage is cleared.",
+    },
+    usopp: {
+      name: "Spyglass",
+      title: "Sniper",
+      description: "Keeps lookout from the bow and tells very brave tales.",
+    },
+    sanji: {
+      name: "Skillet",
+      title: "Cook",
+      description: "Cooks the crew a victory feast after every voyage.",
+    },
+    chopper: {
+      name: "Patch",
+      title: "Doctor",
+      description: "Keeps the whole crew patched up and smiling.",
     },
   },
   fruits: {

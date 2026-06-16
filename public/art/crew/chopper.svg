@@ -1,0 +1,25 @@
+<svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <!-- Doctor — tiny reindeer: pink hat with white X, antlers, blue nose. -->
+  <circle cx="64" cy="64" r="58" fill="#fbdce8" stroke="#2b1d0e" stroke-width="5"/>
+  <!-- antlers -->
+  <path d="M40 46 L30 28 M40 46 L24 42" stroke="#7a4f2c" stroke-width="7" stroke-linecap="round"/>
+  <path d="M88 46 L98 28 M88 46 L104 42" stroke="#7a4f2c" stroke-width="7" stroke-linecap="round"/>
+  <path d="M40 46 L30 28 M40 46 L24 42" stroke="#2b1d0e" stroke-width="2" stroke-linecap="round" opacity="0.25"/>
+  <!-- ear nubs -->
+  <circle cx="38" cy="62" r="7" fill="#a9744d" stroke="#2b1d0e" stroke-width="3"/>
+  <circle cx="90" cy="62" r="7" fill="#a9744d" stroke="#2b1d0e" stroke-width="3"/>
+  <!-- head -->
+  <circle cx="64" cy="76" r="26" fill="#a9744d" stroke="#2b1d0e" stroke-width="4"/>
+  <!-- pink top hat: brim then dome, white X on the dome -->
+  <ellipse cx="64" cy="48" rx="28" ry="8" fill="#f08bb4" stroke="#2b1d0e" stroke-width="4"/>
+  <path d="M46 46 Q46 24 64 24 Q82 24 82 46 Z" fill="#f08bb4" stroke="#2b1d0e" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M59 31 L69 41 M69 31 L59 41" stroke="#fff7e6" stroke-width="4" stroke-linecap="round"/>
+  <!-- muzzle + the famous blue nose -->
+  <ellipse cx="64" cy="87" rx="16" ry="11" fill="#ecd2a8" stroke="#2b1d0e" stroke-width="3"/>
+  <circle cx="64" cy="84" r="6" fill="#4a90d9" stroke="#2b1d0e" stroke-width="3"/>
+  <!-- eyes -->
+  <circle cx="52" cy="73" r="3.4" fill="#2b1d0e"/>
+  <circle cx="76" cy="73" r="3.4" fill="#2b1d0e"/>
+  <!-- smile -->
+  <path d="M58 93 Q64 98 70 93" stroke="#2b1d0e" stroke-width="3" stroke-linecap="round" fill="none"/>
+</svg>

@@ -1,5 +1,6 @@
 import Phaser from "phaser";
-import { missions } from "../../sim/content";
+import { missions, recruitedCrewInOrder } from "../../sim/content";
+import { deckSlotsFor } from "../../sim/crewDeck";
 import { createMissionState } from "../../sim/engine";
 import { gameStore } from "../../sim/store";
 import { getActiveTheme } from "../../themes";
@@ -15,6 +16,7 @@ import type {
 import { playSfx } from "../../ui/audio";
 import { haptic } from "../../ui/haptic";
 import {
+  crewArtKey,
   goalArtKey,
   goalGlyph,
   kindGlyphMap,
@@ -70,7 +72,13 @@ export class MissionScene extends Phaser.Scene {
 
   private statusText?: Phaser.GameObjects.Text;
 
-  private shipSprite?: Phaser.GameObjects.Image;
+  /** The ship and its crew sail as one unit: a container holding the hull
+   * sprite plus one portrait badge per recruited crew mate. Move/dodge/bob
+   * tweens target the container; badges counter-rotate on facing changes so
+   * the little faces stay upright (see `syncCrewBadgeRotation`). */
+  private shipContainer?: Phaser.GameObjects.Container;
+
+  private crewBadges: Phaser.GameObjects.Image[] = [];
 
   private goalSprite?: Phaser.GameObjects.Image;
 
@@ -393,7 +401,8 @@ export class MissionScene extends Phaser.Scene {
     this.effectsLayer?.removeAll(true);
     this.wakeParticleCount = 0;
     this.tileSprites.clear();
-    this.shipSprite = undefined;
+    this.shipContainer = undefined;
+    this.crewBadges = [];
     this.goalSprite = undefined;
 
     const { tileSize, offsetX, offsetY } = this.boardMetrics(mission);
@@ -555,22 +564,68 @@ export class MissionScene extends Phaser.Scene {
 
     const shipCenter = this.worldXY(mission, ship.position);
     const hasShipArt = this.textures.exists(shipArtKey);
-    const shipImage = this.add.image(
-      shipCenter.x,
-      shipCenter.y,
-      hasShipArt ? shipArtKey : textureKeys.ship,
-    );
+    const shipImage = this.add.image(0, 0, hasShipArt ? shipArtKey : textureKeys.ship);
+    let shipW: number;
+    let shipH: number;
     if (hasShipArt) {
       // Preserve the painted sprite's aspect ratio (portrait, bow up).
-      const targetH = tileSize * 0.94;
-      shipImage.setDisplaySize(targetH * (shipImage.width / shipImage.height), targetH);
+      shipH = tileSize * 0.94;
+      shipW = shipH * (shipImage.width / shipImage.height);
     } else {
-      shipImage.setDisplaySize(tileSize - 8, tileSize - 20);
+      shipW = tileSize - 8;
+      shipH = tileSize - 20;
     }
-    shipImage.setAngle(facingAngle(ship.facing));
-    this.boardLayer?.add(shipImage);
-    this.shipSprite = shipImage;
-    this.shipBaseScale = { x: shipImage.scaleX, y: shipImage.scaleY };
+    shipImage.setDisplaySize(shipW, shipH);
+
+    const shipContainer = this.add.container(shipCenter.x, shipCenter.y, [shipImage]);
+    this.crewBadges = this.buildCrewBadges(shipContainer, shipW, shipH, tileSize);
+    shipContainer.setAngle(facingAngle(ship.facing));
+    this.syncCrewBadgeRotation();
+    this.boardLayer?.add(shipContainer);
+    this.shipContainer = shipContainer;
+    // The fail lunge scales the whole ship (hull + crew) around this base. The
+    // container's own scale is (1,1) — the hull and badges are sized
+    // individually inside it — so the lunge grows everyone together.
+    this.shipBaseScale = { x: shipContainer.scaleX, y: shipContainer.scaleY };
+  }
+
+  /**
+   * One portrait badge per recruited crew mate, standing on the deck in
+   * boarding order (captain at the bow). Slots are fractions of the hull's
+   * display size — see `deckSlotsFor`. Crew whose portrait texture failed to
+   * load simply don't get a badge; the voyage sails on without them.
+   */
+  private buildCrewBadges(
+    container: Phaser.GameObjects.Container,
+    shipW: number,
+    shipH: number,
+    tileSize: number,
+  ): Phaser.GameObjects.Image[] {
+    const aboard = recruitedCrewInOrder(
+      gameStore.getState().profile.crewRoster,
+    ).filter((crewId) => this.textures.exists(crewArtKey(crewId)));
+    const slots = deckSlotsFor(aboard.length);
+    const badgeSize = Phaser.Math.Clamp(tileSize * 0.3, 15, 34);
+    return aboard.slice(0, slots.length).map((crewId, index) => {
+      const slot = slots[index];
+      const badge = this.add.image(
+        slot.fx * shipW,
+        slot.fy * shipH,
+        crewArtKey(crewId),
+      );
+      badge.setDisplaySize(badgeSize, badgeSize);
+      container.add(badge);
+      return badge;
+    });
+  }
+
+  /** Counter-rotate every crew badge so faces stay upright while the hull
+   * (their parent container) turns to its sailing direction. */
+  private syncCrewBadgeRotation(): void {
+    const angle = this.shipContainer?.angle ?? 0;
+    for (const badge of this.crewBadges) {
+      badge.setAngle(-angle);
+    }
   }
 
   /**
@@ -612,7 +667,7 @@ export class MissionScene extends Phaser.Scene {
     duration: number,
   ): Promise<void> {
     return new Promise((resolve) => {
-      const ship = this.shipSprite;
+      const ship = this.shipContainer;
       if (!ship) {
         resolve();
         return;
@@ -641,7 +696,7 @@ export class MissionScene extends Phaser.Scene {
     duration: number,
   ): Promise<void> {
     return new Promise((resolve) => {
-      const ship = this.shipSprite;
+      const ship = this.shipContainer;
       if (!ship) {
         resolve();
         return;
@@ -676,7 +731,7 @@ export class MissionScene extends Phaser.Scene {
 
   private tweenShipAngle(targetFacing: string, duration: number): Promise<void> {
     return new Promise((resolve) => {
-      const ship = this.shipSprite;
+      const ship = this.shipContainer;
       if (!ship) {
         resolve();
         return;
@@ -687,6 +742,7 @@ export class MissionScene extends Phaser.Scene {
       const next = current + delta;
       if (duration <= 0 || delta === 0) {
         ship.setAngle(target);
+        this.syncCrewBadgeRotation();
         resolve();
         return;
       }
@@ -695,8 +751,11 @@ export class MissionScene extends Phaser.Scene {
         angle: next,
         duration,
         ease: "Sine.easeInOut",
+        // Keep the crew's faces upright through every frame of the turn.
+        onUpdate: () => this.syncCrewBadgeRotation(),
         onComplete: () => {
           ship.setAngle(target);
+          this.syncCrewBadgeRotation();
           resolve();
         },
       });
@@ -823,16 +882,16 @@ export class MissionScene extends Phaser.Scene {
   }
 
   private startShipBob(): void {
-    if (!this.shipSprite || this.shipBobTween) {
+    if (!this.shipContainer || this.shipBobTween) {
       return;
     }
     if (gameStore.getState().profile.settings.reducedMotion) {
       return;
     }
-    const baseY = this.shipSprite.y;
+    const baseY = this.shipContainer.y;
     this.shipBaseY = baseY;
     this.shipBobTween = this.tweens.add({
-      targets: this.shipSprite,
+      targets: this.shipContainer,
       y: baseY - 3,
       duration: 800,
       ease: "Sine.easeInOut",
@@ -842,14 +901,19 @@ export class MissionScene extends Phaser.Scene {
   }
 
   private stopShipBob(): void {
-    if (this.shipBobTween) {
-      this.shipBobTween.stop();
-      this.shipBobTween = undefined;
+    if (!this.shipBobTween) {
+      // No bob tween was running — reduced-motion never spawns one, so
+      // `shipBaseY` was never captured from this container. Restoring it here
+      // would snap the ship to a stale/zero Y the moment playback starts;
+      // leave the container exactly where `renderBoard` placed it.
+      return;
     }
+    this.shipBobTween.stop();
+    this.shipBobTween = undefined;
     // Restore base Y so any subsequent move-tween starts from the snapped cell
     // center, not a bob offset.
-    if (this.shipSprite) {
-      this.shipSprite.setY(this.shipBaseY);
+    if (this.shipContainer) {
+      this.shipContainer.setY(this.shipBaseY);
     }
   }
 
@@ -1051,7 +1115,7 @@ export class MissionScene extends Phaser.Scene {
     from: Position,
     toward: Position,
   ): void {
-    const ship = this.shipSprite;
+    const ship = this.shipContainer;
     if (!ship) {
       return;
     }
@@ -1075,10 +1139,11 @@ export class MissionScene extends Phaser.Scene {
    * motion, never awaited; snapToStep restores the resting scale either way.
    */
   private hopShip(): void {
-    const ship = this.shipSprite;
+    const ship = this.shipContainer;
     if (!ship || gameStore.getState().profile.settings.reducedMotion) {
       return;
     }
+    // Scaling the container hops the hull and the crew badges together.
     this.tweens.add({
       targets: ship,
       scaleX: this.shipBaseScale.x * 1.06,
@@ -1095,11 +1160,13 @@ export class MissionScene extends Phaser.Scene {
    * final success linger. Cosmetic; skipped under reduced motion.
    */
   private wiggleShip(): void {
-    const ship = this.shipSprite;
+    const ship = this.shipContainer;
     if (!ship || gameStore.getState().profile.settings.reducedMotion) {
       return;
     }
     const baseAngle = ship.angle;
+    // The crew rock along with the hull for the celebration, then settle back
+    // upright when the wiggle resolves.
     this.tweens.add({
       targets: ship,
       angle: baseAngle + 8,
@@ -1107,7 +1174,10 @@ export class MissionScene extends Phaser.Scene {
       ease: "Sine.easeInOut",
       yoyo: true,
       repeat: 2,
-      onComplete: () => ship.setAngle(baseAngle),
+      onComplete: () => {
+        ship.setAngle(baseAngle);
+        this.syncCrewBadgeRotation();
+      },
     });
   }
 
@@ -1129,12 +1199,14 @@ export class MissionScene extends Phaser.Scene {
    * when they never ran because the page was hidden.
    */
   private snapToStep(mission: MissionDefinition, step: RunStep): void {
-    const ship = this.shipSprite;
+    const ship = this.shipContainer;
     if (ship) {
       this.tweens.killTweensOf(ship);
       const { x, y } = this.worldXY(mission, step.ship.position);
       ship.setPosition(x, y);
       ship.setAngle(facingAngle(step.ship.facing));
+      // Faces upright at the corrected resting facing.
+      this.syncCrewBadgeRotation();
       // Restore resting scale — a cosmetic hop killed mid-flight (hidden page)
       // must never leave the ship stuck inflated.
       ship.setScale(this.shipBaseScale.x, this.shipBaseScale.y);

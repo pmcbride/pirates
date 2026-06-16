@@ -1,5 +1,7 @@
 import Phaser from "phaser";
+import { crewPortraitPaths } from "../../sim/portraits";
 import {
+  crewArtKey,
   goalArtKey,
   missionBackgrounds,
   shipArtKey,
@@ -83,6 +85,12 @@ export class BootScene extends Phaser.Scene {
       this.load.svg(key, `art/tiles/${key}.svg`, svgSize);
     }
     this.load.svg(goalArtKey, `art/tiles/${goalArtKey}.svg`, svgSize);
+    // Crew portrait badges — rasterized at 2× their largest on-screen size
+    // so they stay crisp on retina tablets. Missing files degrade to the
+    // badge simply not rendering (scenes check texture existence).
+    for (const [crewId, path] of Object.entries(crewPortraitPaths)) {
+      this.load.svg(crewArtKey(crewId), path, { width: 96, height: 96 });
+    }
   }
 
   create(): void {

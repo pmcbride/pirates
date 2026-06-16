@@ -154,7 +154,17 @@ export const conditionLabels: Record<ConditionKind, string> = {
   crewHere: "crew here",
 };
 
+// The full six-mate crew. `luffy` is never a mission reward — he's the
+// captain, seeded into every profile's roster (see profile.ts). The other
+// five are recruited one per voyage, in the same order they join in the
+// show: zoro → nami → usopp → sanji → chopper. passiveType on the four
+// newer mates is forward-looking metadata (DESIGN.md §3) — the engine only
+// acts on zoro (sparkle hints) and nami (+1 berry) today.
 export const crewMates: Record<string, CrewMate> = {
+  luffy: {
+    id: "luffy",
+    passiveType: "range",
+  },
   zoro: {
     id: "zoro",
     passiveType: "hint",
@@ -163,7 +173,36 @@ export const crewMates: Record<string, CrewMate> = {
     id: "nami",
     passiveType: "gold",
   },
+  usopp: {
+    id: "usopp",
+    passiveType: "range",
+  },
+  sanji: {
+    id: "sanji",
+    passiveType: "safeCollect",
+  },
+  chopper: {
+    id: "chopper",
+    passiveType: "hint",
+  },
 };
+
+/** Captain — aboard from the very first launch, never a mission reward. */
+export const captainCrewId = "luffy";
+
+/** Canonical display/boarding order for the crew (captain first). */
+export const orderedCrewIds = [
+  "luffy",
+  "zoro",
+  "nami",
+  "usopp",
+  "sanji",
+  "chopper",
+];
+
+/** Filter a profile roster into canonical boarding order, dropping unknown ids. */
+export const recruitedCrewInOrder = (roster: string[]): string[] =>
+  orderedCrewIds.filter((id) => roster.includes(id));
 
 export const fruitPowers: Record<string, FruitPower> = {
   gumgum: {
@@ -212,6 +251,7 @@ export const missionNodes: MissionNode[] = [
       berries: 110,
       bounty: 1_000_000,
       stars: 2,
+      crewId: "nami",
       unlockCommandIds: [],
     },
     unlockMissionIds: ["spark-shoals"],
@@ -226,6 +266,7 @@ export const missionNodes: MissionNode[] = [
       berries: 130,
       bounty: 2_000_000,
       stars: 2,
+      crewId: "usopp",
       // Up/Down unlock here so they're in hand before harbor-bend — the next
       // mission's palette is where those blocks first appear.
       unlockCommandIds: ["move-up", "move-down"],
@@ -242,6 +283,9 @@ export const missionNodes: MissionNode[] = [
       berries: 120,
       bounty: 1_000_000,
       stars: 2,
+      crewId: "sanji",
+      // Up/Down already unlocked at barrel-bay (the prior voyage); this is the
+      // mission whose palette first uses them.
       unlockCommandIds: [],
     },
     unlockMissionIds: ["barrel-bay"],
@@ -256,6 +300,7 @@ export const missionNodes: MissionNode[] = [
       berries: 140,
       bounty: 0,
       stars: 2,
+      crewId: "chopper",
       unlockCommandIds: ["repeat"],
     },
     unlockMissionIds: ["harbor-bend"],
@@ -285,7 +330,6 @@ export const missionNodes: MissionNode[] = [
       berries: 240,
       bounty: 5_000_000,
       stars: 3,
-      crewId: "nami",
       unlockCommandIds: [],
     },
     unlockMissionIds: ["coral-lookout"],
@@ -421,6 +465,7 @@ export const missions: Record<string, MissionDefinition> = {
       berries: 110,
       bounty: 1_000_000,
       stars: 2,
+      crewId: "nami",
       unlockCommandIds: [],
     },
     tiles: [
@@ -468,6 +513,7 @@ export const missions: Record<string, MissionDefinition> = {
       berries: 130,
       bounty: 2_000_000,
       stars: 2,
+      crewId: "usopp",
       // Up/Down unlock here so they're in hand before harbor-bend — the next
       // mission's palette is where those blocks first appear.
       unlockCommandIds: ["move-up", "move-down"],
@@ -524,6 +570,9 @@ export const missions: Record<string, MissionDefinition> = {
       berries: 120,
       bounty: 1_000_000,
       stars: 2,
+      crewId: "sanji",
+      // Up/Down already unlocked at barrel-bay (the prior voyage); this is the
+      // mission whose palette first uses them.
       unlockCommandIds: [],
     },
     tiles: [
@@ -564,6 +613,7 @@ export const missions: Record<string, MissionDefinition> = {
       berries: 140,
       bounty: 0,
       stars: 2,
+      crewId: "chopper",
       unlockCommandIds: ["repeat"],
     },
     tiles: [
@@ -677,7 +727,6 @@ export const missions: Record<string, MissionDefinition> = {
       berries: 240,
       bounty: 5_000_000,
       stars: 3,
-      crewId: "nami",
       unlockCommandIds: [],
     },
     tiles: [

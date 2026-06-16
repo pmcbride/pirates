@@ -21,8 +21,9 @@ import {
   commandLibrary,
   missionNodes,
   missions,
+  recruitedCrewInOrder,
 } from "../sim/content";
-import { missionPortraits } from "../sim/portraits";
+import { crewPortraitPaths, missionPortraits } from "../sim/portraits";
 import { gameStore } from "../sim/store";
 import type { AppState, HintResult, PlannedCommand, PlayerProfile } from "../sim/types";
 import { playSfx, setMuted } from "./audio";
@@ -227,24 +228,25 @@ const commandFingerprint = (command: PlannedCommand, isRunning: boolean): string
   ].join("|");
 
 /**
- * Crew ids with a painted wanted-poster portrait in `public/art/crew/`.
- * Gated by id rather than letting the <img> 404: vite's SPA fallback answers
- * missing public files with 200 text/html, which renders as a broken image
- * tile instead of failing cleanly.
+ * Crew portrait <img>. One SVG badge set serves the whole app (status strip,
+ * wanted cards, map docket) — see `crewPortraitPaths`. Returns "" for ids
+ * with no portrait so a content/asset mismatch degrades to text-only.
  */
-const crewPortraitIds = new Set(["zoro", "nami"]);
+const crewFaceImg = (theme: Theme, crewId: string, className: string): string => {
+  const path = crewPortraitPaths[crewId];
+  if (!path) return "";
+  const name = theme.crew[crewId]?.name ?? crewId;
+  return `<img class="${className}" src="${path}" alt="${escapeHtml(name)}" title="${escapeHtml(name)}" draggable="false">`;
+};
 
 const wantedCrewCard = (theme: Theme, crewId: string): string => {
   const crew = theme.crew[crewId];
   if (!crew) return "";
-  const portrait = crewPortraitIds.has(crewId)
-    ? `<img class="wanted-portrait" src="art/crew/crew-${crewId}.webp" alt="" aria-hidden="true" draggable="false" />`
-    : "";
   return `
     <li>
       <div class="wanted-card">
         <div class="wanted-header">Wanted</div>
-        ${portrait}
+        ${crewFaceImg(theme, crewId, "wanted-face")}
         <p class="wanted-name">${escapeHtml(crew.name)}</p>
         <div class="wanted-role">${escapeHtml(crew.title)}</div>
         <p class="wanted-line">${escapeHtml(crew.description)}</p>
@@ -253,8 +255,9 @@ const wantedCrewCard = (theme: Theme, crewId: string): string => {
   `;
 };
 
-/** Fruit ids with painted art in `public/art/fruits/` — same SPA-fallback
- *  gating rationale as `crewPortraitIds`. */
+/** Fruit ids with painted art in `public/art/fruits/`. Gated by id rather than
+ *  letting the <img> 404: vite's SPA fallback answers missing public files with
+ *  200 text/html, which renders as a broken image tile instead of failing. */
 const fruitArtIds = new Set(["gumgum"]);
 
 const wantedFruitCard = (theme: Theme, fruitId: string): string => {
@@ -556,10 +559,28 @@ const statsInlineMarkup = (profile: PlayerProfile, theme: Theme): string => `
 `;
 
 /**
- * Mission-screen status strip. A narrow vertical stack pinned to the
- * top-left corner: headline coin chip, bounty sub-line, then crew + fruit
- * mini pills side by side. Stays under ~8.5rem wide so it can never reach
- * the centered objective chip (they used to collide at 768px).
+ * The crew watching from the rail: an overlapping row of portrait badges,
+ * one per recruited mate in boarding order. Replaces the old anonymous
+ * crew-count pill — the kid sees *who* is aboard while planning, and each
+ * new recruit visibly joins the row.
+ */
+const crewStripMarkup = (profile: PlayerProfile, theme: Theme): string => {
+  const aboard = recruitedCrewInOrder(profile.crewRoster);
+  if (aboard.length === 0) {
+    return `<span class="stat-pill"><span class="stat-icon" aria-hidden="true">${iconFor("crewMate")}</span>0</span>`;
+  }
+  return `
+    <span class="stat-pill crew-strip">
+      ${aboard.map((crewId) => crewFaceImg(theme, crewId, "crew-face")).join("")}
+    </span>
+  `;
+};
+
+/**
+ * Mission-screen status strip. Same consolidation idea as the map: one big
+ * coin chip is the headline; bounty drops to a sub-line; the crew portrait
+ * row + fruit count stay as compact pills next to it. The fruit count keeps
+ * the hand-drawn SVG icon — no raw emoji in always-visible chrome.
  */
 const statusStripInnerMarkup = (profile: PlayerProfile, theme: Theme): string => `
   <span class="stat-cluster">
@@ -568,10 +589,8 @@ const statusStripInnerMarkup = (profile: PlayerProfile, theme: Theme): string =>
     </span>
     <span class="stat-pill-sub" aria-label="Bounty">Bounty: ${escapeHtml(formatBountyFor(theme, profile.bounty))}</span>
   </span>
-  <span class="stat-mini-row">
-    <span class="stat-pill stat-pill-mini" aria-label="Crew aboard"><span class="stat-icon" aria-hidden="true">${iconFor("crewMate")}</span>${profile.crewRoster.length}</span>
-    <span class="stat-pill stat-pill-mini" aria-label="Devil Fruits"><span class="stat-icon" aria-hidden="true">${iconFor("fruit")}</span>${profile.fruitPowers.length}</span>
-  </span>
+  ${crewStripMarkup(profile, theme)}
+  <span class="stat-pill" aria-label="Devil Fruits"><span class="stat-icon" aria-hidden="true">${iconFor("fruit")}</span>${profile.fruitPowers.length}</span>
 `;
 
 const conditionOptions = [
@@ -1505,7 +1524,7 @@ export class Hud {
           <span>${iconFor("coin")} ${escapeHtml(formatCurrency(theme, node?.rewards.berries ?? 0))}</span>
           <span>${iconFor("flag")} ${escapeHtml(formatBountyFor(theme, node?.rewards.bounty ?? 0))}</span>
           <span>${iconFor("star")} ${node?.rewards.stars ?? 0}</span>
-          ${node?.rewards.crewId ? `<span>${iconFor("crewMate")} ${escapeHtml(theme.crew[node.rewards.crewId]?.name ?? "")}</span>` : ""}
+          ${node?.rewards.crewId ? `<span class="crew-reward-chip">${crewFaceImg(theme, node.rewards.crewId, "crew-face-inline")}${escapeHtml(theme.crew[node.rewards.crewId]?.name ?? "")}</span>` : ""}
           ${node?.rewards.fruitPowerId ? `<span>${iconFor("fruit")} ${escapeHtml(theme.fruits[node.rewards.fruitPowerId]?.name ?? "")}</span>` : ""}
         </div>
         <button data-action="open-selected-mission" class="primary-cta">${
@@ -1711,7 +1730,9 @@ export class Hud {
 
     // — Status strip
     const profile = state.profile;
-    const statusFp = `${theme.meta.id}|${profile.berries}|${profile.bounty}|${profile.crewRoster.length}|${profile.fruitPowers.length}`;
+    // Roster joins by id (not length) — switching captains can swap in a
+    // same-size roster with different faces.
+    const statusFp = `${theme.meta.id}|${profile.berries}|${profile.bounty}|${profile.crewRoster.join(",")}|${profile.fruitPowers.length}`;
     if (statusFp !== m.fingerprints.status) {
       // Render the .stat-pill children straight into the wrapper.
       m.status.innerHTML = statusStripInnerMarkup(profile, theme);

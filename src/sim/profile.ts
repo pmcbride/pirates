@@ -1,3 +1,4 @@
+import { captainCrewId, missionNodes } from "./content";
 import type { CaptainLogEntry, PlayerProfile, RewardBundle } from "./types";
 
 const profileStorageKey = "sea-of-codes/profile/v2";
@@ -27,7 +28,8 @@ export const defaultProfile = (): PlayerProfile => ({
   berries: 0,
   bounty: 0,
   stars: 0,
-  crewRoster: [],
+  // The captain is aboard from the very first launch — recruits join later.
+  crewRoster: [captainCrewId],
   fruitPowers: [],
   commandUnlocks: ["move-up", "move-down", "move-left", "move-right", "collect"],
   bestStars: {},
@@ -47,6 +49,43 @@ export const defaultProfile = (): PlayerProfile => ({
 
 export const cloneProfile = (profile: PlayerProfile): PlayerProfile =>
   JSON.parse(JSON.stringify(profile)) as PlayerProfile;
+
+/**
+ * Roster reconciliation, applied on every profile load:
+ *   - the captain is always aboard (older saves predate him existing);
+ *   - any crew mate granted by a mission the player has *already* completed
+ *     is backfilled, so re-wiring which voyage recruits whom never strands a
+ *     crew mate behind an already-cleared island.
+ * Existing roster order is preserved (captain leads); backfills append in
+ * mission order. Rewards stay first-clear-only — this never double-grants.
+ */
+export const reconcileCrewRoster = (
+  roster: string[],
+  completedMissionIds: string[],
+): string[] => {
+  // `roster` crosses the JSON.parse trust boundary, so the `string[]` type is
+  // not enforced at runtime. A corrupt or hand-edited save can hand us a
+  // non-array — coerce instead of letting `.filter` throw, since that
+  // TypeError would bubble into deserializeProfile's catch and silently reset
+  // the *entire* profile to default, wiping every cleared voyage. Backfilling
+  // from completedMissionIds below still rebuilds the real roster.
+  const safeRoster = Array.isArray(roster) ? roster : [];
+  const reconciled = [
+    captainCrewId,
+    ...safeRoster.filter((id) => id !== captainCrewId),
+  ];
+  for (const node of missionNodes) {
+    const crewId = node.rewards.crewId;
+    if (
+      crewId &&
+      completedMissionIds.includes(node.missionId) &&
+      !reconciled.includes(crewId)
+    ) {
+      reconciled.push(crewId);
+    }
+  }
+  return reconciled;
+};
 
 export const serializeProfile = (profile: PlayerProfile): string =>
   JSON.stringify(profile);
@@ -89,7 +128,10 @@ export const deserializeProfile = (raw: string | null): PlayerProfile => {
         ]),
       ),
       completedMissionIds,
-      crewRoster: parsed.crewRoster ?? merged.crewRoster,
+      crewRoster: reconcileCrewRoster(
+        parsed.crewRoster ?? merged.crewRoster,
+        completedMissionIds,
+      ),
       fruitPowers: parsed.fruitPowers ?? merged.fruitPowers,
       commandUnlocks: parsed.commandUnlocks ?? merged.commandUnlocks,
       bestStars: parsed.bestStars ?? merged.bestStars,

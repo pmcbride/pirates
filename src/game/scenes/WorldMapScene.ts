@@ -1,10 +1,16 @@
 import Phaser from "phaser";
-import { missionNodes, sandboxMissionId } from "../../sim/content";
+import {
+  missionNodes,
+  recruitedCrewInOrder,
+  sandboxMissionId,
+} from "../../sim/content";
+import { deckSlotsFor } from "../../sim/crewDeck";
 import { missionPortraits } from "../../sim/portraits";
 import { gameStore } from "../../sim/store";
 import { getActiveTheme } from "../../themes";
+import type { AppState } from "../../sim/types";
 import { playSfx } from "../../ui/audio";
-import { uiColors } from "../assets/manifest";
+import { crewArtKey, shipArtKey, textureKeys, uiColors } from "../assets/manifest";
 
 export class WorldMapScene extends Phaser.Scene {
   private unsubscribe?: () => void;
@@ -42,6 +48,9 @@ export class WorldMapScene extends Phaser.Scene {
   private renderMap(): void {
     const width = this.scale.width;
     const height = this.scale.height;
+    // The frontier ship's bob tween must die with its container — renderMap
+    // wipes and rebuilds the whole layer on every store notification.
+    this.tweens.killAll();
     this.layer?.removeAll(true);
 
     // During boot/resize the canvas can briefly report tiny (or zero)
@@ -344,6 +353,82 @@ export class WorldMapScene extends Phaser.Scene {
 
       this.layer?.add(label);
     });
+
+    this.renderFrontierShip(state, nodePoint, nodeRadius, ui, chartX);
+  }
+
+  /**
+   * "You are here": the ship — with every recruited crew mate standing on
+   * deck — floats beside the next island to clear, sailing the dotted route.
+   * Recruits earned on past voyages visibly join the deck, which is the
+   * payoff that makes the next recruit worth chasing.
+   */
+  private renderFrontierShip(
+    state: AppState,
+    nodePoint: (node: { x: number; y: number }) => { x: number; y: number },
+    nodeRadius: number,
+    ui: number,
+    chartX: number,
+  ): void {
+    const routeNodes = missionNodes.filter(
+      (node) => node.missionId !== sandboxMissionId,
+    );
+    const frontier =
+      routeNodes.find(
+        (node) =>
+          state.profile.unlockedMissionIds.includes(node.missionId) &&
+          !state.profile.completedMissionIds.includes(node.missionId),
+      ) ??
+      [...routeNodes]
+        .reverse()
+        .find((node) => state.profile.completedMissionIds.includes(node.missionId)) ??
+      routeNodes[0];
+
+    const point = nodePoint(frontier);
+    const hasShipArt = this.textures.exists(shipArtKey);
+    const shipImage = this.add.image(0, 0, hasShipArt ? shipArtKey : textureKeys.ship);
+    const shipH = Math.max(56, Math.round(80 * ui));
+    const shipW = hasShipArt
+      ? shipH * (shipImage.width / shipImage.height)
+      : Math.round(shipH * 0.8);
+    shipImage.setDisplaySize(shipW, shipH);
+
+    // Anchor just down-route of the island (the route climbs left→right), and
+    // never off the parchment's left edge.
+    const x = Math.max(chartX + shipW * 0.8, point.x - nodeRadius * 2.2);
+    const y = point.y + nodeRadius * 0.55;
+
+    const container = this.add.container(x, y, [shipImage]);
+    const tilt = 14; // jaunty heading toward the island
+    const aboard = recruitedCrewInOrder(state.profile.crewRoster).filter(
+      (crewId) => this.textures.exists(crewArtKey(crewId)),
+    );
+    const slots = deckSlotsFor(aboard.length);
+    const badgeSize = Math.max(15, Math.round(shipH * 0.3));
+    aboard.slice(0, slots.length).forEach((crewId, index) => {
+      const slot = slots[index];
+      const badge = this.add.image(
+        slot.fx * shipW,
+        slot.fy * shipH,
+        crewArtKey(crewId),
+      );
+      badge.setDisplaySize(badgeSize, badgeSize);
+      badge.setAngle(-tilt); // faces stay upright on the tilted hull
+      container.add(badge);
+    });
+    container.setAngle(tilt);
+    this.layer?.add(container);
+
+    if (!state.profile.settings.reducedMotion) {
+      this.tweens.add({
+        targets: container,
+        y: y - 5,
+        duration: 1200,
+        ease: "Sine.easeInOut",
+        yoyo: true,
+        repeat: -1,
+      });
+    }
   }
 
   shutdown(): void {

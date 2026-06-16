@@ -124,28 +124,30 @@ describe("hex Play button — mission screen", () => {
 });
 
 describe("hex Play button — predict phase (the dock owns the predict beat)", () => {
-  it("turns into confirm-prediction, unlocks once a tile is picked, and runs the plan", () => {
+  it("turns into a live confirm-prediction button and runs the plan from the dock", () => {
     const root = document.createElement("div");
     document.body.appendChild(root);
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const _hud = new Hud(root);
     void _hud;
 
-    // Win the tutorial for real so spark-shoals (prediction required) unlocks.
-    // Earlier tests in this file bumped the tutorial attempt count, so the
-    // pre-loaded queue may be the one-command stub — reset to the full
-    // suggested (winning) plan first.
+    // Reset to a clean slate (the store singleton is shared across tests), then
+    // clear the three prediction-exempt missions so barrel-bay — the first
+    // voyage with a predict beat — unlocks. The exempt set lives in sim/store
+    // (PREDICTION_EXEMPT_MISSION_IDS = the first three missions in curriculum
+    // order); the first three stay friction-free for a learning pre-reader.
+    gameStore.resetActiveProfile();
     gameStore.startAdventure();
-    gameStore.openMission("tutorial-cove");
-    gameStore.resetQueue();
-    gameStore.runActiveMission(); // tutorial is prediction-exempt → straight to running
-    gameStore.finishPlayback();
-    gameStore.claimReward();
+    for (const missionId of ["tutorial-cove", "spark-shoals", "windrise-cove"]) {
+      gameStore.openMission(missionId);
+      gameStore.runActiveMission(); // exempt → straight to running on the suggested plan
+      gameStore.finishPlayback();
+      gameStore.claimReward();
+    }
 
-    gameStore.openMission("spark-shoals");
+    gameStore.openMission("barrel-bay");
     expect(gameStore.getState().screen).toBe("mission");
 
-    gameStore.resetQueue();
     gameStore.runActiveMission();
     expect(gameStore.getState().missionPhase).toBe("predicting");
 
@@ -156,12 +158,14 @@ describe("hex Play button — predict phase (the dock owns the predict beat)", (
       "dock shows a Skip link while predicting",
     ).not.toBeNull();
 
-    // Hex button: confirm-prediction action, locked until a tile is tapped.
+    // Hex button is the confirm-prediction trigger. The marker is pre-placed on
+    // the ship's start tile, so confirm is live immediately — never a dead button.
     let hex = root.querySelector<HTMLButtonElement>("button.hex-play");
     expect(hex?.dataset.action).toBe("confirm-prediction");
-    expect(hex?.disabled).toBe(true);
-    expect(hex?.classList.contains("is-ready")).toBe(false);
+    expect(hex?.disabled).toBe(false);
+    expect(hex?.classList.contains("is-ready")).toBe(true);
 
+    // Moving the marker to another tile keeps confirm live.
     gameStore.setPrediction({ x: 0, y: 0 });
     hex = root.querySelector<HTMLButtonElement>("button.hex-play");
     expect(hex?.disabled).toBe(false);

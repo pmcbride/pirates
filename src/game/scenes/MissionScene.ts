@@ -5,6 +5,7 @@ import { gameStore } from "../../sim/store";
 import { getActiveTheme } from "../../themes";
 import type {
   AppState,
+  HintResult,
   MissionDefinition,
   MissionTile,
   Position,
@@ -15,6 +16,8 @@ import { playSfx } from "../../ui/audio";
 import { haptic } from "../../ui/haptic";
 import {
   goalArtKey,
+  goalGlyph,
+  kindGlyphMap,
   kindTextureMap,
   missionBackgrounds,
   shipArtKey,
@@ -60,6 +63,11 @@ export class MissionScene extends Phaser.Scene {
 
   private predictLayer?: Phaser.GameObjects.Container;
 
+  /** Pulsing gold rings over `activeHint.highlightPositions` while planning —
+   * the board-side half of the gentle-rewind hint. Cleared whenever the hint
+   * clears (any queue edit) or the board re-renders. */
+  private hintLayer?: Phaser.GameObjects.Container;
+
   private statusText?: Phaser.GameObjects.Text;
 
   private shipSprite?: Phaser.GameObjects.Image;
@@ -73,6 +81,11 @@ export class MissionScene extends Phaser.Scene {
   private shipBobTween?: Phaser.Tweens.Tween;
 
   private shipBaseY = 0;
+
+  /** Ship sprite's resting scale (set by renderBoard's setDisplaySize). The
+   * cosmetic hop tween scales relative to this, and snapToStep restores it so
+   * a hop killed mid-flight (hidden page) can never leave the ship inflated. */
+  private shipBaseScale = { x: 1, y: 1 };
 
   private waveOffset = { value: 0 };
 
@@ -103,6 +116,7 @@ export class MissionScene extends Phaser.Scene {
   create(): void {
     this.boardLayer = this.add.container(0, 0);
     this.effectsLayer = this.add.container(0, 0);
+    this.hintLayer = this.add.container(0, 0);
     this.predictLayer = this.add.container(0, 0).setVisible(false);
     // Status / briefing text sits in a reserved strip at the bottom of the
     // canvas (just above the dock) so it never covers the board.
@@ -139,6 +153,11 @@ export class MissionScene extends Phaser.Scene {
       if (state.missionPhase === "predicting") {
         this.renderPredictLayer(mission, state.predictedEndPosition);
       }
+      // Hint rings are board-metric-anchored too — re-place them on resize.
+      this.renderHintHighlights(
+        mission,
+        state.missionPhase === "planning" ? state.activeHint : null,
+      );
     };
     this.scale.on("resize", onResize);
 
@@ -155,6 +174,7 @@ export class MissionScene extends Phaser.Scene {
     this.unsubscribe = gameStore.subscribe((state) => {
       if (state.screen !== "mission" && state.screen !== "sandbox") {
         this.predictLayer?.setVisible(false);
+        this.hintLayer?.removeAll(true);
         return;
       }
 
@@ -183,6 +203,15 @@ export class MissionScene extends Phaser.Scene {
       }
 
       this.renderedPhase = state.missionPhase;
+
+      // Board-side hint highlights: pulsing gold rings on the tiles the engine
+      // flagged. Redrawn on every notification — the store nulls activeHint on
+      // any queue edit, and renderBoard (which runs on every planning tick)
+      // kills the pulse tweens, so clear-and-redraw keeps both in sync.
+      this.renderHintHighlights(
+        mission,
+        state.missionPhase === "planning" ? state.activeHint : null,
+      );
 
       if (state.missionPhase === "predicting") {
         this.renderPredictLayer(mission, state.predictedEndPosition);
@@ -269,6 +298,52 @@ export class MissionScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * Draw the active hint's highlight rings onto the board (same gold ring +
+   * soft fill language as the predict marker). Clears and redraws the whole
+   * layer each call; passing a null hint just clears it. Static rings (no
+   * pulse tween) under reduced motion — the highlight itself is information,
+   * the pulse is cosmetic.
+   */
+  private renderHintHighlights(
+    mission: MissionDefinition,
+    hint: HintResult | null,
+  ): void {
+    if (!this.hintLayer) {
+      return;
+    }
+    this.hintLayer.removeAll(true);
+    if (!hint || hint.highlightPositions.length === 0) {
+      return;
+    }
+
+    const { tileSize } = this.boardMetrics(mission);
+    const reduced = gameStore.getState().profile.settings.reducedMotion;
+    hint.highlightPositions.forEach((position) => {
+      const { x, y } = this.worldXY(mission, position);
+      // Draw at (0,0) and position the Graphics so the pulse scales from the
+      // ring center (same pattern as spawnMoveSplash).
+      const ring = this.add.graphics();
+      ring.lineStyle(6, 0xffd166, 1);
+      ring.strokeCircle(0, 0, tileSize * 0.36);
+      ring.fillStyle(0xffd166, 0.35);
+      ring.fillCircle(0, 0, tileSize * 0.36);
+      ring.setPosition(x, y);
+      this.hintLayer?.add(ring);
+      if (!reduced) {
+        this.tweens.add({
+          targets: ring,
+          scale: 1.15,
+          alpha: 0.6,
+          duration: 600,
+          ease: "Sine.easeInOut",
+          yoyo: true,
+          repeat: -1,
+        });
+      }
+    });
+  }
+
   private boardMetrics(mission: MissionDefinition) {
     const width = this.scale.width;
     const height = this.scale.height;
@@ -322,8 +397,6 @@ export class MissionScene extends Phaser.Scene {
     this.goalSprite = undefined;
 
     const { tileSize, offsetX, offsetY } = this.boardMetrics(mission);
-    const theme = getActiveTheme(gameStore.getState().profile);
-    const tileLabels = theme.tileLabels[mission.id] ?? {};
 
     const bgKey = missionBackgrounds[mission.id];
     const hasPaintedBg = Boolean(bgKey) && this.textures.exists(bgKey);
@@ -424,15 +497,35 @@ export class MissionScene extends Phaser.Scene {
       .setAlpha(hasGoalArt ? 1 : 0.9);
     this.boardLayer?.add(goal);
     this.goalSprite = goal;
+    // Finish-flag pictogram so pre-readers spot the destination instantly —
+    // but only as the fallback. The hand-drawn goal icon already reads as an
+    // X-marks-the-spot landing pad; stacking the flag emoji on top of it is
+    // two competing glyphs. Static (the goal sprite pulses behind it); the
+    // ship is added later in this method, so it sails over the flag.
+    if (!hasGoalArt) {
+      const goalFlag = this.add
+        .text(goalCenter.x, goalCenter.y, goalGlyph, {
+          fontFamily: "Nunito, sans-serif",
+          fontSize: `${Math.max(Math.round(tileSize * 0.42), 22)}px`,
+        })
+        .setOrigin(0.5)
+        .setAlpha(0.95);
+      this.boardLayer?.add(goalFlag);
+    }
 
     tiles
       .filter((tile) => tile.active)
       .forEach((tile) => {
-        const artKey = tileArtKeys[tile.kind as keyof typeof tileArtKeys];
+        if (tile.kind === "goal") {
+          // The goal renders above as a dedicated sprite + icon — content
+          // never places goal *tiles*, but the type allows it.
+          return;
+        }
+        // Hand-drawn SVG icon is the primary token art; the procedural stamp
+        // + emoji pictogram is the fallback when the icon fails to load.
+        const artKey = tileArtKeys[tile.kind];
         const hasArt = Boolean(artKey) && this.textures.exists(artKey);
-        const key = hasArt
-          ? artKey
-          : kindTextureMap[tile.kind as keyof typeof kindTextureMap];
+        const key = hasArt ? artKey : kindTextureMap[tile.kind];
         if (!key) {
           return;
         }
@@ -442,18 +535,18 @@ export class MissionScene extends Phaser.Scene {
           .image(center.x, center.y, key)
           .setDisplaySize(tileSize - inset, tileSize - inset);
         if (hasArt) {
-          // Painted icons speak for themselves — no two-letter caption.
+          // Painted icons speak for themselves — no glyph overlay.
           this.boardLayer?.add(image);
           this.tileSprites.set(tile.id, { image });
           return;
         }
-        const label = tileLabels[tile.id] ?? "";
+        // Fallback: colored backplate + emoji pictogram, never letters — the
+        // target player can't read yet. The backplate carries the color code.
+        const glyph = kindGlyphMap[tile.kind];
         const text = this.add
-          .text(image.x, image.y, label.slice(0, 2).toUpperCase(), {
-            fontFamily: "Fredoka, Georgia, serif",
-            fontSize: `${Math.max(tileSize * 0.18, 18)}px`,
-            color: "#2b1d0e",
-            fontStyle: "bold",
+          .text(image.x, image.y, glyph, {
+            fontFamily: "Nunito, sans-serif",
+            fontSize: `${Math.max(Math.round(tileSize * 0.5), 24)}px`,
           })
           .setOrigin(0.5);
         this.boardLayer?.add([image, text]);
@@ -477,6 +570,7 @@ export class MissionScene extends Phaser.Scene {
     shipImage.setAngle(facingAngle(ship.facing));
     this.boardLayer?.add(shipImage);
     this.shipSprite = shipImage;
+    this.shipBaseScale = { x: shipImage.scaleX, y: shipImage.scaleY };
   }
 
   /**
@@ -909,11 +1003,162 @@ export class MissionScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * Coral ring flash on a failing tile so the kid sees WHERE the plan went
+   * wrong. The ring itself is information — under reduced motion it renders
+   * static (no flash tween) and is wiped by the post-run board re-render.
+   */
+  private flashFailRing(
+    mission: MissionDefinition,
+    at: Position,
+    reduced: boolean,
+  ): void {
+    if (!this.effectsLayer) {
+      return;
+    }
+    const { tileSize } = this.boardMetrics(mission);
+    const { x, y } = this.worldXY(mission, at);
+    const ring = this.add.graphics();
+    ring.lineStyle(6, uiColors.coral, 1);
+    ring.strokeCircle(0, 0, tileSize * 0.36);
+    ring.fillStyle(uiColors.coral, 0.25);
+    ring.fillCircle(0, 0, tileSize * 0.36);
+    ring.setPosition(x, y);
+    this.effectsLayer.add(ring);
+    if (reduced) {
+      return;
+    }
+    // Two flash pulses, sized to finish inside the ~900ms fail hold.
+    this.tweens.add({
+      targets: ring,
+      alpha: 0.25,
+      scale: 1.18,
+      duration: 220,
+      ease: "Sine.easeInOut",
+      yoyo: true,
+      repeat: 1,
+      onComplete: () => ring.destroy(),
+    });
+  }
+
+  /**
+   * Cosmetic fail lunge: nudge the ship halfway from `from` toward the flagged
+   * tile, then bounce back. Never awaited — snapToStep corrects the position
+   * at the end of the step regardless of whether the tween ran.
+   */
+  private bumpShipToward(
+    mission: MissionDefinition,
+    from: Position,
+    toward: Position,
+  ): void {
+    const ship = this.shipSprite;
+    if (!ship) {
+      return;
+    }
+    const bump = this.worldXY(mission, {
+      x: from.x + (toward.x - from.x) * 0.5,
+      y: from.y + (toward.y - from.y) * 0.5,
+    });
+    this.tweens.add({
+      targets: ship,
+      x: bump.x,
+      y: bump.y,
+      duration: 220,
+      ease: "Sine.easeOut",
+      yoyo: true,
+    });
+  }
+
+  /**
+   * Tiny scale-hop at the start of each move so consecutive moves read as
+   * distinct hops instead of one long glide. Cosmetic — skipped under reduced
+   * motion, never awaited; snapToStep restores the resting scale either way.
+   */
+  private hopShip(): void {
+    const ship = this.shipSprite;
+    if (!ship || gameStore.getState().profile.settings.reducedMotion) {
+      return;
+    }
+    this.tweens.add({
+      targets: ship,
+      scaleX: this.shipBaseScale.x * 1.06,
+      scaleY: this.shipBaseScale.y * 1.06,
+      duration: 70,
+      ease: "Sine.easeOut",
+      yoyo: true,
+      onComplete: () => ship.setScale(this.shipBaseScale.x, this.shipBaseScale.y),
+    });
+  }
+
+  /**
+   * Victory wiggle at the goal tile — a quick side-to-side rock layered on the
+   * final success linger. Cosmetic; skipped under reduced motion.
+   */
+  private wiggleShip(): void {
+    const ship = this.shipSprite;
+    if (!ship || gameStore.getState().profile.settings.reducedMotion) {
+      return;
+    }
+    const baseAngle = ship.angle;
+    this.tweens.add({
+      targets: ship,
+      angle: baseAngle + 8,
+      duration: 120,
+      ease: "Sine.easeInOut",
+      yoyo: true,
+      repeat: 2,
+      onComplete: () => ship.setAngle(baseAngle),
+    });
+  }
+
+  /**
+   * Wall-clock pause. Phaser's clock (tweens, delayedCall) stops whenever the
+   * page is hidden — a backgrounded tablet mid-run, or a headless preview —
+   * and a playback loop awaiting it freezes forever. window.setTimeout keeps
+   * firing in hidden pages (throttled, but it fires), so every pacing wait in
+   * the run loop goes through here: playback semantics must never depend on
+   * the animator's clock.
+   */
+  private beat(ms: number): Promise<void> {
+    return new Promise((resolve) => window.setTimeout(resolve, ms));
+  }
+
+  /**
+   * Hard-set the ship sprite (and any mid-animation tile sprites) to a step's
+   * true end state. Idempotent when the tweens already completed; corrective
+   * when they never ran because the page was hidden.
+   */
+  private snapToStep(mission: MissionDefinition, step: RunStep): void {
+    const ship = this.shipSprite;
+    if (ship) {
+      this.tweens.killTweensOf(ship);
+      const { x, y } = this.worldXY(mission, step.ship.position);
+      ship.setPosition(x, y);
+      ship.setAngle(facingAngle(step.ship.facing));
+      // Restore resting scale — a cosmetic hop killed mid-flight (hidden page)
+      // must never leave the ship stuck inflated.
+      ship.setScale(this.shipBaseScale.x, this.shipBaseScale.y);
+      this.shipBaseY = y;
+    }
+    const activeIds = new Set(
+      step.tiles.filter((tile) => tile.active).map((tile) => tile.id),
+    );
+    for (const [id, sprite] of this.tileSprites) {
+      if (!activeIds.has(id)) {
+        // Kill frozen fade/pop tweens so they can't resume once the page is
+        // visible again and replay against a sprite syncTilesToStep is about
+        // to destroy (its alpha/scale guard only spares fully-faded sprites).
+        this.tweens.killTweensOf([sprite.image, sprite.text]);
+      }
+    }
+  }
+
   private async playStep(
     mission: MissionDefinition,
     prev: RunStep | null,
     step: RunStep,
     durations: { move: number; turn: number; dodge: number; tile: number },
+    token: number,
   ): Promise<void> {
     const prevShip = prev?.ship ?? { position: mission.start.position, facing: mission.start.facing };
 
@@ -928,6 +1173,10 @@ export class MissionScene extends Phaser.Scene {
 
     const tasks: Promise<void>[] = [];
 
+    // Set by the fail branch — replaces the default minimum beat with a longer
+    // informational hold so the kid SEES the bump before the board resets.
+    let failHoldMs = 0;
+
     // Always tween angle if facing changed. With the absolute-direction model
     // facing is auto-set to the last-moved direction, so this fires whenever
     // the player switches between Up/Down/Left/Right blocks.
@@ -940,6 +1189,7 @@ export class MissionScene extends Phaser.Scene {
       this.fireSfxFor("sail");
       this.spawnWakeTrail(mission, prevShip.position);
       this.spawnMoveSplash(mission, prevShip.position);
+      this.hopShip();
       tasks.push(this.tweenShipTo(mission, step.ship.position, durations.move));
     } else if (primary?.kind === "dodge") {
       this.fireSfxFor("dodge");
@@ -990,6 +1240,25 @@ export class MissionScene extends Phaser.Scene {
     } else if (primary?.kind === "fail") {
       this.fireSfxFor("fail");
       haptic("fail");
+      const reduced = gameStore.getState().profile.settings.reducedMotion;
+      // The engine puts the colliding tile(s) on the fail event; the hint's
+      // highlightPositions carry the same data as a fallback.
+      const failPositions =
+        primary.positions && primary.positions.length > 0
+          ? primary.positions
+          : gameStore.getState().lastRun?.hint?.highlightPositions ?? [];
+      failPositions.forEach((position) =>
+        this.flashFailRing(mission, position, reduced),
+      );
+      if (!reduced && failPositions.length > 0) {
+        // Cosmetic lunge-and-bounce toward the collision — not awaited. Lunge
+        // from where the sprite visually sits (the previous step's tile): the
+        // engine parks the failed step's ship.position ON the collision tile,
+        // which would degenerate the bump into a full-tile jump.
+        this.bumpShipToward(mission, prevShip.position, failPositions[0]);
+      }
+      // Readable failure beat — shortened under reduced motion, never skipped.
+      failHoldMs = reduced ? 400 : 900;
     } else if (primary?.kind === "goal") {
       // success sfx + haptic when we reach the goal
       this.fireSfxFor("success");
@@ -1009,19 +1278,34 @@ export class MissionScene extends Phaser.Scene {
         this.fireSfxFor("sail");
         this.spawnWakeTrail(mission, prevShip.position);
         this.spawnMoveSplash(mission, prevShip.position);
+        this.hopShip();
         tasks.push(this.tweenShipTo(mission, step.ship.position, durations.move));
       }
     }
 
-    if (tasks.length === 0) {
+    if (failHoldMs > 0) {
+      // Wall-clock hold while the bump/flash tweens play out (they finish
+      // inside the hold). The fail step queues no awaited tasks of its own.
+      await this.beat(failHoldMs);
+    } else if (tasks.length === 0) {
       // Minimum beat so messages remain readable.
-      await new Promise<void>((resolve) =>
-        this.time.delayedCall(Math.max(120, durations.move * 0.5), () => resolve()),
-      );
+      await this.beat(Math.max(120, durations.move * 0.5));
     } else {
-      await Promise.all(tasks);
+      // Tween promises resolve on Phaser's clock, which freezes while the
+      // page is hidden. Race them against a wall-clock deadline and converge
+      // on the step's true state either way — the run must always finish.
+      const deadline =
+        Math.max(durations.move, durations.turn, durations.dodge, durations.tile) + 200;
+      await Promise.race([Promise.all(tasks), this.beat(deadline)]);
     }
 
+    // Wall-clock beats keep firing after a token bump (newer run, scene
+    // shutdown) — never snap a stale step onto the new run's sprites.
+    if (token !== this.activePlaybackToken) {
+      return;
+    }
+
+    this.snapToStep(mission, step);
     this.syncTilesToStep(step.tiles);
 
     if (step.status === "success") {
@@ -1075,50 +1359,69 @@ export class MissionScene extends Phaser.Scene {
       ? { move: 120, turn: 90, dodge: 140, tile: 160 }
       : { move: 260, turn: 200, dodge: 320, tile: 300 };
 
-    let prev: RunStep | null = null;
-    for (let i = 0; i < steps.length; i += 1) {
-      if (token !== this.activePlaybackToken) {
-        return;
-      }
-      const step = steps[i];
-      this.statusText?.setText(step.message);
-      gameStore.setPlaybackIndex(i);
+    try {
+      let prev: RunStep | null = null;
+      for (let i = 0; i < steps.length; i += 1) {
+        if (token !== this.activePlaybackToken) {
+          return;
+        }
+        const step = steps[i];
+        this.statusText?.setText(step.message);
+        gameStore.setPlaybackIndex(i);
 
-      await this.playStep(mission, prev, step, durations);
+        await this.playStep(mission, prev, step, durations, token);
 
-      if (token !== this.activePlaybackToken) {
-        return;
-      }
+        if (token !== this.activePlaybackToken) {
+          return;
+        }
 
-      // Final success step gets a moment to linger so the player feels the win.
-      if (i === steps.length - 1 && step.status === "success") {
-        await new Promise<void>((resolve) =>
-          this.time.delayedCall(reduced ? 240 : 500, () => resolve()),
-        );
-      }
+        // Final success step gets a moment to linger so the player feels the
+        // win BEFORE the screen swaps to the reward card: sparkle burst + ship
+        // wiggle at the goal tile (cosmetic), riding a wall-clock hold
+        // (informational — shortened under reduced motion, never skipped).
+        if (i === steps.length - 1 && step.status === "success") {
+          const goalPoint = this.worldXY(mission, step.ship.position);
+          this.spawnSparkleBurst(goalPoint.x, goalPoint.y);
+          this.wiggleShip();
+          await this.beat(reduced ? 400 : 900);
+        }
 
-      // Warning beats (no-op fire/collect/talk) dwell longer so the player
-      // actually notices the wasted move and the "💨 nothing here" status text.
-      // Reduced-motion still gets a short dwell — we never *skip* informational
-      // beats, just shorten them.
-      if (step.status === "warning") {
-        await new Promise<void>((resolve) =>
-          this.time.delayedCall(reduced ? 220 : 480, () => resolve()),
-        );
+        // Warning beats (no-op fire/collect/talk) dwell longer so the player
+        // actually notices the wasted move and the "💨 nothing here" status
+        // text. Reduced-motion still gets a short dwell — we never *skip*
+        // informational beats, just shorten them.
+        if (step.status === "warning") {
+          await this.beat(reduced ? 220 : 480);
+        }
+
+        // Fixed inter-step breath so back-to-back commands read as separate
+        // beats instead of one continuous slide. Wall clock, like every pacing
+        // wait in this loop.
+        if (i < steps.length - 1) {
+          await this.beat(reduced ? 50 : 110);
+        }
+        prev = step;
       }
-      prev = step;
+    } catch (err) {
+      // An animation/subscriber bug must never wedge the mission in "running"
+      // (board frozen, every control locked, reward silently dropped).
+      console.error("[mission] playback aborted by error", err);
+    } finally {
+      // Completion is structurally guaranteed for the run that still owns the
+      // playback token: success lands on the reward screen, failure lands in
+      // gentle rewind. Cancelled runs (token bumped by a newer run or scene
+      // shutdown) skip it — the canceller owns the state transition.
+      if (token === this.activePlaybackToken) {
+        gameStore.finishPlayback();
+      }
     }
-
-    if (token !== this.activePlaybackToken) {
-      return;
-    }
-    gameStore.finishPlayback();
   }
 
   shutdown(): void {
     this.unsubscribe?.();
     this.unsubscribe = undefined;
     this.predictLayer?.removeAll(true);
+    this.hintLayer?.removeAll(true);
     this.effectsLayer?.removeAll(true);
     this.wakeParticleCount = 0;
     this.renderedPhase = null;

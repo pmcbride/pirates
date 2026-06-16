@@ -67,6 +67,7 @@ const bootstrap = async (): Promise<void> => {
     { missions },
     { getActiveTheme },
     { createAriaLiveRegion },
+    { speak },
   ] = await Promise.all([
     import("./game/createGame"),
     import("./sim/store"),
@@ -74,6 +75,7 @@ const bootstrap = async (): Promise<void> => {
     import("./sim/content"),
     import("./themes"),
     import("./ui/aria-live"),
+    import("./ui/speech"),
   ]);
 
   // Boot Phaser only once the shell has real layout — WebGL renderer
@@ -158,14 +160,22 @@ const bootstrap = async (): Promise<void> => {
     });
   };
 
-  // — Screen-reader narration —
+  // — Screen-reader narration + voice narration —
   // Watch state for screen / phase / playback / reward transitions and pipe a
   // human-readable sentence to the aria-live region. The element is throttled
   // internally so rapid-fire ticks don't flood the SR queue.
+  //
+  // `speak()` (Web Speech) additionally voices the three moments a PRE-READER
+  // needs read aloud: mission open (the themed objective), hint arrival
+  // (reason + fix — spoken only; the aria region gets the phase line), and
+  // the reward sentence (the one string shared with aria.announce). speak()
+  // no-ops when unsupported and is muted alongside sfx via the HUD's store
+  // subscription.
   let lastScreen: AppState["screen"] | null = null;
   let lastPhase: AppState["missionPhase"] | null = null;
   let lastPlaybackKey: string | null = null;
   let lastRewardMissionId: string | null = null;
+  let lastSpokenHintKey: string | null = null;
 
   const describePhase = (state: AppState): string => {
     const mission = state.activeMissionId ? missions[state.activeMissionId] : null;
@@ -197,6 +207,16 @@ const bootstrap = async (): Promise<void> => {
         aria.announce("Sea of Codes. Tap Set Sail to begin.");
       } else if (state.screen === "map") {
         aria.announce("Sea chart. Pick the next voyage.");
+      } else if (state.screen === "mission" || state.screen === "sandbox") {
+        // Voice the themed objective the moment a mission opens — the one
+        // sentence that tells a pre-reader what "winning" looks like.
+        const mission = state.activeMissionId
+          ? missions[state.activeMissionId]
+          : null;
+        if (mission) {
+          const theme = getActiveTheme(state.profile);
+          speak(theme.missions[mission.id]?.objective.primary ?? "");
+        }
       } else if (state.screen === "reward") {
         const reward = state.lastRun?.reward;
         const lastLog = state.profile.captainLog.at(-1);
@@ -209,10 +229,23 @@ const bootstrap = async (): Promise<void> => {
         if (lastLog) {
           parts.push(lastLog.oneLine);
         }
-        aria.announce(parts.join(" "));
+        const line = parts.join(" ");
+        aria.announce(line);
+        speak(line);
         lastRewardMissionId = state.rewardMissionId;
       }
     }
+
+    // Hint arrival — voice the reason AND the suggested fix together so the
+    // gentle rewind works without reading. Keyed on the hint text so playback
+    // ticks while the bubble sits open don't re-trigger it. Sandbox bounces
+    // silently (no hint banner there either).
+    const hint = state.activeHint;
+    const hintKey = hint ? `${hint.reason}|${hint.suggestion}` : null;
+    if (hint && hintKey !== lastSpokenHintKey && state.screen !== "sandbox") {
+      speak(`${hint.reason} ${hint.suggestion}`);
+    }
+    lastSpokenHintKey = hintKey;
 
     // Mission phase change.
     if (
@@ -260,4 +293,17 @@ const bootstrap = async (): Promise<void> => {
   });
 };
 
-void bootstrap();
+// A bootstrap failure (e.g. storage APIs throwing before any handler exists)
+// must not be a silent blank page — the dev-only error listeners above don't
+// run in production builds, and the audience can't open a console.
+bootstrap().catch((err) => {
+  console.error("[soc] bootstrap failed", err);
+  app.innerHTML = `
+    <main class="app-shell" style="display:grid;place-items:center;">
+      <section class="surface-card" style="max-width:420px;padding:2rem;text-align:center;">
+        <h1 style="margin:0 0 0.5rem;">⚓ Rough seas!</h1>
+        <p style="margin:0;">The game couldn't start. Try reloading the page.</p>
+      </section>
+    </main>
+  `;
+});

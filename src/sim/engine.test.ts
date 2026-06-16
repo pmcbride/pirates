@@ -286,6 +286,109 @@ describe("mission runner", () => {
     expect(result.reward?.bounty).toBe(3_000_000);
   });
 
+  it("teaches range when a wasted Fire preceded sailing into the foe (windrise-cove)", () => {
+    const profile = defaultProfile();
+    const mission = missions["windrise-cove"];
+
+    // Fire from the dock — the foe at (2,1) is two tiles away, out of range —
+    // then sail straight into it. The old hint said "use Fire", contradicting
+    // the wasted Fire the player just watched; the new one teaches range.
+    const queue: PlannedCommand[] = [
+      { instanceId: "range-1", templateId: "fire", type: "action", action: "fire" },
+      { instanceId: "range-2", templateId: "move-right", type: "action", action: "move-right" },
+      { instanceId: "range-3", templateId: "move-right", type: "action", action: "move-right" },
+    ];
+
+    const result = runMission(mission, queue, profile, originalTheme);
+
+    expect(result.success).toBe(false);
+    const wastedFire = result.steps.find((step) => step.status === "warning");
+    expect(wastedFire?.events[0]?.kind).toBe("fire");
+    expect(result.hint?.reason).toBe("The cannon was too far away");
+    expect(result.hint?.suggestion).toContain(
+      "Sail next to the patrol skiff, then Fire",
+    );
+    expect(result.hint?.focusTemplateId).toBe("move-right");
+    // Approach-side tile first (where to Fire from next time), then the foe.
+    expect(result.hint?.highlightPositions).toEqual([
+      { x: 1, y: 1 },
+      { x: 2, y: 1 },
+    ]);
+  });
+
+  it("only suggests a Repeat when the mission palette offers one", () => {
+    const profile = defaultProfile();
+    const shortPlan = (id: string): PlannedCommand[] => [
+      { instanceId: `${id}-short`, templateId: "move-right", type: "action", action: "move-right" },
+    ];
+
+    // tutorial-cove has no Repeat block — the hint must not mention one.
+    const noLoop = runMission(
+      missions["tutorial-cove"],
+      shortPlan("cove"),
+      profile,
+      originalTheme,
+    );
+    expect(noLoop.success).toBe(false);
+    expect(noLoop.hint?.suggestion).toContain("Add more direction arrows");
+    expect(noLoop.hint?.suggestion).not.toContain("Repeat");
+
+    // current-crescent teaches Repeat — there the nudge belongs.
+    const withLoop = runMission(
+      missions["current-crescent"],
+      shortPlan("crescent"),
+      profile,
+      originalTheme,
+    );
+    expect(withLoop.success).toBe(false);
+    expect(withLoop.hint?.suggestion).toContain("(or a Repeat)");
+  });
+
+  it("never leaks raw ids into step titles, messages, events, or hints", () => {
+    const profile = defaultProfile();
+    // Hyphenated template ids and camelCase condition ids are code, not copy.
+    const rawId =
+      /move-(up|down|left|right)|enemyAhead|obstacleAhead|treasureHere|crewHere/;
+
+    // treasure-isle exercises every block type (moves, two Ifs, Repeat with a
+    // body, Talk); current-crescent adds the legacy body-less Repeat; the
+    // one-block tutorial plan adds the end-of-queue failure hint.
+    const runs = [
+      runMission(
+        missions["treasure-isle"],
+        cloneQueuedCommands(missions["treasure-isle"].suggestedQueue),
+        profile,
+        originalTheme,
+      ),
+      runMission(
+        missions["current-crescent"],
+        cloneQueuedCommands(missions["current-crescent"].suggestedQueue),
+        profile,
+        originalTheme,
+      ),
+      runMission(
+        missions["tutorial-cove"],
+        [{ instanceId: "leak-1", templateId: "move-right", type: "action", action: "move-right" }],
+        profile,
+        originalTheme,
+      ),
+    ];
+
+    for (const result of runs) {
+      for (const step of result.steps) {
+        expect(step.title).not.toMatch(rawId);
+        expect(step.message).not.toMatch(rawId);
+        for (const event of step.events) {
+          expect(event.text).not.toMatch(rawId);
+        }
+      }
+      if (result.hint) {
+        expect(result.hint.reason).not.toMatch(rawId);
+        expect(result.hint.suggestion).not.toMatch(rawId);
+      }
+    }
+  });
+
   it("clears the barrel-bay East Blue practice with its sample queue", () => {
     const profile = {
       ...defaultProfile(),

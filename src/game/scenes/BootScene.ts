@@ -26,6 +26,39 @@ const drawStamp = (
   graphics.destroy();
 };
 
+/**
+ * Current token — a foam spiral on storm blue. The old sea-blue stamp
+ * (uiColors.sea) was invisible against the water tiles it sat on; storm blue
+ * contrasts with the board and the spiral telegraphs "swirling current"
+ * without any reading.
+ */
+const drawCurrentStamp = (scene: Phaser.Scene, key: string): void => {
+  const size = 96;
+  const graphics = scene.add.graphics();
+  graphics.setVisible(false);
+  graphics.fillStyle(uiColors.storm, 1);
+  graphics.fillRoundedRect(0, 0, size, size, 30);
+  graphics.lineStyle(6, uiColors.ink, 1);
+  graphics.strokeRoundedRect(3, 3, size - 6, size - 6, 30);
+  // Archimedean spiral approximated as a polyline — cheap, crisp at token size.
+  graphics.lineStyle(7, uiColors.foam, 1);
+  graphics.beginPath();
+  const center = size / 2;
+  for (let theta = 0; theta <= Math.PI * 3.5; theta += Math.PI / 16) {
+    const radius = 2 + theta * 3;
+    const px = center + Math.cos(theta) * radius;
+    const py = center + Math.sin(theta) * radius;
+    if (theta === 0) {
+      graphics.moveTo(px, py);
+    } else {
+      graphics.lineTo(px, py);
+    }
+  }
+  graphics.strokePath();
+  graphics.generateTexture(key, size, size);
+  graphics.destroy();
+};
+
 export class BootScene extends Phaser.Scene {
   constructor() {
     super("boot");
@@ -65,8 +98,8 @@ export class BootScene extends Phaser.Scene {
     drawStamp(this, textureKeys.crew, uiColors.plum);
     // Goal marker — bright sun.
     drawStamp(this, textureKeys.goal, uiColors.sunset, 110, 110, 40);
-    // Current — sea blue.
-    drawStamp(this, textureKeys.current, uiColors.sea, 96, 96, 30);
+    // Current — foam spiral on storm blue (sea blue vanished against water).
+    drawCurrentStamp(this, textureKeys.current);
 
     // Hand off to the shell's scene router (main.ts) — it starts whichever
     // scene matches the store's current screen. Hardcoding `start("title")`

@@ -52,7 +52,18 @@ src/
    `engine.test.ts` rely on this.
 5. **Mission failure is "gentle rewind", not game over.** Always return a `HintResult`
    with a `focusTemplateId` and `highlightPositions`. The HUD turns this into a speech
-   bubble pointing at the suggested fix.
+   bubble pointing at the suggested fix (queue card, or the palette stamp when the fix
+   is a missing block); `MissionScene` draws pulsing rings on the highlighted tiles.
+6. **Run playback advances on the wall clock, never Phaser's clock.** Phaser tweens and
+   `delayedCall` freeze while the page is hidden (backgrounded tablet, headless preview),
+   so a run awaiting them never reaches `finishPlayback()`. Flow-critical waits in
+   `MissionScene` go through `beat()` (`window.setTimeout`); tweens are cosmetic-only and
+   every step converges via `snapToStep()`. This is what makes automated preview
+   playthroughs possible — keep it that way.
+7. **Pre-readers gate every UX decision.** No required reading or typing on the critical
+   path: first-run identity is the tap-a-pirate preset grid, board tiles speak pictogram
+   (never letters), prediction starts at mission 4, and Web Speech narration mirrors
+   on-screen text.
 
 **Content authoring (`src/sim/content.ts`):**
 
@@ -109,6 +120,7 @@ There is no lint script yet — TypeScript strict + the test suite are the safet
 | Add a Devil Fruit power | `fruitPowers` + `engine.ts` (e.g. `fireRange()` reads it) |
 | Restyle the HUD | `src/styles.css` + markup in `src/ui/hud.ts` |
 | Change board visuals | `src/game/scenes/MissionScene.ts` + `assets/manifest.ts` |
+| Generate painted art (backgrounds, sprites) | use the `generate-game-art` skill (`.claude/skills/generate-game-art/`) |
 | Add a stat (bounty, log) | `PlayerProfile` in `types.ts` → engine → store → HUD |
 
 ## Definition of done for a PR

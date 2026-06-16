@@ -31,14 +31,17 @@ import type {
 } from "./types";
 
 /**
- * Missions where prediction is required. Tutorial is exempt so the very first
- * experience stays friction-free.
+ * Missions that skip the predict-then-run beat. The first three voyages stay
+ * friction-free so a pre-reader can build → run without an extra gate; the
+ * predict beat starts with the fourth, after three full plan→watch loops.
+ * Derived from the curriculum ordering so a mission rename or insertion can
+ * never silently shift the gate.
  */
-const PREDICTION_EXEMPT_MISSION_IDS = new Set<string>(["tutorial-cove"]);
+const PREDICTION_EXEMPT_MISSION_IDS = new Set<string>(orderedMissionIds.slice(0, 3));
 
 /**
  * Pure helper: does the player need to predict before running this mission?
- * - Tutorial is exempt.
+ * - The first three missions are exempt.
  * - Player can opt out via settings (skipPrediction).
  */
 export const shouldPredictForMission = (
@@ -52,19 +55,21 @@ export const shouldPredictForMission = (
 };
 
 /**
- * Pure helper: pick the queue to pre-load when opening a mission, based on
- * how many times the player has attempted it and their settings.
+ * Pure helper: pick the queue to pre-load when opening a mission.
  *
- * - First attempt (or alwaysShowSuggested true): full suggested queue.
- * - Subsequent attempts: stub queue with only the first command (so the
- *   canvas isn't empty for a pre-reader). Empty suggested queue → empty stub.
+ * - Mission not yet cleared (or alwaysShowSuggested true): the full suggested
+ *   queue. A pre-reader retrying after a failure shouldn't have to rebuild
+ *   the whole plan from a near-blank canvas.
+ * - Replaying an already-cleared mission: stub queue with only the first
+ *   command (so the canvas isn't empty, but the replay is theirs to build).
+ *   Empty suggested queue → empty stub.
  */
 export const pickInitialQueue = (
   mission: MissionDefinition,
   profile: PlayerProfile,
 ): PlannedCommand[] => {
-  const attempts = profile.attemptCounts[mission.id] ?? 0;
-  if (attempts === 0 || profile.settings.alwaysShowSuggested) {
+  const cleared = profile.completedMissionIds.includes(mission.id);
+  if (!cleared || profile.settings.alwaysShowSuggested) {
     return cloneQueuedCommands(mission.suggestedQueue);
   }
   if (mission.suggestedQueue.length === 0) {
@@ -194,7 +199,17 @@ export class GameStore {
 
   private setState(next: AppState): void {
     this.state = next;
-    this.listeners.forEach((listener) => listener(this.state));
+    // Isolate listeners from each other: state is already committed, so one
+    // throwing subscriber (HUD render, scene draw, narration) must not starve
+    // the rest into rendering stale state — that's how one cosmetic bug turns
+    // into a canvas/HUD desync or a run wedged mid-playback.
+    this.listeners.forEach((listener) => {
+      try {
+        listener(this.state);
+      } catch (err) {
+        console.error("[store] subscriber failed during notify", err);
+      }
+    });
   }
 
   private update(mutator: (state: AppState) => AppState): void {
@@ -741,17 +756,48 @@ export class GameStore {
     }
 
     if (shouldPredictForMission(missionId, this.state.profile)) {
+      const mission = missions[missionId];
       this.update((state) => ({
         ...state,
         missionPhase: "predicting",
         activeHint: null,
         lastRun: null,
-        predictedEndPosition: null,
+        // Pre-place the marker on the ship's start tile so the confirm CTA
+        // is live immediately — a pre-reader can always tap Go, even before
+        // discovering that the marker can be moved.
+        predictedEndPosition: {
+          x: mission.start.position.x,
+          y: mission.start.position.y,
+        },
         lastPredictionCorrect: null,
       }));
       return;
     }
 
+    this.executeRun();
+  }
+
+  /**
+   * One-shot skip from the predict beat: run the queued plan right now
+   * without scoring a guess. Unlike toggleSkipPrediction (the Settings-drawer
+   * opt-out) this never touches the persisted profile settings.
+   */
+  skipPredictionOnce(): void {
+    // Phase guard, like setPrediction/confirmPrediction: a double-tap on the
+    // Skip button must not re-execute the run that the first tap started.
+    if (this.state.missionPhase !== "predicting") {
+      return;
+    }
+    if (!this.state.activeMissionId || this.state.queuedCommands.length === 0) {
+      return;
+    }
+    // Drop any pre-placed marker first so the skipped run isn't scored as a
+    // wrong guess — the player chose not to predict this time.
+    this.update((state) => ({
+      ...state,
+      predictedEndPosition: null,
+      lastPredictionCorrect: null,
+    }));
     this.executeRun();
   }
 

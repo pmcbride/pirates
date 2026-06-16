@@ -63,9 +63,16 @@ export const reconcileCrewRoster = (
   roster: string[],
   completedMissionIds: string[],
 ): string[] => {
+  // `roster` crosses the JSON.parse trust boundary, so the `string[]` type is
+  // not enforced at runtime. A corrupt or hand-edited save can hand us a
+  // non-array — coerce instead of letting `.filter` throw, since that
+  // TypeError would bubble into deserializeProfile's catch and silently reset
+  // the *entire* profile to default, wiping every cleared voyage. Backfilling
+  // from completedMissionIds below still rebuilds the real roster.
+  const safeRoster = Array.isArray(roster) ? roster : [];
   const reconciled = [
     captainCrewId,
-    ...roster.filter((id) => id !== captainCrewId),
+    ...safeRoster.filter((id) => id !== captainCrewId),
   ];
   for (const node of missionNodes) {
     const crewId = node.rewards.crewId;

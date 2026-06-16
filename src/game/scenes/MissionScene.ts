@@ -770,10 +770,15 @@ export class MissionScene extends Phaser.Scene {
   }
 
   private stopShipBob(): void {
-    if (this.shipBobTween) {
-      this.shipBobTween.stop();
-      this.shipBobTween = undefined;
+    if (!this.shipBobTween) {
+      // No bob tween was running — reduced-motion never spawns one, so
+      // `shipBaseY` was never captured from this container. Restoring it here
+      // would snap the ship to a stale/zero Y the moment playback starts;
+      // leave the container exactly where `renderBoard` placed it.
+      return;
     }
+    this.shipBobTween.stop();
+    this.shipBobTween = undefined;
     // Restore base Y so any subsequent move-tween starts from the snapped cell
     // center, not a bob offset.
     if (this.shipContainer) {

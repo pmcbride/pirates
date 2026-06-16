@@ -118,6 +118,37 @@ describe("crew roster migration", () => {
     ]);
   });
 
+  it("tolerates a corrupt non-array roster instead of throwing", () => {
+    // A hand-edited/corrupt save can put a non-array past deserializeProfile's
+    // `?? merged.crewRoster` guard (?? only fills null/undefined). Reconcile
+    // must coerce, not throw — a throw here bubbles into deserializeProfile's
+    // catch and silently resets the whole profile to default.
+    for (const bad of ["luffy", 42, { id: "luffy" }, true] as unknown[]) {
+      expect(() =>
+        reconcileCrewRoster(bad as string[], ["windrise-cove"]),
+      ).not.toThrow();
+      // Real progress is still rebuilt from the completed voyages.
+      expect(reconcileCrewRoster(bad as string[], ["windrise-cove"])).toEqual([
+        captainCrewId,
+        "nami",
+      ]);
+    }
+  });
+
+  it("preserves progress when a stored save has a non-array roster", () => {
+    const stored = JSON.stringify({
+      unlockedMissionIds: ["tutorial-cove", "spark-shoals"],
+      completedMissionIds: ["tutorial-cove", "spark-shoals"],
+      berries: 160,
+      crewRoster: "zoro", // corrupt: a bare string, not an array
+    });
+    const profile = deserializeProfile(stored);
+    // Not reset to default — berries + cleared voyages survive, roster rebuilt.
+    expect(profile.berries).toBe(160);
+    expect(profile.completedMissionIds).toContain("spark-shoals");
+    expect(profile.crewRoster).toEqual(["luffy", "zoro"]);
+  });
+
   it("never duplicates and is idempotent", () => {
     const once = reconcileCrewRoster(
       ["luffy", "zoro", "nami"],

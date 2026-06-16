@@ -1,5 +1,6 @@
 import type {
   CommandBlock,
+  ConditionKind,
   CrewMate,
   FruitPower,
   MissionDefinition,
@@ -142,6 +143,17 @@ export const commandLibrary: Record<string, CommandBlock> = {
   },
 };
 
+// Kid-readable names for condition ids. Step titles and event text must never
+// show a raw id like "enemyAhead" — pre-readers can't parse camelCase ids.
+// Wording matches the HUD's condition-picker labels, lowercased for
+// mid-sentence use.
+export const conditionLabels: Record<ConditionKind, string> = {
+  enemyAhead: "foe ahead",
+  obstacleAhead: "reef ahead",
+  treasureHere: "treasure here",
+  crewHere: "crew here",
+};
+
 // The full six-mate crew. `luffy` is never a mission reward — he's the
 // captain, seeded into every profile's roster (see profile.ts). The other
 // five are recruited one per voyage, in the same order they join in the
@@ -255,7 +267,9 @@ export const missionNodes: MissionNode[] = [
       bounty: 2_000_000,
       stars: 2,
       crewId: "usopp",
-      unlockCommandIds: [],
+      // Up/Down unlock here so they're in hand before harbor-bend — the next
+      // mission's palette is where those blocks first appear.
+      unlockCommandIds: ["move-up", "move-down"],
     },
     unlockMissionIds: ["windrise-cove"],
   },
@@ -270,7 +284,9 @@ export const missionNodes: MissionNode[] = [
       bounty: 1_000_000,
       stars: 2,
       crewId: "sanji",
-      unlockCommandIds: ["move-up", "move-down"],
+      // Up/Down already unlocked at barrel-bay (the prior voyage); this is the
+      // mission whose palette first uses them.
+      unlockCommandIds: [],
     },
     unlockMissionIds: ["barrel-bay"],
   },
@@ -498,7 +514,9 @@ export const missions: Record<string, MissionDefinition> = {
       bounty: 2_000_000,
       stars: 2,
       crewId: "usopp",
-      unlockCommandIds: [],
+      // Up/Down unlock here so they're in hand before harbor-bend — the next
+      // mission's palette is where those blocks first appear.
+      unlockCommandIds: ["move-up", "move-down"],
     },
     tiles: [
       {
@@ -553,7 +571,9 @@ export const missions: Record<string, MissionDefinition> = {
       bounty: 1_000_000,
       stars: 2,
       crewId: "sanji",
-      unlockCommandIds: ["move-up", "move-down"],
+      // Up/Down already unlocked at barrel-bay (the prior voyage); this is the
+      // mission whose palette first uses them.
+      unlockCommandIds: [],
     },
     tiles: [
       {

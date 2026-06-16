@@ -1,5 +1,5 @@
 import type { Theme } from "../themes/types";
-import { missions } from "./content";
+import { commandLibrary, conditionLabels, missions } from "./content";
 import type {
   ActionCommandId,
   ConditionKind,
@@ -39,6 +39,12 @@ const moveActionToFacing: Record<
 };
 
 const clonePosition = (position: Position): Position => ({ ...position });
+
+// Player-facing name for a queued block. Step titles, messages, and event
+// text must never show a raw template id ("move-right") — pre-readers can't
+// parse hyphenated ids, only the big block labels they already know.
+const commandLabel = (templateId: string): string =>
+  commandLibrary[templateId]?.label ?? templateId;
 
 const cloneTiles = (tiles: MissionTile[]): MissionTile[] =>
   tiles.map((tile) => ({
@@ -477,6 +483,30 @@ export const runMission = (
         const collision = activeTileAt(state.tiles, next, ["enemy", "obstacle"]);
 
         if (collision?.kind === "enemy") {
+          // If this run already wasted a Fire (warning beat with a fire
+          // event), the real lesson is range, not "use Fire" — the player
+          // fired, just from too far away. Telling them to Fire again would
+          // contradict what they watched happen.
+          const wastedFire = steps.some(
+            (step) =>
+              step.status === "warning" && step.events[0]?.kind === "fire",
+          );
+          if (wastedFire) {
+            // The tile we just moved from is the spot adjacent to the enemy
+            // on the approach side — the place to Fire from next time.
+            const approachTile: Position = {
+              x: next.x - delta.x,
+              y: next.y - delta.y,
+            };
+            return failRun(
+              commandId,
+              "The cannon was too far away",
+              `Sail next to the ${theme.enemyKind.singular}, then Fire.`,
+              "move-right",
+              [approachTile, collision.position],
+            );
+          }
+
           return failRun(
             commandId,
             `A ${theme.enemyKind.singular} was still in the lane`,
@@ -590,7 +620,7 @@ export const runMission = (
     if (command.type === "action") {
       const result = applyAction(
         command.instanceId,
-        command.templateId.replace("-", " "),
+        commandLabel(command.templateId),
         command.action ?? "move-right",
       );
       if (result) {
@@ -615,9 +645,9 @@ export const runMission = (
             pushStep(
               command.instanceId,
               `Repeat ${index + 1}/${count}`,
-              `The crew runs ${innerAction} (step ${index + 1} of ${count}).`,
+              `The crew runs ${commandLabel(innerAction)} (step ${index + 1} of ${count}).`,
               "running",
-              [{ kind: "repeat", text: `Repeat ${innerAction}.` }],
+              [{ kind: "repeat", text: `Repeat ${commandLabel(innerAction)}.` }],
             );
             const result = applyAction(
               command.instanceId,
@@ -636,9 +666,9 @@ export const runMission = (
           pushStep(
             command.instanceId,
             `Repeat ${index + 1}/${count}`,
-            `The crew prepares to ${fallbackAction} again.`,
+            `The crew runs ${commandLabel(fallbackAction)} again.`,
             "running",
-            [{ kind: "repeat", text: `Repeat ${fallbackAction}.` }],
+            [{ kind: "repeat", text: `Repeat ${commandLabel(fallbackAction)}.` }],
           );
           const result = applyAction(
             command.instanceId,
@@ -659,11 +689,12 @@ export const runMission = (
 
     const condition = command.condition ?? "enemyAhead";
     const thenAction = command.thenAction ?? "fire";
+    const conditionTitle = `If ${conditionLabels[condition]}`;
     const matches = evaluateCondition(state, condition, profile);
     if (!matches) {
       pushStep(
         command.instanceId,
-        `If ${condition}`,
+        conditionTitle,
         "The sea stays calm, so the crew waits.",
         "running",
         [{ kind: "condition", text: "Condition skipped." }],
@@ -673,12 +704,12 @@ export const runMission = (
 
     pushStep(
       command.instanceId,
-      `If ${condition}`,
-      `The condition is true, so the crew will ${thenAction}.`,
+      conditionTitle,
+      `The crew spots ${conditionLabels[condition]}, so they ${commandLabel(thenAction)}.`,
       "running",
-      [{ kind: "condition", text: `Condition matched ${condition}.` }],
+      [{ kind: "condition", text: `Spotted: ${conditionLabels[condition]}.` }],
     );
-    const result = applyAction(command.instanceId, `If ${condition}`, thenAction);
+    const result = applyAction(command.instanceId, conditionTitle, thenAction);
     if (result) {
       return result;
     }
@@ -703,10 +734,13 @@ export const runMission = (
   }
 
   if (!goalReached(mission, state)) {
+    // Only mention Repeat when the mission's palette actually offers it —
+    // advice about a block the player can't see is just confusing.
+    const loopNudge = mission.palette.includes("repeat") ? " (or a Repeat)" : "";
     return failRun(
       queuedCommands.at(-1)?.instanceId ?? "finish",
       "The lighthouse is still ahead",
-      "Add more direction arrows (or a Repeat) to reach the goal.",
+      `Add more direction arrows${loopNudge} to reach the goal.`,
       "move-right",
       [clonePosition(mission.goal)],
     );

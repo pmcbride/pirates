@@ -1,3 +1,5 @@
+import type { TileKind } from "../../sim/types";
+
 export const textureKeys = {
   ship: "ship-token",
   enemy: "enemy-token",
@@ -52,10 +54,31 @@ export const uiColors = {
   white: 0xffffff,
 } as const;
 
+/** Every board tile kind except "goal" (the goal renders via textureKeys.goal
+ * + goalGlyph). Anchoring both maps to TileKind means adding a new kind fails
+ * compilation here instead of silently rendering a blank tile. */
+type BoardTileKind = Exclude<TileKind, "goal">;
+
 export const kindTextureMap = {
   enemy: textureKeys.enemy,
   obstacle: textureKeys.obstacle,
   treasure: textureKeys.treasure,
   crew: textureKeys.crew,
   current: textureKeys.current,
-} as const;
+} as const satisfies Record<BoardTileKind, string>;
+
+/** Pictogram per tile kind — pre-readers identify board tokens by glyph, not
+ * letters. Rendered as Phaser text centered on the colored token backplate
+ * (the backplate keeps carrying the color coding). The current token is
+ * glyph-free: its procedural stamp already paints a foam spiral, and stacking
+ * the cyclone emoji on top read as two competing swirls. */
+export const kindGlyphMap = {
+  enemy: "⛵",
+  obstacle: "🪨",
+  treasure: "💰",
+  crew: "🧑",
+  current: "",
+} as const satisfies Record<BoardTileKind, string>;
+
+/** Goal-tile pictogram overlay — the finish flag every kid knows from races. */
+export const goalGlyph = "🏁";

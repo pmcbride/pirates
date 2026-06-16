@@ -5,8 +5,11 @@
  * pointer is set in localStorage by the time anything reads it. Handles three
  * cases:
  *
- *   1. No profiles in storage → "Welcome aboard! What's your captain name?"
- *      text input flow. Creates a fresh profile and resolves.
+ *   1. No profiles in storage → "Who's sailing today?" tap-a-pirate grid.
+ *      One tap on a preset portrait creates a fresh profile and resolves —
+ *      a pre-reader gets into the game without typing a single letter.
+ *      A small "Type a name instead" disclosure keeps the typed form
+ *      available for parents.
  *   2. Exactly one profile → silently resolves with that profile as active.
  *   3. 2+ profiles → "Pick your captain" picker with big buttons + "+ New".
  *
@@ -18,7 +21,9 @@ import {
   MAX_CAPTAINS_SHOWN,
   MAX_NAME_LENGTH,
   createProfile,
+  createProfileWithPreset,
   listProfiles,
+  presetCaptains,
   setActiveProfile,
   validateCaptainName,
 } from "../sim/captains";
@@ -47,7 +52,69 @@ const errorMessage = (
   }
 };
 
-const renderNewCaptainForm = (host: HTMLElement, onDone: () => void): void => {
+/**
+ * Default new-captain flow: a grid of big emoji-portrait buttons. One tap
+ * creates the profile (duplicate names auto-suffix — see
+ * `createProfileWithPreset`) and starts the game. No keyboard anywhere on
+ * the kid path.
+ */
+const renderPresetGrid = (host: HTMLElement, onDone: () => void): void => {
+  const presetButtons = presetCaptains
+    .map(
+      (preset) => `
+        <button
+          type="button"
+          class="captain-pick captain-pick-preset"
+          data-preset-name="${escapeHtml(preset.name)}"
+        >
+          <span class="captain-pick-icon" aria-hidden="true">${preset.icon}</span>
+          <strong>${escapeHtml(preset.name)}</strong>
+        </button>
+      `,
+    )
+    .join("");
+
+  host.innerHTML = `
+    <section class="captain-overlay" role="dialog" aria-labelledby="captain-overlay-title">
+      <div class="surface-card captain-card">
+        <p class="eyebrow">Sea of Codes</p>
+        <h1 id="captain-overlay-title">Who's sailing today?</h1>
+        <p>Tap a pirate to begin!</p>
+        <div class="captain-grid captain-preset-grid">
+          ${presetButtons}
+        </div>
+        <button type="button" class="captain-type-toggle" data-captain-type-name>
+          ✏️ Type a name instead
+        </button>
+      </div>
+    </section>
+  `;
+
+  host
+    .querySelectorAll<HTMLButtonElement>("[data-preset-name]")
+    .forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const name = btn.dataset.presetName ?? "";
+        if (!name) return;
+        // Never fails — collisions auto-suffix and the new captain is active.
+        createProfileWithPreset(name);
+        onDone();
+      });
+    });
+
+  const typeBtn = host.querySelector<HTMLButtonElement>(
+    "[data-captain-type-name]",
+  );
+  typeBtn?.addEventListener("click", () => {
+    renderTypedNameForm(host, onDone);
+  });
+};
+
+/**
+ * Parent path: the original typed-name form, reachable only through the
+ * "Type a name instead" disclosure on the preset grid.
+ */
+const renderTypedNameForm = (host: HTMLElement, onDone: () => void): void => {
   host.innerHTML = `
     <section class="captain-overlay" role="dialog" aria-labelledby="captain-overlay-title">
       <div class="surface-card captain-card">
@@ -70,6 +137,9 @@ const renderNewCaptainForm = (host: HTMLElement, onDone: () => void): void => {
           <p class="captain-error" data-captain-error aria-live="polite"></p>
           <button type="submit" class="primary-cta">⛵ Set sail</button>
         </form>
+        <button type="button" class="captain-type-toggle" data-captain-back-to-presets>
+          🏴‍☠️ Back to the pirates
+        </button>
       </div>
     </section>
   `;
@@ -90,6 +160,13 @@ const renderNewCaptainForm = (host: HTMLElement, onDone: () => void): void => {
     }
     error.textContent = "";
     onDone();
+  });
+
+  const backBtn = host.querySelector<HTMLButtonElement>(
+    "[data-captain-back-to-presets]",
+  );
+  backBtn?.addEventListener("click", () => {
+    renderPresetGrid(host, onDone);
   });
 };
 
@@ -145,7 +222,7 @@ const renderPicker = (host: HTMLElement, onDone: () => void): void => {
 
   const newBtn = host.querySelector<HTMLButtonElement>("[data-captain-new]");
   newBtn?.addEventListener("click", () => {
-    renderNewCaptainForm(host, onDone);
+    renderPresetGrid(host, onDone);
   });
 };
 
@@ -170,7 +247,7 @@ export const resolveActiveCaptain = (host: HTMLElement): Promise<void> => {
     };
 
     if (records.length === 0) {
-      renderNewCaptainForm(host, done);
+      renderPresetGrid(host, done);
     } else {
       renderPicker(host, done);
     }

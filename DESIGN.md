@@ -79,16 +79,24 @@ World map ─► Mission planning ─► Plan execution ─► Resolution
 | 2 | East Blue         | Spark Shoals      | Seq + first enemy| 10 berries, unlock `dodge`, recruit Zoro    |
 | 3 | Grand Line entry  | Current Crescent  | `repeat`         | 14 berries, unlock `repeat`                 |
 | 4 | Sky Island        | Coral Lookout     | `if`             | 18 berries, unlock `if`+`talk`, Gum-Gum Fruit |
-| 5 | Raftel            | Treasure Isle     | `repeat` + `if`  | 24 berries, recruit Nami                    |
+| 5 | Raftel            | Treasure Isle     | `repeat` + `if`  | 24 berries, the One Piece finale            |
 
-**Straw Hat crew (passive helpers, not separate combat units):**
+**Straw Hat crew (passive helpers, not separate combat units).** Luffy
+captains the ship from the first launch; the other five are recruited one per
+voyage, in the order they board in the show (Zoro → Nami → Usopp → Sanji →
+Chopper). Every recruited mate is *visible*: a portrait badge stands on the
+ship's deck during planning and playback, the mission status strip shows the
+crew row while building a plan, and the wanted-poster cards (drawer + reward
+reveal) carry the portraits.
 
-| Crew    | Role          | Passive                                       |
-|---------|---------------|-----------------------------------------------|
-| Zoro    | Swordsman     | Hints get a sparkle and a clearer suggestion. |
-| Nami    | Navigator     | +1 berry on every cleared mission.            |
-| Usopp   | Sniper (v1.1) | Extends `fire` range by 1.                    |
-| Sanji   | Cook (v1.1)   | Failed `collect` no longer ends the run.      |
+| Crew    | Role      | Joins at              | Passive                                        |
+|---------|-----------|-----------------------|------------------------------------------------|
+| Luffy   | Captain   | aboard from the start | flavor only                                    |
+| Zoro    | Swordsman | Spark Shoals          | Hints get a sparkle and a clearer suggestion.  |
+| Nami    | Navigator | Windrise Cove         | +1 berry on every cleared mission.             |
+| Usopp   | Sniper    | Barrel Bay            | flavor only — `fire` +1 range planned (v1.2)   |
+| Sanji   | Cook      | Baratie Harbor        | flavor only — safe `collect` planned (v1.2)    |
+| Chopper | Doctor    | Current Crescent      | flavor only                                    |
 
 **Devil Fruits (command modifiers, not new commands):**
 
@@ -192,6 +200,12 @@ last entry shows on the reward screen.
 |               | `public/art/bg-<mission-id>.webp`) — open-ocean center for tile     |
 |               | contrast, land only at the edges. Missions without a loaded texture |
 |               | fall back to the procedural sky/sea gradient.                       |
+| Crew art      | Six chibi portrait badges, hand-authored SVG in                     |
+|               | `public/art/crew/<id>.svg`. One asset set serves both layers: the  |
+|               | DOM HUD drops them into `<img>` tags (status strip, wanted cards,   |
+|               | map docket) and Phaser rasterizes them into deck badges that sail   |
+|               | with the ship (counter-rotated so faces stay upright). A missing    |
+|               | file degrades to that badge simply not rendering.                   |
 
 ### 5.2 Layout (mission view, portrait tablet)
 
@@ -244,10 +258,16 @@ ribboned banner labels per sea ("East Blue", "Grand Line", "Raftel"). Each
 island bobs in a sea-foam ring on hover.
 
 The map docket (bottom card) leads with the selected island's portrait glyph +
-mission name, a one-line preview, reward chips, and a big "Set Sail" CTA. The
+mission name, a one-line preview, reward chips (including the recruit's portrait
+face when the voyage brings a new crew mate), and a big "Set Sail" CTA. The
 full island list lives in the Routes drawer ("Voyage Log" — cleared / ready /
 locked status per island); the Captain's Log keeps its own Log drawer. Berries/stars/bounty pills sit in
 the top strip, not the docket.
+
+A small **frontier ship** floats beside the next island to clear — the whole
+recruited crew standing on deck — doubling as a "you are here" marker and as
+the visible payoff for every recruit earned so far. It bobs gently
+(reduced-motion: static).
 
 **Responsive layout rules** (the canvas is `Scale.RESIZE` — no fixed stage):
 
@@ -286,8 +306,12 @@ only. If publication is ever considered, all of the following must be renamed
 (no character likenesses or trademarked terms):
 
 - Ship "Going Merry" → e.g. "Sunny Skipper"
-- Crew: Luffy/Zoro/Nami/Usopp/Sanji → original names matching the codex draft
-  (Captain Coral, Saber, Compass, Spyglass, Skillet).
+- Crew: Luffy/Zoro/Nami/Usopp/Sanji/Chopper → original names matching the
+  codex draft (Captain Coral, Saber, Compass, Spyglass, Skillet, Patch) —
+  already wired into the "original" theme.
+- The crew portrait badges in `public/art/crew/` are chibi likenesses of the
+  One Piece crew (straw hat, three swords, the long nose, the pink-hatted
+  reindeer). For publication they must be redrawn, not just renamed.
 - Fruits: Gum-Gum → "Stretch Fruit"; Smoke-Smoke → "Mist Fruit"; etc.
 - Seas: East Blue / Grand Line / Raftel → "Starter Cove / Grand Sea / Last Isle".
 - Currency Berries (฿) → "Doubloons".
@@ -297,8 +321,8 @@ only. If publication is ever considered, all of the following must be renamed
 
 | Phase   | Scope |
 |---------|-------|
-| v1.0 (now) | 5 missions, 9 blocks, 2 crew, 1 fruit, bounty meter, captain's log, full HUD redesign, all engine tests green. |
-| v1.1   | 3 more missions in Alabasta, +3 crew (Usopp/Sanji/Chopper), +2 fruits, sound, animated wanted posters. |
+| v1.0 (now) | 5 missions, 9 blocks, all 6 crew aboard and visible (deck badges + portrait strip), 1 fruit, bounty meter, captain's log, full HUD redesign, all engine tests green. |
+| v1.1   | 3 more missions in Alabasta, +2 fruits, sound, animated wanted posters. |
 | v1.2   | Sandbox island: free-play with all unlocked blocks, no objective — pure programming play. |
 | v2     | Multi-step lessons (introduce `if-else`), 2-block `repeat`, branching world map with optional islands. |
 

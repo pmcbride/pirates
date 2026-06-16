@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { onePieceTheme, originalTheme } from "../themes";
 import type { Theme } from "../themes/types";
-import { missions } from "./content";
+import { crewMates, missions } from "./content";
 import { cloneQueuedCommands, runMission } from "./engine";
 import {
   applyReward,
@@ -577,7 +577,9 @@ describe("theme catalog", () => {
   // power that exists in the structural content layer. Catches the easy
   // mistake of forgetting to extend a theme when adding new content.
   const requiredMissionIds = Object.keys(missions);
-  const requiredCrewIds = ["zoro", "nami"];
+  // Derived from the catalog so adding a crew mate without theme strings
+  // fails here instead of rendering a blank name in the drawer.
+  const requiredCrewIds = Object.keys(crewMates);
   const requiredFruitIds = ["gumgum"];
 
   const cases: Array<[string, Theme]> = [

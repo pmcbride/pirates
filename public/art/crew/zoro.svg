@@ -1,0 +1,20 @@
+<svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <!-- Swordsman — moss-green hair, stern brows, three gold earrings. -->
+  <circle cx="64" cy="64" r="58" fill="#d9efdc" stroke="#2b1d0e" stroke-width="5"/>
+  <!-- face -->
+  <circle cx="64" cy="76" r="28" fill="#ffdcb0" stroke="#2b1d0e" stroke-width="4"/>
+  <!-- short green hair, slightly spiky crown -->
+  <path d="M36 64 Q36 40 64 38 Q92 40 92 64 Q86 56 80 58 L82 50 L74 56 L72 46 L64 54 L56 46 L54 56 L46 50 L48 58 Q42 56 36 64 Z"
+    fill="#5fae6e" stroke="#2b1d0e" stroke-width="4" stroke-linejoin="round"/>
+  <!-- stern angled brows -->
+  <path d="M48 67 L60 71 M80 67 L68 71" stroke="#2b1d0e" stroke-width="3.4" stroke-linecap="round"/>
+  <!-- eyes -->
+  <circle cx="55" cy="77" r="3.2" fill="#2b1d0e"/>
+  <circle cx="73" cy="77" r="3.2" fill="#2b1d0e"/>
+  <!-- confident smirk -->
+  <path d="M56 90 Q64 95 72 90" stroke="#2b1d0e" stroke-width="3.2" stroke-linecap="round" fill="none"/>
+  <!-- three gold earrings on the left ear -->
+  <circle cx="90" cy="82" r="2.6" fill="#ffc94a" stroke="#2b1d0e" stroke-width="1.6"/>
+  <circle cx="92" cy="88" r="2.6" fill="#ffc94a" stroke="#2b1d0e" stroke-width="1.6"/>
+  <circle cx="90" cy="94" r="2.6" fill="#ffc94a" stroke="#2b1d0e" stroke-width="1.6"/>
+</svg>

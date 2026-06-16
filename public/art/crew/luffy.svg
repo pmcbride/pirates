@@ -1,0 +1,19 @@
+<svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <!-- Captain — straw hat with red band, black fringe, huge grin, cheek scar. -->
+  <circle cx="64" cy="64" r="58" fill="#cdeef7" stroke="#2b1d0e" stroke-width="5"/>
+  <!-- face -->
+  <circle cx="64" cy="76" r="28" fill="#ffdcb0" stroke="#2b1d0e" stroke-width="4"/>
+  <!-- black fringe peeking under the brim -->
+  <path d="M40 60 Q47 50 64 50 Q81 50 88 60 Q81 66 64 64 Q47 66 40 60 Z" fill="#2b1d0e"/>
+  <!-- straw hat: dome, red band, wide brim -->
+  <ellipse cx="64" cy="38" rx="24" ry="17" fill="#f2c969" stroke="#2b1d0e" stroke-width="4"/>
+  <rect x="41" y="40" width="46" height="9" rx="4" fill="#d94f3c" stroke="#2b1d0e" stroke-width="3"/>
+  <ellipse cx="64" cy="51" rx="44" ry="11" fill="#f2c969" stroke="#2b1d0e" stroke-width="4"/>
+  <!-- eyes -->
+  <circle cx="55" cy="74" r="3.4" fill="#2b1d0e"/>
+  <circle cx="73" cy="74" r="3.4" fill="#2b1d0e"/>
+  <!-- scar under the left eye -->
+  <path d="M49 81 h8 M51 79 v4 M55 79 v4" stroke="#2b1d0e" stroke-width="2" stroke-linecap="round" fill="none"/>
+  <!-- huge open grin -->
+  <path d="M52 86 Q64 99 76 86 Q64 92 52 86 Z" fill="#8c4a3c" stroke="#2b1d0e" stroke-width="3" stroke-linejoin="round"/>
+</svg>

@@ -99,6 +99,29 @@ function parseArgs(argv: string[]): Args {
 
 // ---------- generation -------------------------------------------------------
 
+/** The model accepted the request but returned no usable image. Distinct from
+ * transport/auth errors so the caller can decide to try a different model. */
+class ModelOutputError extends Error {}
+
+/**
+ * True only for errors that a *different model* might not hit: a bad request
+ * (400 — e.g. a size/quality this model rejects), an unknown model (404), or an
+ * empty result. Auth (401/403), quota/rate (429), server (5xx), and network
+ * errors would fail identically on the fallback model, so they are NOT
+ * model-level — surfacing them immediately avoids a second pointless paid call.
+ */
+function isModelLevelError(err: unknown): boolean {
+  if (err instanceof ModelOutputError) return true;
+  const status = (err as { status?: number })?.status;
+  return status === 400 || status === 404;
+}
+
+function describeError(err: unknown): string {
+  const status = (err as { status?: number })?.status;
+  const message = (err as Error)?.message ?? String(err);
+  return status ? `HTTP ${status}: ${message}` : message;
+}
+
 async function tryGenerate(
   client: OpenAI,
   model: string,
@@ -132,7 +155,7 @@ async function tryGenerate(
 
   const data = response.data?.[0];
   if (!data?.b64_json) {
-    throw new Error(`Model ${model} returned no image data`);
+    throw new ModelOutputError(`Model ${model} returned no image data`);
   }
   return { b64: data.b64_json, rawMeta: { model, size, quality, created: response.created } };
 }
@@ -144,50 +167,73 @@ async function main() {
   mkdirSync(dirname(resolve(args.out)), { recursive: true });
 
   const models = args.model ? [args.model] : ["gpt-image-1", "dall-e-3"];
-  let lastError: unknown;
-  for (const model of models) {
+
+  // Phase 1 — generate. This is the ONLY step we retry across models, and only
+  // when the failure is plausibly model-specific (see isModelLevelError). An
+  // auth/quota/network failure is rethrown at once so we don't bill a second
+  // doomed call against the fallback model.
+  let generated: { b64: string; rawMeta: unknown } | undefined;
+  let usedModel = "";
+  let elapsedMs = 0;
+  let firstError: unknown;
+  for (let i = 0; i < models.length; i += 1) {
+    const model = models[i];
+    const isLast = i === models.length - 1;
     try {
       console.log(`[generate-art] Generating via ${model} → ${args.out}`);
       const start = Date.now();
-      const { b64, rawMeta } = await tryGenerate(client, model, args);
-      const buffer = Buffer.from(b64, "base64");
-      writeFileSync(args.out, buffer);
-      const elapsedMs = Date.now() - start;
-
-      const logPath = join(
-        dirname(args.out),
-        basename(args.out, extname(args.out)) + ".log.txt",
-      );
-      writeFileSync(
-        logPath,
-        [
-          `[Sea of Codes art generation log]`,
-          `timestamp: ${new Date().toISOString()}`,
-          `model: ${model}`,
-          `requested_size: ${args.size}`,
-          `requested_quality: ${args.quality}`,
-          `output: ${args.out}`,
-          `bytes: ${buffer.byteLength}`,
-          `elapsed_ms: ${elapsedMs}`,
-          `meta: ${JSON.stringify(rawMeta)}`,
-          ``,
-          `--- PROMPT ---`,
-          args.prompt,
-          ``,
-        ].join("\n"),
-      );
-      console.log(
-        `[generate-art] Saved ${buffer.byteLength} bytes in ${elapsedMs} ms; log → ${logPath}`,
-      );
-      return;
+      generated = await tryGenerate(client, model, args);
+      elapsedMs = Date.now() - start;
+      usedModel = model;
+      break;
     } catch (err) {
+      firstError ??= err;
+      if (isLast || !isModelLevelError(err)) {
+        // Preserve the original error as the cause rather than flattening it to
+        // a string, so the stack and OpenAI error body survive to the top.
+        throw new Error(
+          `[generate-art] ${model} failed: ${describeError(err)}`,
+          { cause: firstError },
+        );
+      }
       console.warn(
-        `[generate-art] ${model} failed: ${(err as Error).message ?? err}`,
+        `[generate-art] ${model} failed (${describeError(err)}); falling back to ${models[i + 1]}`,
       );
-      lastError = err;
     }
   }
-  throw lastError ?? new Error("All models failed");
+  if (!generated) throw firstError ?? new Error("[generate-art] all models failed");
+
+  // Phase 2 — persist. A filesystem error here is a real failure of THIS run
+  // (bad --out path, permissions, disk) and must NOT trigger a model fallback,
+  // so it lives outside the loop above.
+  const buffer = Buffer.from(generated.b64, "base64");
+  writeFileSync(args.out, buffer);
+
+  const logPath = join(
+    dirname(args.out),
+    basename(args.out, extname(args.out)) + ".log.txt",
+  );
+  writeFileSync(
+    logPath,
+    [
+      `[Sea of Codes art generation log]`,
+      `timestamp: ${new Date().toISOString()}`,
+      `model: ${usedModel}`,
+      `requested_size: ${args.size}`,
+      `requested_quality: ${args.quality}`,
+      `output: ${args.out}`,
+      `bytes: ${buffer.byteLength}`,
+      `elapsed_ms: ${elapsedMs}`,
+      `meta: ${JSON.stringify(generated.rawMeta)}`,
+      ``,
+      `--- PROMPT ---`,
+      args.prompt,
+      ``,
+    ].join("\n"),
+  );
+  console.log(
+    `[generate-art] Saved ${buffer.byteLength} bytes in ${elapsedMs} ms; log → ${logPath}`,
+  );
 }
 
 main().catch((err) => {

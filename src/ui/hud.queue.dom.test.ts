@@ -226,7 +226,11 @@ describe("command dock layout — no canvas overlap", () => {
 
     const decl = block?.[1] ?? "";
     expect(decl).toMatch(/display:\s*grid/);
-    // 1fr (playfield) + auto (dock) — the dock claims only what it needs.
-    expect(decl).toMatch(/grid-template-rows:\s*1fr\s+auto/);
+    // minmax(0,1fr) (playfield) + auto (dock) — the dock claims only what it
+    // needs, and the playfield track is clamped so neither row nor column can
+    // be inflated past the viewport by content min-size (the queue strip's
+    // cards once pushed the column to ~825px on a 768px tablet).
+    expect(decl).toMatch(/grid-template-rows:\s*minmax\(0,\s*1fr\)\s+auto/);
+    expect(decl).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)/);
   });
 });

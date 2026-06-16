@@ -1,6 +1,14 @@
 import Phaser from "phaser";
 import { crewPortraitPaths } from "../../sim/portraits";
-import { crewArtKey, missionBackgrounds, shipArtKey, textureKeys, uiColors } from "../assets/manifest";
+import {
+  crewArtKey,
+  goalArtKey,
+  missionBackgrounds,
+  shipArtKey,
+  textureKeys,
+  tileArtKeys,
+  uiColors,
+} from "../assets/manifest";
 
 const drawStamp = (
   scene: Phaser.Scene,
@@ -69,6 +77,14 @@ export class BootScene extends Phaser.Scene {
     for (const [, key] of Object.entries(missionBackgrounds)) {
       this.load.image(key, `art/${key}.webp`);
     }
+    // Hand-drawn tile icons (treasure chest, marine skiff, reef, crew mate,
+    // current swirl, X-marks-the-spot goal). SVGs rasterized at 192px — about
+    // 2× the largest on-board tile size — so they stay crisp on retina.
+    const svgSize = { width: 192, height: 192 };
+    for (const [, key] of Object.entries(tileArtKeys)) {
+      this.load.svg(key, `art/tiles/${key}.svg`, svgSize);
+    }
+    this.load.svg(goalArtKey, `art/tiles/${goalArtKey}.svg`, svgSize);
     // Crew portrait badges — rasterized at 2× their largest on-screen size
     // so they stay crisp on retina tablets. Missing files degrade to the
     // badge simply not rendering (scenes check texture existence).

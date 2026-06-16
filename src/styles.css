@@ -50,7 +50,12 @@ body,
   margin: 0;
   min-height: 100%;
   width: 100%;
-  overflow: hidden;
+  /* `clip` (not `hidden`): a hidden box is still programmatically scrollable,
+     so a stray `scrollIntoView` from deep inside the dock could shove the
+     whole app sideways and clip the left edge of every HUD card. `clip`
+     forbids scrolling entirely — the queue strip is the only horizontal
+     scroller we ever want. */
+  overflow: clip;
 }
 
 body {
@@ -89,12 +94,15 @@ button:disabled {
   width: 100vw;
   height: 100vh;
   display: grid;
-  grid-template-rows: 1fr auto;
-  /* minmax(0, 1fr), not bare 1fr: a bare fr track's minimum is the content's
-     min-width, so a long command queue blew the whole shell wider than the
-     viewport (clipping the hex Play button offscreen at 768px). The queue
-     strip owns horizontal overflow; the shell must never exceed the screen. */
+  /* minmax(0, …) on BOTH axes: a bare `1fr` track grows to fit its items'
+     min-content size, so a queue strip holding 8 non-shrinkable cards used
+     to inflate the column to ~825px on a 768px tablet and push every
+     left-anchored card off-screen (and clipped the hex Play button offscreen).
+     Clamping the track floor to 0 forces the overflow down into the scrollers
+     that are designed for it; the shell must never exceed the screen. */
+  grid-template-rows: minmax(0, 1fr) auto;
   grid-template-columns: minmax(0, 1fr);
+  overflow: clip;
 }
 
 .playfield-region {
@@ -102,13 +110,15 @@ button:disabled {
   grid-row: 1;
   grid-column: 1;
   min-height: 0;
-  overflow: hidden;
+  min-width: 0;
+  overflow: clip;
 }
 
 .dock-root {
   grid-row: 2;
   grid-column: 1;
   position: relative;
+  min-width: 0;
   pointer-events: auto;
   /* Keep the dock above sit-on-top transient layers. The picker backdrop
      (z-index: 50) still needs to cover the dock for outside-tap dismiss. */
@@ -292,6 +302,12 @@ button:disabled {
   margin-right: 0.4rem;
 }
 
+.stat-icon .icon-svg {
+  width: 1.3em;
+  height: 1.3em;
+  vertical-align: -0.3em;
+}
+
 .stat-pill.bounty {
   background: var(--bounty);
   color: var(--parchment);
@@ -336,6 +352,11 @@ button:disabled {
   text-align: center;
   font-weight: 800;
   text-transform: uppercase;
+  /* Floats over the painted board — needs its own parchment backing or it
+     vanishes against dark cliff/forest art. */
+  background: rgba(255, 241, 207, 0.92);
+  border-radius: 999px;
+  padding: 0.15rem 0.55rem;
 }
 
 /* ── Side rail ─────────────────────────────────────────────── */
@@ -346,6 +367,18 @@ button:disabled {
   top: 7.5rem;
   display: grid;
   gap: 0.6rem;
+}
+
+.rail-actions button {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.45rem;
+}
+
+.rail-actions button .icon-svg {
+  width: 1.5em;
+  height: 1.5em;
 }
 
 /* ── Map docket ────────────────────────────────────────────── */
@@ -424,8 +457,30 @@ button:disabled {
   top: 0.75rem;
   left: 1rem;
   display: flex;
-  gap: 0.6rem;
+  /* Vertical stack pinned to the top-left corner: coin chip, bounty line,
+     then the crew/fruit mini pills. Capped narrow so it can never reach the
+     centered objective chip (which starts at ~164px on a 768px tablet). */
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  max-width: 8.5rem;
   pointer-events: auto;
+}
+
+.stat-mini-row {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.stat-pill-mini {
+  font-size: 0.85rem;
+  padding: 0.3rem 0.65rem;
+  display: inline-flex;
+  align-items: center;
+}
+
+.stat-pill-mini .stat-icon {
+  margin-right: 0.3rem;
 }
 
 /* ── Hint speech bubble ────────────────────────────────────── */
@@ -433,7 +488,11 @@ button:disabled {
 .hint-banner {
   position: absolute;
   left: 1rem;
-  top: 13rem;
+  /* Static fallback parks the bubble just above the dock — never over the
+     board. When a queue card is the hint target, JS switches to anchored
+     mode and owns left/top instead. */
+  bottom: 0.75rem;
+  top: auto;
   width: min(82vw, 460px);
   padding: 1.1rem 1.2rem 1.2rem;
   /* When anchored, JS sets `left`/`top` inline and toggles `.is-anchored` so
@@ -472,7 +531,8 @@ button:disabled {
 
 .hint-banner.is-anchored {
   /* JS owns the position when anchored — width can shrink so the tail can
-     hug shorter cards. */
+     hug shorter cards. `top` comes from JS, so release the bottom pin. */
+  bottom: auto;
   width: min(82vw, 360px);
 }
 
@@ -554,6 +614,9 @@ button:disabled {
   margin: 0.5rem 0.75rem max(0.5rem, env(safe-area-inset-bottom));
   padding: 0.75rem 0.9rem;
   display: grid;
+  /* Same minmax(0,…) clamp as .app-shell — the implicit `auto` column used
+     to size itself to the queue row's min-content and burst the dock. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.55rem;
   /* Surface card already supplies parchment background + ink border. */
 }
@@ -984,6 +1047,13 @@ button:disabled {
   width: 12px;
   height: 12px;
   vertical-align: 0;
+}
+
+/* Locked phases disable the remove buttons; the generic `button:disabled`
+   opacity (0.55) outranks our hidden-by-default rule and made a faint ✕
+   appear on every card during predict/run. Keep disabled removes invisible. */
+.queue-remove:disabled {
+  opacity: 0;
 }
 
 .queue-card:hover .queue-remove,
@@ -1468,6 +1538,20 @@ button:disabled {
   padding-bottom: 0.4rem;
 }
 
+/* Painted mugshot between the WANTED header and the name — the poster's
+   photograph. Square, ink-framed, sized so two posters + the fruit section
+   still browse comfortably inside the drawer. */
+.wanted-card .wanted-portrait {
+  width: min(100%, 220px);
+  aspect-ratio: 1;
+  justify-self: center;
+  object-fit: cover;
+  border: var(--border-ink);
+  border-radius: var(--radius-sm);
+  background: var(--parchment);
+  box-shadow: 0 3px 0 rgba(43, 29, 14, 0.2);
+}
+
 .wanted-card .wanted-name {
   font-family: var(--display-font);
   font-size: 1.6rem;
@@ -1608,36 +1692,20 @@ button:disabled {
 @media (max-width: 720px) {
   .poster-copy,
   .map-docket,
-  .objective-chip,
   .hint-banner,
   .drawer-host {
     width: calc(100vw - 2rem);
     max-width: none;
   }
 
+  /* Slot the objective chip between the stats stack (left) and the rail
+     (right) instead of centering it — centered would collide with both
+     neighbors on narrow screens. */
   .objective-chip {
-    top: 0.8rem;
-  }
-
-  .status-strip {
-    left: 1rem;
-    right: auto;
-    bottom: auto;
-    top: 0.75rem;
-  }
-
-  .hint-banner {
-    top: 17rem;
-  }
-
-  .rail-actions {
-    right: auto;
-    left: 1rem;
-    top: auto;
-    bottom: auto;
-    /* Sit just below the status strip — the dock owns the bottom now. */
-    top: 15rem;
-    grid-auto-flow: column;
+    left: 9.25rem;
+    right: 8.25rem;
+    width: auto;
+    transform: none;
   }
 }
 
@@ -1652,34 +1720,14 @@ button:disabled {
   }
 }
 
-/* Predict-then-run beat */
-.predict-banner {
-  position: absolute;
-  left: 1rem;
-  top: 13rem;
-  width: min(82vw, 460px);
-  padding: 1.1rem 1.2rem 1.2rem;
-  z-index: 6;
-}
+/* ── Predict-then-run beat ─────────────────────────────────────
+   Lives inside the dock now (head copy + Skip link + the hex Play
+   button doubling as "Run plan!"), so the board the player must tap
+   stays fully visible. The old floating parchment card covered the
+   left third of the grid it was pointing at. */
 
-.predict-banner strong {
-  font-family: var(--display-font);
-  font-size: 1.3rem;
-  color: var(--ink);
-  display: block;
-  margin: 0.2rem 0;
-}
-
-.predict-banner p {
-  margin: 0.3rem 0 0.7rem;
-  color: var(--ink-soft);
-}
-
-.predict-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  flex-wrap: wrap;
+.dock-head .ghost-link {
+  min-height: 44px;
 }
 
 .ghost-link {

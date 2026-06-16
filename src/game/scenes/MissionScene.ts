@@ -17,18 +17,23 @@ import { playSfx } from "../../ui/audio";
 import { haptic } from "../../ui/haptic";
 import {
   crewArtKey,
+  goalArtKey,
   goalGlyph,
   kindGlyphMap,
   kindTextureMap,
   missionBackgrounds,
   shipArtKey,
   textureKeys,
+  tileArtKeys,
   uiColors,
 } from "../assets/manifest";
 
 interface TileSprite {
   image: Phaser.GameObjects.Image;
-  text: Phaser.GameObjects.Text;
+  /** Two-letter label — only present on the procedural fallback stamps. The
+   * hand-drawn tile icons carry their meaning visually, so they skip text
+   * (the audience is pre-readers anyway). */
+  text?: Phaser.GameObjects.Text;
 }
 
 const facingAngle = (facing: string): number => {
@@ -149,6 +154,14 @@ export class MissionScene extends Phaser.Scene {
       const mission = missions[state.activeMissionId];
       const fresh = createMissionState(mission, state.queuedCommands);
       this.renderBoard(mission, fresh.ship, fresh.tiles);
+      // The predict overlay (dim rect + tap zones + marker) is laid out with
+      // the same board metrics — rebuild it too, or its tap zones would keep
+      // pointing at the pre-resize tile positions. The dock grows when it
+      // swaps into predict mode, so this resize fires on every predict entry.
+      if (state.missionPhase === "predicting") {
+        this.renderPredictLayer(mission, state.predictedEndPosition);
+      }
+      // Hint rings are board-metric-anchored too — re-place them on resize.
       this.renderHintHighlights(
         mission,
         state.missionPhase === "planning" ? state.activeHint : null,
@@ -348,7 +361,9 @@ export class MissionScene extends Phaser.Scene {
     const topChrome = Math.min(150, height * 0.22);
     // Reserve a strip at the bottom for the status/briefing text.
     const bottomPad = 76;
-    const sidePad = 110;
+    // Clear the right-hand rail (≈128px wide incl. margin) — at 110 the
+    // rightmost column of 8-wide boards tucked under the Settings button.
+    const sidePad = 132;
     const tileSize = Math.min(
       (width - sidePad * 2) / mission.width,
       (height - topChrome - bottomPad) / mission.height,
@@ -453,6 +468,9 @@ export class MissionScene extends Phaser.Scene {
     }
 
     const grid = this.add.graphics();
+    // Scale the corner radius with the cell — a fixed 24px turns the small
+    // cells of wide boards (8 cols ≈ 55px cells) into circles.
+    const cellRadius = Math.min(24, (tileSize - 8) * 0.3);
     for (let y = 0; y < mission.height; y += 1) {
       for (let x = 0; x < mission.width; x += 1) {
         if (hasPaintedBg) {
@@ -466,7 +484,7 @@ export class MissionScene extends Phaser.Scene {
           offsetY + y * tileSize,
           tileSize - 8,
           tileSize - 8,
-          24,
+          cellRadius,
         );
         grid.lineStyle(hasPaintedBg ? 2 : 3, uiColors.ink, hasPaintedBg ? 0.14 : 0.18);
         grid.strokeRoundedRect(
@@ -474,46 +492,65 @@ export class MissionScene extends Phaser.Scene {
           offsetY + y * tileSize,
           tileSize - 8,
           tileSize - 8,
-          24,
+          cellRadius,
         );
       }
     }
     this.boardLayer?.add(grid);
 
     const goalCenter = this.worldXY(mission, mission.goal);
+    const hasGoalArt = this.textures.exists(goalArtKey);
     const goal = this.add
-      .image(goalCenter.x, goalCenter.y, textureKeys.goal)
-      .setDisplaySize(tileSize - 18, tileSize - 18)
-      .setAlpha(0.9);
+      .image(goalCenter.x, goalCenter.y, hasGoalArt ? goalArtKey : textureKeys.goal)
+      .setDisplaySize(tileSize - 12, tileSize - 12)
+      .setAlpha(hasGoalArt ? 1 : 0.9);
     this.boardLayer?.add(goal);
     this.goalSprite = goal;
-    // Finish-flag pictogram so pre-readers spot the destination instantly.
-    // Static (the goal sprite pulses behind it); the ship is added later in
-    // this method, so it sails over the flag.
-    const goalFlag = this.add
-      .text(goalCenter.x, goalCenter.y, goalGlyph, {
-        fontFamily: "Nunito, sans-serif",
-        fontSize: `${Math.max(Math.round(tileSize * 0.42), 22)}px`,
-      })
-      .setOrigin(0.5)
-      .setAlpha(0.95);
-    this.boardLayer?.add(goalFlag);
+    // Finish-flag pictogram so pre-readers spot the destination instantly —
+    // but only as the fallback. The hand-drawn goal icon already reads as an
+    // X-marks-the-spot landing pad; stacking the flag emoji on top of it is
+    // two competing glyphs. Static (the goal sprite pulses behind it); the
+    // ship is added later in this method, so it sails over the flag.
+    if (!hasGoalArt) {
+      const goalFlag = this.add
+        .text(goalCenter.x, goalCenter.y, goalGlyph, {
+          fontFamily: "Nunito, sans-serif",
+          fontSize: `${Math.max(Math.round(tileSize * 0.42), 22)}px`,
+        })
+        .setOrigin(0.5)
+        .setAlpha(0.95);
+      this.boardLayer?.add(goalFlag);
+    }
 
     tiles
       .filter((tile) => tile.active)
       .forEach((tile) => {
         if (tile.kind === "goal") {
-          // The goal renders above as a dedicated sprite + flag pictogram —
-          // content never places goal *tiles*, but the type allows it.
+          // The goal renders above as a dedicated sprite + icon — content
+          // never places goal *tiles*, but the type allows it.
           return;
         }
-        const key = kindTextureMap[tile.kind];
+        // Hand-drawn SVG icon is the primary token art; the procedural stamp
+        // + emoji pictogram is the fallback when the icon fails to load.
+        const artKey = tileArtKeys[tile.kind];
+        const hasArt = Boolean(artKey) && this.textures.exists(artKey);
+        const key = hasArt ? artKey : kindTextureMap[tile.kind];
+        if (!key) {
+          return;
+        }
         const center = this.worldXY(mission, tile.position);
+        const inset = hasArt ? 10 : 22;
         const image = this.add
           .image(center.x, center.y, key)
-          .setDisplaySize(tileSize - 22, tileSize - 22);
-        // Pictogram, not letters — the target player can't read yet. The
-        // colored backplate still carries the per-kind color coding.
+          .setDisplaySize(tileSize - inset, tileSize - inset);
+        if (hasArt) {
+          // Painted icons speak for themselves — no glyph overlay.
+          this.boardLayer?.add(image);
+          this.tileSprites.set(tile.id, { image });
+          return;
+        }
+        // Fallback: colored backplate + emoji pictogram, never letters — the
+        // target player can't read yet. The backplate carries the color code.
         const glyph = kindGlyphMap[tile.kind];
         const text = this.add
           .text(image.x, image.y, glyph, {
@@ -603,7 +640,7 @@ export class MissionScene extends Phaser.Scene {
       if (!activeIds.has(id) && sprite.image.alpha > 0 && sprite.image.scale > 0) {
         // Untouched by a fade animation — drop instantly.
         sprite.image.destroy();
-        sprite.text.destroy();
+        sprite.text?.destroy();
         this.tileSprites.delete(id);
       }
     }
@@ -615,8 +652,13 @@ export class MissionScene extends Phaser.Scene {
       return;
     }
     sprite.image.destroy();
-    sprite.text.destroy();
+    sprite.text?.destroy();
     this.tileSprites.delete(tileId);
+  }
+
+  /** Tween targets for a tile — image plus the fallback caption when present. */
+  private tileTargets(sprite: TileSprite): Array<Phaser.GameObjects.Image | Phaser.GameObjects.Text> {
+    return sprite.text ? [sprite.image, sprite.text] : [sprite.image];
   }
 
   private tweenShipTo(
@@ -736,7 +778,7 @@ export class MissionScene extends Phaser.Scene {
         return;
       }
       this.tweens.add({
-        targets: [sprite.image, sprite.text],
+        targets: this.tileTargets(sprite),
         alpha: 0,
         scale: 0,
         duration,
@@ -766,13 +808,13 @@ export class MissionScene extends Phaser.Scene {
       const up = Math.max(60, duration * 0.4);
       const down = Math.max(60, duration - up);
       this.tweens.add({
-        targets: [sprite.image, sprite.text],
+        targets: this.tileTargets(sprite),
         scale: peak,
         duration: up,
         ease: "Sine.easeOut",
         onComplete: () => {
           this.tweens.add({
-            targets: [sprite.image, sprite.text],
+            targets: this.tileTargets(sprite),
             scale: 0,
             alpha: 0,
             duration: down,

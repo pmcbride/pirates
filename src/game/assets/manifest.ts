@@ -67,11 +67,26 @@ export const kindTextureMap = {
   current: textureKeys.current,
 } as const satisfies Record<BoardTileKind, string>;
 
-/** Pictogram per tile kind — pre-readers identify board tokens by glyph, not
- * letters. Rendered as Phaser text centered on the colored token backplate
- * (the backplate keeps carrying the color coding). The current token is
- * glyph-free: its procedural stamp already paints a foam spiral, and stacking
- * the cyclone emoji on top read as two competing swirls. */
+/** Hand-drawn SVG tile icons (public/art/tiles/). Rasterized by the loader at
+ * 2× tile scale and used as the primary board token art; missions fall back to
+ * the procedural `kindTextureMap` stamp + `kindGlyphMap` pictogram when a file
+ * fails to load, mirroring the painted-background pattern. */
+export const tileArtKeys = {
+  enemy: "tile-art-enemy",
+  obstacle: "tile-art-obstacle",
+  treasure: "tile-art-treasure",
+  crew: "tile-art-crew",
+  current: "tile-art-current",
+} as const satisfies Record<BoardTileKind, string>;
+
+/** X-marks-the-spot landing pad — the goal tile's painted icon. */
+export const goalArtKey = "tile-art-goal";
+
+/** Pictogram per tile kind — the pre-reader fallback when a hand-drawn icon
+ * fails to load. Rendered as Phaser text centered on the colored token
+ * backplate (the backplate keeps carrying the color coding). The current
+ * token is glyph-free: its procedural stamp already paints a foam spiral, and
+ * stacking the cyclone emoji on top read as two competing swirls. */
 export const kindGlyphMap = {
   enemy: "⛵",
   obstacle: "🪨",
@@ -80,5 +95,6 @@ export const kindGlyphMap = {
   current: "",
 } as const satisfies Record<BoardTileKind, string>;
 
-/** Goal-tile pictogram overlay — the finish flag every kid knows from races. */
+/** Goal-tile pictogram — the finish flag every kid knows from races, shown
+ * when the painted goal icon isn't available. */
 export const goalGlyph = "🏁";

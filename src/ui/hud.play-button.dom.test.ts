@@ -123,6 +123,60 @@ describe("hex Play button — mission screen", () => {
   });
 });
 
+describe("hex Play button — predict phase (the dock owns the predict beat)", () => {
+  it("turns into a live confirm-prediction button and runs the plan from the dock", () => {
+    const root = document.createElement("div");
+    document.body.appendChild(root);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _hud = new Hud(root);
+    void _hud;
+
+    // Reset to a clean slate (the store singleton is shared across tests), then
+    // clear the three prediction-exempt missions so barrel-bay — the first
+    // voyage with a predict beat — unlocks. The exempt set lives in sim/store
+    // (PREDICTION_EXEMPT_MISSION_IDS = the first three missions in curriculum
+    // order); the first three stay friction-free for a learning pre-reader.
+    gameStore.resetActiveProfile();
+    gameStore.startAdventure();
+    for (const missionId of ["tutorial-cove", "spark-shoals", "windrise-cove"]) {
+      gameStore.openMission(missionId);
+      gameStore.runActiveMission(); // exempt → straight to running on the suggested plan
+      gameStore.finishPlayback();
+      gameStore.claimReward();
+    }
+
+    gameStore.openMission("barrel-bay");
+    expect(gameStore.getState().screen).toBe("mission");
+
+    gameStore.runActiveMission();
+    expect(gameStore.getState().missionPhase).toBe("predicting");
+
+    // The floating predict banner is gone — the dock head carries the beat.
+    expect(root.querySelector(".predict-banner")).toBeNull();
+    expect(
+      root.querySelector('[data-action="skip-prediction"]'),
+      "dock shows a Skip link while predicting",
+    ).not.toBeNull();
+
+    // Hex button is the confirm-prediction trigger. The marker is pre-placed on
+    // the ship's start tile, so confirm is live immediately — never a dead button.
+    let hex = root.querySelector<HTMLButtonElement>("button.hex-play");
+    expect(hex?.dataset.action).toBe("confirm-prediction");
+    expect(hex?.disabled).toBe(false);
+    expect(hex?.classList.contains("is-ready")).toBe(true);
+
+    // Moving the marker to another tile keeps confirm live.
+    gameStore.setPrediction({ x: 0, y: 0 });
+    hex = root.querySelector<HTMLButtonElement>("button.hex-play");
+    expect(hex?.disabled).toBe(false);
+    expect(hex?.classList.contains("is-ready")).toBe(true);
+
+    // Confirming runs the plan — same hex button, no separate CTA needed.
+    hex?.click();
+    expect(gameStore.getState().missionPhase).toBe("running");
+  });
+});
+
 describe("title screen — single affordance", () => {
   it("renders exactly one start-adventure button on the title screen", () => {
     // The store starts on the title screen. Mount a fresh HUD against an

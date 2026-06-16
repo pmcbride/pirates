@@ -41,12 +41,14 @@ World map ─► Mission planning ─► Plan execution ─► Resolution
 3. **Predict-then-run.** From the fourth mission onward (the first three keep
    the loop friction-free while it's being learned), the playfield enters a
    tap-to-predict overlay before playback: "Where will the ship end up?" The
-   marker starts pre-placed on the ship's tile so "Run plan!" is never dead;
-   the player may move it, then confirms. After playback the reward (or hint)
-   screen reports whether the prediction was right — converting passive
-   watching into active reasoning per Wing/Bers/Resnick research on early CT.
-   The predict card's Skip button skips one run only; the persistent opt-out
-   lives in Settings for parents.
+   marker starts pre-placed on the ship's tile so the hex Play button — now a
+   "Run plan!" confirm — is never dead; the player may move the marker, then
+   confirms. The whole beat lives in the command dock (head copy + a one-shot
+   "Skip prediction" link); nothing floats over the board the child is being
+   asked to tap. After playback the reward (or hint) screen reports whether the
+   prediction was right — converting passive watching into active reasoning per
+   Wing/Bers/Resnick research on early CT. The Skip link skips a single run;
+   the persistent opt-out lives in Settings for parents.
 4. **Plan execution.** The Going Merry runs the queue beat-by-beat. Each block
    highlights as it executes. On a hit (treasure, enemy, recruit) the affected
    tile pops and a 1-word callout fires. On a failure the ship lunges at the
@@ -200,6 +202,18 @@ last entry shows on the reward screen.
 |               | `public/art/bg-<mission-id>.webp`) — open-ocean center for tile     |
 |               | contrast, land only at the edges. Missions without a loaded texture |
 |               | fall back to the procedural sky/sea gradient.                       |
+| Tile icons    | Hand-drawn SVGs in `public/art/tiles/tile-art-<kind>.svg` (96 viewBox, |
+|               | 5px ink outlines, flat cel fills from the palette): treasure chest, |
+|               | Marine skiff, reef rocks, waving crew mate, current swirl, and the  |
+|               | X-marks-the-spot goal pad. Rasterized at 192px by Phaser's SVG      |
+|               | loader; missions fall back to the procedural colored stamp + emoji  |
+|               | pictogram (never 2-letter captions — the audience can't read) when  |
+|               | a file fails to load.                                               |
+| HUD icons     | Same ink-outline style, bundled inline like the Twemoji command     |
+|               | glyphs (`src/ui/icons/*.svg?raw`): coin, star, straw hat (crew),    |
+|               | devil fruit, jolly-roger flag, chart, scroll, gear. Used in the     |
+|               | stat pills, side rail, reward rows, and captain pill — no raw       |
+|               | Unicode emoji in always-visible chrome.                             |
 | Crew art      | Six chibi portrait badges, hand-authored SVG in                     |
 |               | `public/art/crew/<id>.svg`. One asset set serves both layers: the  |
 |               | DOM HUD drops them into `<img>` tags (status strip, wanted cards,   |
@@ -232,9 +246,13 @@ last entry shows on the reward screen.
 └──────────────────────────────────────────────────┘
 ```
 
-Side stats (berries, bounty, crew count, fruit count) collapse to a single
-horizontal pill row above the command queue on tablet-portrait — the codex
-draft's right-side vertical stack swallowed too much screen.
+Side stats (berries, bounty, crew count, fruit count) live in a narrow
+vertical stack pinned to the top-left corner (coin chip, bounty chip, then
+crew/fruit mini pills), capped at ~8.5rem wide so it can never collide with
+the centered objective chip. The board reserves 132px side gutters so the
+right-hand rail never covers the goal column, and the app shell's grid
+tracks are `minmax(0, 1fr)` so an over-full queue strip scrolls instead of
+inflating the page past the viewport.
 
 ### 5.3 Component spec
 

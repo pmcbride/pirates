@@ -255,13 +255,22 @@ const wantedCrewCard = (theme: Theme, crewId: string): string => {
   `;
 };
 
+/** Fruit ids with painted art in `public/art/fruits/`. Gated by id rather than
+ *  letting the <img> 404: vite's SPA fallback answers missing public files with
+ *  200 text/html, which renders as a broken image tile instead of failing. */
+const fruitArtIds = new Set(["gumgum"]);
+
 const wantedFruitCard = (theme: Theme, fruitId: string): string => {
   const fruit = theme.fruits[fruitId];
   if (!fruit) return "";
+  const portrait = fruitArtIds.has(fruitId)
+    ? `<img class="wanted-portrait" src="art/fruits/fruit-${fruitId}.webp" alt="" aria-hidden="true" draggable="false" />`
+    : "";
   return `
     <li>
       <div class="wanted-card">
         <div class="wanted-header">Devil Fruit</div>
+        ${portrait}
         <p class="wanted-name">${escapeHtml(fruit.name)}</p>
         <div class="wanted-role">${escapeHtml(fruit.title)}</div>
         <p class="wanted-line">${escapeHtml(fruit.description)}</p>
@@ -538,11 +547,11 @@ const drawerContent = (
 const statsInlineMarkup = (profile: PlayerProfile, theme: Theme): string => `
   <div class="stats-inline">
     <span class="stat-pill stat-pill-star" aria-label="Stars earned">
-      <span class="stat-icon" aria-hidden="true">⭐</span>${profile.stars}
+      <span class="stat-icon" aria-hidden="true">${iconFor("star")}</span>${profile.stars}
     </span>
     <span class="stat-cluster">
       <span class="stat-pill stat-pill-coin" aria-label="Berries">
-        <span class="stat-icon" aria-hidden="true">🪙</span>${escapeHtml(formatCurrency(theme, profile.berries))}
+        <span class="stat-icon" aria-hidden="true">${iconFor("coin")}</span>${escapeHtml(formatCurrency(theme, profile.berries))}
       </span>
       <span class="stat-pill-sub" aria-label="Bounty">Bounty: ${escapeHtml(formatBountyFor(theme, profile.bounty))}</span>
     </span>
@@ -552,13 +561,13 @@ const statsInlineMarkup = (profile: PlayerProfile, theme: Theme): string => `
 /**
  * The crew watching from the rail: an overlapping row of portrait badges,
  * one per recruited mate in boarding order. Replaces the old anonymous
- * `🧑‍🎤 N` count pill — the kid sees *who* is aboard while planning, and
- * each new recruit visibly joins the row.
+ * crew-count pill — the kid sees *who* is aboard while planning, and each
+ * new recruit visibly joins the row.
  */
 const crewStripMarkup = (profile: PlayerProfile, theme: Theme): string => {
   const aboard = recruitedCrewInOrder(profile.crewRoster);
   if (aboard.length === 0) {
-    return `<span class="stat-pill"><span class="stat-icon">🧑‍🎤</span>0</span>`;
+    return `<span class="stat-pill"><span class="stat-icon" aria-hidden="true">${iconFor("crewMate")}</span>0</span>`;
   }
   return `
     <span class="stat-pill crew-strip">
@@ -570,17 +579,18 @@ const crewStripMarkup = (profile: PlayerProfile, theme: Theme): string => {
 /**
  * Mission-screen status strip. Same consolidation idea as the map: one big
  * coin chip is the headline; bounty drops to a sub-line; the crew portrait
- * row + fruit count stay as compact pills next to it.
+ * row + fruit count stay as compact pills next to it. The fruit count keeps
+ * the hand-drawn SVG icon — no raw emoji in always-visible chrome.
  */
 const statusStripInnerMarkup = (profile: PlayerProfile, theme: Theme): string => `
   <span class="stat-cluster">
     <span class="stat-pill stat-pill-coin" aria-label="Berries">
-      <span class="stat-icon" aria-hidden="true">🪙</span>${escapeHtml(formatCurrency(theme, profile.berries))}
+      <span class="stat-icon" aria-hidden="true">${iconFor("coin")}</span>${escapeHtml(formatCurrency(theme, profile.berries))}
     </span>
     <span class="stat-pill-sub" aria-label="Bounty">Bounty: ${escapeHtml(formatBountyFor(theme, profile.bounty))}</span>
   </span>
   ${crewStripMarkup(profile, theme)}
-  <span class="stat-pill"><span class="stat-icon">🍎</span>${profile.fruitPowers.length}</span>
+  <span class="stat-pill" aria-label="Devil Fruits"><span class="stat-icon" aria-hidden="true">${iconFor("fruit")}</span>${profile.fruitPowers.length}</span>
 `;
 
 const conditionOptions = [
@@ -654,7 +664,6 @@ interface MissionScaffold {
   palette: HTMLElement;
   drawerHost: HTMLElement;
   pickerHost: HTMLElement;
-  predictHost: HTMLElement;
   // Fingerprints of last-rendered inputs per region.
   fingerprints: {
     objective: string;
@@ -666,7 +675,6 @@ interface MissionScaffold {
     palette: string;
     drawer: string;
     picker: string;
-    predict: string;
     isRunning: boolean;
   };
   // Map of queued-command instanceId → rendered <article> + last fingerprint.
@@ -1485,7 +1493,7 @@ export class Hud {
       : "";
 
     const captainPill = activeName
-      ? `<span class="captain-pill" title="Active captain">🏴‍☠️ ${escapeHtml(activeName)}</span>`
+      ? `<span class="captain-pill" title="Active captain">${iconFor("flag")} ${escapeHtml(activeName)}</span>`
       : "";
 
     return `
@@ -1500,10 +1508,10 @@ export class Hud {
       </header>
 
       <nav class="rail-actions">
-        <button data-action="toggle-drawer" data-drawer="map">🗺️ Routes</button>
-        <button data-action="toggle-drawer" data-drawer="crew">🧑‍🎤 Crew</button>
-        <button data-action="toggle-drawer" data-drawer="log">📜 Log</button>
-        <button data-action="toggle-drawer" data-drawer="settings">⚙️ Settings</button>
+        <button data-action="toggle-drawer" data-drawer="map">${iconFor("map")}<span>Routes</span></button>
+        <button data-action="toggle-drawer" data-drawer="crew">${iconFor("crewMate")}<span>Crew</span></button>
+        <button data-action="toggle-drawer" data-drawer="log">${iconFor("scroll")}<span>Log</span></button>
+        <button data-action="toggle-drawer" data-drawer="settings">${iconFor("gear")}<span>Settings</span></button>
       </nav>
 
       <section class="map-docket surface-card">
@@ -1513,11 +1521,11 @@ export class Hud {
           ${escapeHtml(node ? missionLabel(theme, node.missionId) : "")}
         </h3>
         <div class="map-reward-row">
-          <span>💰 ${escapeHtml(formatCurrency(theme, node?.rewards.berries ?? 0))}</span>
-          <span>🏴‍☠️ ${escapeHtml(formatBountyFor(theme, node?.rewards.bounty ?? 0))}</span>
-          <span>⭐ ${node?.rewards.stars ?? 0}</span>
+          <span>${iconFor("coin")} ${escapeHtml(formatCurrency(theme, node?.rewards.berries ?? 0))}</span>
+          <span>${iconFor("flag")} ${escapeHtml(formatBountyFor(theme, node?.rewards.bounty ?? 0))}</span>
+          <span>${iconFor("star")} ${node?.rewards.stars ?? 0}</span>
           ${node?.rewards.crewId ? `<span class="crew-reward-chip">${crewFaceImg(theme, node.rewards.crewId, "crew-face-inline")}${escapeHtml(theme.crew[node.rewards.crewId]?.name ?? "")}</span>` : ""}
-          ${node?.rewards.fruitPowerId ? `<span>🍎 ${escapeHtml(theme.fruits[node.rewards.fruitPowerId]?.name ?? "")}</span>` : ""}
+          ${node?.rewards.fruitPowerId ? `<span>${iconFor("fruit")} ${escapeHtml(theme.fruits[node.rewards.fruitPowerId]?.name ?? "")}</span>` : ""}
         </div>
         <button data-action="open-selected-mission" class="primary-cta">${
           missionId === "sandbox-isle"
@@ -1551,15 +1559,16 @@ export class Hud {
       : "Voyage Clear";
 
     // Hide zero-value chips — a "+0" pill is pure noise to a pre-reader.
+    // Icons are the hand-drawn SVG set, not emoji (matches the HUD chrome).
     const chips = [
       (reward?.berries ?? 0) > 0
-        ? `<span class="stat-pill">💰 ${escapeHtml(formatCurrency(theme, reward?.berries ?? 0))}</span>`
+        ? `<span class="stat-pill">${iconFor("coin")} ${escapeHtml(formatCurrency(theme, reward?.berries ?? 0))}</span>`
         : "",
       (reward?.bounty ?? 0) > 0
-        ? `<span class="stat-pill bounty" aria-label="Bounty">🏴‍☠️ +${escapeHtml(formatBountyFor(theme, reward?.bounty ?? 0))}</span>`
+        ? `<span class="stat-pill bounty" aria-label="Bounty">${iconFor("flag")} +${escapeHtml(formatBountyFor(theme, reward?.bounty ?? 0))}</span>`
         : "",
       (reward?.stars ?? 0) > 0
-        ? `<span class="stat-pill">⭐ +${reward?.stars ?? 0}</span>`
+        ? `<span class="stat-pill">${iconFor("star")} +${reward?.stars ?? 0}</span>`
         : "",
     ].join("");
 
@@ -1639,9 +1648,6 @@ export class Hud {
     // Picker host stays in the DOM but only has content while a picker is open;
     // empty innerHTML when closed.
     const pickerHost = Hud.makeElement(`<div class="picker-host"></div>`);
-    // Predict host shows the speech-bubble banner only while mission is in
-    // the "predicting" phase.
-    const predictHost = Hud.makeElement(`<div class="predict-host"></div>`);
 
     dock.appendChild(dockHead);
     dock.appendChild(queueRow);
@@ -1651,7 +1657,6 @@ export class Hud {
     layer.appendChild(status);
     layer.appendChild(rail);
     layer.appendChild(hintHost);
-    layer.appendChild(predictHost);
     // The dock mounts into its own grid row below the playfield so it never
     // overlaps the board. When no separate dock root was provided (tests),
     // it stays inside the overlay layer.
@@ -1674,7 +1679,6 @@ export class Hud {
       palette,
       drawerHost,
       pickerHost,
-      predictHost,
       fingerprints: {
         objective: "",
         status: "",
@@ -1685,7 +1689,6 @@ export class Hud {
         palette: "",
         drawer: "",
         picker: "",
-        predict: "",
         isRunning: false,
       },
       queueNodes: new Map(),
@@ -1740,10 +1743,10 @@ export class Hud {
     const railFp = `mission-rail`;
     if (railFp !== m.fingerprints.rail) {
       m.rail.innerHTML = `
-        <button data-action="leave-mission">🗺️ Map</button>
-        <button data-action="toggle-drawer" data-drawer="crew">🧑‍🎤 Crew</button>
-        <button data-action="toggle-drawer" data-drawer="log">📜 Log</button>
-        <button aria-label="Settings" data-action="toggle-drawer" data-drawer="settings">⚙️</button>
+        <button data-action="leave-mission">${iconFor("map")}<span>Map</span></button>
+        <button data-action="toggle-drawer" data-drawer="crew">${iconFor("crewMate")}<span>Crew</span></button>
+        <button data-action="toggle-drawer" data-drawer="log">${iconFor("scroll")}<span>Log</span></button>
+        <button aria-label="Settings" data-action="toggle-drawer" data-drawer="settings">${iconFor("gear")}</button>
       `;
       m.fingerprints.rail = railFp;
     }
@@ -1780,34 +1783,12 @@ export class Hud {
       m.fingerprints.hint = hintFp;
     }
 
-    // — Predict banner (mounted only while predicting)
-    const predictFp = isPredicting
-      ? `predict|${state.predictedEndPosition ? `${state.predictedEndPosition.x},${state.predictedEndPosition.y}` : "none"}`
-      : "";
-    if (predictFp !== m.fingerprints.predict) {
-      m.predictHost.innerHTML = isPredicting
-        ? `
-          <section class="predict-banner surface-card">
-            <p class="eyebrow">🔮 Predict First</p>
-            <strong>Where will the ship end up?</strong>
-            <p>Tap a tile on the map to drop your guess, then run the plan.</p>
-            <div class="predict-actions">
-              <button
-                data-action="confirm-prediction"
-                class="primary-cta"
-                ${state.predictedEndPosition ? "" : "disabled"}
-              >▶ Run plan!</button>
-              <button data-action="skip-prediction" class="predict-skip">
-                <span class="dock-action-icon" aria-hidden="true">⏭️</span>Skip
-              </button>
-            </div>
-          </section>
-        `
-        : "";
-      m.fingerprints.predict = predictFp;
-    }
-
     // — Dock head (depends on phase + mission tutorial only)
+    // The predict beat lives HERE, not in a floating card: the old
+    // `.predict-banner` parchment card covered the left third of the very
+    // board it asked the player to tap. Now predicting swaps the tutorial
+    // line for the predict instruction and the Clear/Reset pair for a Skip
+    // link — and the hex Play button becomes the "Run plan!" trigger.
     const themedTutorial = missionTutorial(theme, mission.id);
     const phaseChar = isRunning ? "r" : isPredicting ? "x" : "p";
     const dockHeadFp = `${theme.meta.id}|${phaseChar}|${themedTutorial}`;
@@ -1817,29 +1798,41 @@ export class Hud {
         : isPredicting
           ? "Predict before you sail"
           : "Build the route";
+      const headCopy = isPredicting
+        ? "Tap the tile where the ship will land, then press Play."
+        : themedTutorial;
+      const headActions = isPredicting
+        ? `<button data-action="skip-prediction" class="ghost-link">Skip prediction</button>`
+        : `
+          <button ${locked ? "disabled" : ""} data-action="clear-queue"><span class="dock-action-icon" aria-hidden="true">🧹</span>Clear</button>
+          <button ${locked ? "disabled" : ""} data-action="reset-queue"><span class="dock-action-icon" aria-hidden="true">🔄</span>Reset</button>
+        `;
       m.dockHead.innerHTML = `
         <div>
           <p class="eyebrow">Command Queue</p>
           <h3>${h3Text}</h3>
-          <p>${escapeHtml(themedTutorial)}</p>
+          <p>${escapeHtml(headCopy)}</p>
         </div>
         <div class="dock-actions">
-          <button ${locked ? "disabled" : ""} data-action="clear-queue"><span class="dock-action-icon" aria-hidden="true">🧹</span>Clear</button>
-          <button ${locked ? "disabled" : ""} data-action="reset-queue"><span class="dock-action-icon" aria-hidden="true">🔄</span>Reset</button>
+          ${headActions}
         </div>
       `;
       m.fingerprints.dockHead = dockHeadFp;
     }
 
     // — Hex Play button (right of the queue list)
-    // Disabled while running / predicting. Pulses gently when the queue has
-    // commands ready to run. Keyboard-accessible: it's a real <button> so Enter
-    // / Space synthesizes the click that routes through `handleClick`.
+    // Planning: runs the plan once the queue has commands. Predicting: becomes
+    // the "Run plan!" confirm — disabled until the player drops a guess on a
+    // tile, then pulses ready. Running: locked. Keyboard-accessible: it's a
+    // real <button> so Enter / Space synthesizes the click that routes
+    // through `handleClick`.
     const hasQueue = state.queuedCommands.length > 0;
-    const canRun = !locked && hasQueue;
-    const playFp = `${locked ? "l" : "u"}|${hasQueue ? "q" : "e"}`;
+    const hasPrediction = state.predictedEndPosition !== null;
+    const playEnabled = isPredicting ? hasPrediction : !locked && hasQueue;
+    const playAction = isPredicting ? "confirm-prediction" : "run-mission";
+    const playFp = `${phaseChar}|${hasQueue ? "q" : "e"}|${playEnabled ? "y" : "n"}`;
     if (playFp !== m.fingerprints.playButton) {
-      m.playButton.innerHTML = renderHexPlayButton(canRun, locked);
+      m.playButton.innerHTML = renderHexPlayButton(playEnabled, isRunning, playAction);
       m.fingerprints.playButton = playFp;
     }
 
@@ -2248,14 +2241,18 @@ export class Hud {
  * Real native <button> so Enter / Space keyboard activation works for free,
  * routed through the existing `data-action="run-mission"` click handler.
  */
-const renderHexPlayButton = (canRun: boolean, locked: boolean): string => {
-  const disabled = !canRun;
-  const stateClass = canRun ? "is-ready" : locked ? "is-locked" : "is-idle";
+const renderHexPlayButton = (
+  enabled: boolean,
+  lockedVisual: boolean,
+  action: "run-mission" | "confirm-prediction" = "run-mission",
+): string => {
+  const disabled = !enabled;
+  const stateClass = enabled ? "is-ready" : lockedVisual ? "is-locked" : "is-idle";
   return `
     <button
       type="button"
       class="hex-play ${stateClass}"
-      data-action="run-mission"
+      data-action="${action}"
       aria-label="Run plan"
       title="Run plan"
       ${disabled ? "disabled" : ""}

@@ -1,0 +1,16 @@
+<svg viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg">
+  <!-- Reef rocks breaking the surface, foam at the waterline. -->
+  <ellipse cx="48" cy="84" rx="36" ry="7" fill="#2b1d0e" opacity="0.16"/>
+  <!-- Back rock -->
+  <path d="M52 74l4-34 16-10 12 26-6 18z" fill="#3c6e91" stroke="#2b1d0e" stroke-width="5" stroke-linejoin="round"/>
+  <!-- Main rock -->
+  <path d="M16 76l-4-26 16-30 20 12 6 44z" fill="#4f6a55" stroke="#2b1d0e" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M28 22l6 18-10 12" fill="none" stroke="#2b1d0e" stroke-width="3" opacity="0.35"/>
+  <path d="M30 24l14 9" fill="none" stroke="#d6f3f8" stroke-width="4" stroke-linecap="round" opacity="0.8"/>
+  <!-- Small front rock -->
+  <path d="M58 78l2-14 13-7 9 14-4 7z" fill="#5d7a63" stroke="#2b1d0e" stroke-width="4.5" stroke-linejoin="round"/>
+  <!-- Foam -->
+  <path d="M8 76q6-4 12 0t12 0M52 80q6-4 12 0t12 0" fill="none" stroke="#d6f3f8" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="14" cy="69" r="2.2" fill="#d6f3f8"/>
+  <circle cx="84" cy="73" r="2.2" fill="#d6f3f8"/>
+</svg>

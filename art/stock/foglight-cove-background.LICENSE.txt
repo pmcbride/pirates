@@ -1,0 +1,28 @@
+Source asset: "Sample.png" from the Kenney Pirate Pack (190+) — a composed
+top-down sample scene showing the pack's tiles assembled into a coastline
+with islands, water, sand, and dock structures. Dimensions: 918 × 515,
+PNG with RGBA. Close fit to the 1024 × 512 target for the MissionScene
+board background.
+
+Author:   Kenney Vleugels (Kenney.nl)
+Source:   https://opengameart.org/content/pirate-pack-190
+Mirror:   https://kenney.nl/assets/pirate-pack
+Download: https://opengameart.org/sites/default/files/kenney_piratepack.zip
+License:  CC0 1.0 Universal (Public Domain Dedication)
+          https://creativecommons.org/publicdomain/zero/1.0/
+
+Attribution to Kenney is appreciated but not required by the license. The
+asset is fully free for commercial and non-commercial use, modification, and
+redistribution with no restrictions.
+
+Verified on 2026-05-25. The original archive ships a `License.txt` at its
+root; a verbatim copy lives in this repo at
+`art/stock/KENNEY_PIRATE_PACK_LICENSE.txt`.
+
+Note: Kenney's pack does not include a dedicated lighthouse asset. If we
+ship the stock variant for Foglight Cove, we either accept the more generic
+"island coastline" framing or composite a hand-drawn lighthouse stamp on
+top in MissionScene. Other CC0 lighthouse-specific backgrounds searched
+(OpenGameArt "CC0 Backgrounds" set, Wikimedia Commons paintings, Pixabay)
+were either wrong style (4-color pixel art), wrong license (Pixabay Content
+License, not CC0/CC-BY), or didn't match the warm sticker palette.
